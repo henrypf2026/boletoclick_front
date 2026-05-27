@@ -3,6 +3,7 @@ import { Inter } from "next/font/google";
 import "./globals.css";
 import Navbar from "@/components/layout/Navbar";
 import Footer from "@/components/layout/Footer";
+import DarkModeToggle from "@/components/layout/DarkModeToggle";
 
 const inter = Inter({
   variable: "--font-inter",
@@ -16,15 +17,21 @@ export const metadata: Metadata = {
 
 export default function RootLayout({
   children,
-}: Readonly<{
+}: {
   children: React.ReactNode;
-}>) {
+}) {
   return (
     <html lang="es" className={`${inter.variable} h-full antialiased`}>
-      <body className="min-h-full flex flex-col bg-bg text-text">
+      <body className="min-h-full flex flex-col bg-background text-text transition-colors duration-200">
         <Navbar />
-        {children}
+
+        <main className="grow w-full max-w-7xl mx-auto px-4 py-8">
+          {children}
+        </main>
+
         <Footer />
+
+        <DarkModeToggle />
       </body>
     </html>
   );
