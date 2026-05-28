@@ -1,0 +1,21 @@
+@import "tailwindcss";
+@import "flowbite-react/plugin/tailwindcss";
+@source "../.flowbite-react/class-list.json";
+@plugin "flowbite/plugin";
+@source "../node_modules/flowbite-react/dist";
+@source "../node_modules/flowbite";
+
+@theme {
+  --color-brand: #00ff88;
+  --color-brand-dark: #00cc6a;
+}
+
+@layer base {
+  html {
+    @apply scroll-smooth;
+  }
+
+  body {
+    @apply min-h-dvh bg-gray-950 text-gray-100 antialiased;
+  }
+}
