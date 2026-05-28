@@ -1,60 +1,110 @@
 @import "tailwindcss";
 
-/* ─── TOKENS DE MARCA ─────────────────────────────────────────────────────── */
 :root {
-  /* Modo claro */
-  --primary:      #6750E0; /* Violeta — botones, links, elementos de marca */
-  --primary-deep: #4D3BB5; /* Violeta oscuro — hover y estados activos */
-  --accent:       #E8703A; /* Coral — promos, badges y destacados secundarios */
-  --bg:           #FAFAFA; /* Fondo general de la página */
-  --surface:      #FFFFFF; /* Fondo de cards, modales y paneles */
-  --surface-2:    #F0EEFF; /* Fondo alternativo — inputs y secciones internas */
-  --success:      #1E9E63; /* Verde — confirmaciones y estados exitosos */
-  --text:         #0F0E18; /* Texto principal */
-  --text-soft:    #5E5A7A; /* Texto secundario — subtítulos, placeholders, info de apoyo */
+  --primary: #6750e0;
+  --primary-deep: #4d3bb5;
+  --accent: #ff6b00;
+  --background: #efeede;
+  --bg: #efeede;
+  --surface: #f5f4f0;
+  --surface-2: #e2e1d5;
+  --border: #171717;
+  --success: #16a34a;
+  --text: #171717;
+  --text-soft: #4a4a4a;
 
   --font-sans: var(--font-inter);
 }
 
 .dark {
-  /* Modo oscuro */
-  --primary:      #8A75FF; /* Violeta — botones, links, elementos de marca */
-  --primary-deep: #6750E0; /* Violeta oscuro — hover y estados activos */
-  --accent:       #FF8F68; /* Coral — promos, badges y destacados secundarios */
-  --bg:           #0F0E18; /* Fondo general de la página */
-  --surface:      #1A1828; /* Fondo de cards, modales y paneles */
-  --surface-2:    #252337; /* Fondo alternativo — inputs y secciones internas */
-  --success:      #4AD395; /* Verde — confirmaciones y estados exitosos */
-  --text:         #F0EEFF; /* Texto principal */
-  --text-soft:    #9E99C0; /* Texto secundario — subtítulos, placeholders, info de apoyo */
+  --primary: #ccff00;
+  --primary-deep: #b3e600;
+  --accent: #ffffff;
+  --background: #000000;
+  --bg: #000000;
+  --surface: #121212;
+  --surface-2: #1e1e1e;
+  --border: #ffffff;
+  --success: #00ff66;
+  --text: #ffffff;
+  --text-soft: #a3a3a3;
 }
 
-/* ─── REGISTRO EN TAILWIND ────────────────────────────────────────────────── */
 @theme inline {
-  --color-primary:      var(--primary);
+  --color-primary: var(--primary);
   --color-primary-deep: var(--primary-deep);
-  --color-accent:       var(--accent);
-  --color-bg:           var(--bg);
-  --color-surface:      var(--surface);
-  --color-surface-2:    var(--surface-2);
-  --color-success:      var(--success);
-  --color-text:         var(--text);
-  --color-text-soft:    var(--text-soft);
-  --font-sans:          var(--font-inter);
+  --color-accent: var(--accent);
+  --color-background: var(--background);
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-border: var(--border);
+  --color-success: var(--success);
+  --color-text: var(--text);
+  --color-text-soft: var(--text-soft);
+  --font-sans: var(--font-sans);
 }
 
-/* ─── BASE ────────────────────────────────────────────────────────────────── */
 body {
-  background-color: var(--bg);
+  background-color: var(--background);
   color: var(--text);
   font-family: var(--font-sans), sans-serif;
+  -webkit-font-smoothing: antialiased;
 }
 
-/* ─── TIPOGRAFÍA ──────────────────────────────────────────────────────────── */
-h1 { font-size: 2.25rem;  font-weight: 700; line-height: 1.2; }
-h2 { font-size: 1.875rem; font-weight: 700; line-height: 1.25; }
-h3 { font-size: 1.5rem;   font-weight: 600; line-height: 1.3; }
+h1,
+h2,
+h3,
+h4 {
+  font-weight: 900;
+  letter-spacing: -0.03em;
+  text-transform: uppercase;
+}
 
-p  { font-size: 1rem;     font-weight: 400; line-height: 1.6; }
+h1 {
+  font-size: 2.5rem;
+  line-height: 1;
+}
+h2 {
+  font-size: 2rem;
+  line-height: 1.1;
+}
+h3 {
+  font-size: 1.5rem;
+  line-height: 1.2;
+}
 
-small { font-size: 0.875rem; line-height: 1.5; }
+p {
+  font-size: 1rem;
+  font-weight: 500;
+  line-height: 1.5;
+}
+
+.neo-box {
+  background-color: var(--surface);
+  border: 4px solid var(--border);
+  box-shadow: 4px 4px 0px 0px var(--border);
+  transition:
+    transform 0.1s ease,
+    box-shadow 0.1s ease;
+}
+
+.neo-btn-interactive {
+  background-color: var(--primary);
+  color: var(--background);
+  border: 4px solid var(--border);
+  box-shadow: 4px 4px 0px 0px var(--border);
+  font-weight: 900;
+  text-transform: uppercase;
+  transition: all 0.1s ease;
+}
+
+.neo-btn-interactive:hover {
+  transform: translate(-2px, -2px);
+  box-shadow: 6px 6px 0px 0px var(--border);
+}
+
+.neo-btn-interactive:active {
+  transform: translate(4px, 4px);
+  box-shadow: 0px 0px 0px 0px var(--border);
+}
