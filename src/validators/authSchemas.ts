@@ -17,19 +17,19 @@ export const registerSchema = Yup.object({
     .trim()
     .email('Ingresa un correo válido')
     .required('El correo es obligatorio'),
+  birthDate: Yup.string()
+    .required('La fecha de nacimiento es obligatoria'),
+  documentNumber: Yup.string()
+    .trim()
+    .required('El número de documento es obligatorio'),
   password: Yup.string()
     .min(6, 'La contraseña debe tener al menos 6 caracteres')
     .required('La contraseña es obligatoria'),
   confirmPassword: Yup.string()
     .oneOf([Yup.ref('password')], 'Las contraseñas no coinciden')
     .required('Confirma tu contraseña'),
+  allowNewsletter: Yup.boolean().required(),
   acceptTerms: Yup.boolean()
     .oneOf([true], 'Debes aceptar los términos y condiciones')
     .required('Debes aceptar los términos y condiciones'),
-});
-
-export const verifyCodeSchema = Yup.object({
-  verificationCode: Yup.string()
-    .matches(/^\d{6}$/, 'El código debe tener 6 dígitos')
-    .required('Ingresa el código de verificación'),
 });

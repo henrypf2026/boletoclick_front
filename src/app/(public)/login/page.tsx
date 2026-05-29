@@ -33,12 +33,12 @@ function LoginForm() {
   };
 
   return (
-    <Card className="w-full max-w-md border-gray-800 bg-gray-900">
-      <Link href="/" className="text-sm text-gray-400 hover:text-white">
+    <Card className="w-full max-w-md border-border bg-surface">
+      <Link href="/" className="text-sm text-text-soft hover:text-text">
         ← Volver al inicio
       </Link>
-      <h1 className="mt-4 text-2xl font-bold text-white">Iniciar sesión</h1>
-      <p className="text-gray-400">
+      <h1 className="mt-4 text-2xl font-bold text-text">Iniciar sesión</h1>
+      <p className="text-text-soft">
         Ingresa con tu cuenta para comprar entradas y ver tus boletos.
       </p>
 
@@ -50,16 +50,16 @@ function LoginForm() {
 
             {status && <Alert color="failure">{status}</Alert>}
 
-            <Button type="submit" disabled={isSubmitting} className="bg-brand text-gray-950 hover:bg-brand-dark">
+            <Button type="submit" disabled={isSubmitting} className="bg-primary text-background hover:bg-primary-deep">
               {isSubmitting ? 'Ingresando...' : 'Iniciar sesión'}
             </Button>
           </Form>
         )}
       </Formik>
 
-      <p className="mt-4 text-center text-sm text-gray-400">
+      <p className="mt-4 text-center text-sm text-text-soft">
         ¿No tienes cuenta?{' '}
-        <Link href="/registro" className="text-brand hover:underline">
+        <Link href="/registro" className="text-primary hover:underline">
           Regístrate aquí
         </Link>
       </p>
@@ -69,7 +69,7 @@ function LoginForm() {
 
 export default function LoginPage() {
   return (
-    <div className="flex min-h-dvh items-center justify-center bg-gray-950 px-4 py-8 -mx-4 -my-8">
+    <div className="flex min-h-dvh items-center justify-center px-4 py-8 -mx-4 -my-8">
       <Suspense>
         <LoginForm />
       </Suspense>

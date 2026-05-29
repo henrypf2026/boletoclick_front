@@ -1,21 +1,15 @@
 'use client';
 
 import { createContext, useContext, useEffect, useMemo, useState } from 'react';
-import {
-  clearToken,
-  getUserFromToken,
-  loginUser,
-  registerUser,
-  setSession,
-  type User,
-} from '@/lib/auth';
+import { clearToken, getUserFromToken, saveToken, type User } from '@/lib/auth';
+import { authService, type RegisterDto } from '@/services/authService';
 
 interface AuthContextValue {
   user: User | null;
   loading: boolean;
   authenticated: boolean;
   login: (credentials: { email: string; password: string }) => Promise<User>;
-  register: (data: { name: string; email: string; password: string }) => Promise<User>;
+  register: (data: RegisterDto) => Promise<User>;
   logout: () => void;
 }
 
@@ -32,15 +26,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const login = async ({ email, password }: { email: string; password: string }) => {
-    const account = loginUser({ email, password });
-    await setSession(account);
+    const { token, user: account } = await authService.login({ email, password });
+    saveToken(token, account.role);
     setUser(account);
     return account;
   };
 
-  const register = async ({ name, email, password }: { name: string; email: string; password: string }) => {
-    const account = registerUser({ name, email, password });
-    await setSession(account);
+  const register = async (data: RegisterDto) => {
+    const { token, user: account } = await authService.register(data);
+    saveToken(token, account.role);
     setUser(account);
     return account;
   };

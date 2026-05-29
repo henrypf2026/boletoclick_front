@@ -1,15 +1,17 @@
 'use client';
 
-import { createToken, verifyToken } from './jwt';
+import { authService } from '@/services/authService';
+import type { UserRole } from '@/types';
 
 const TOKEN_KEY = 'auth_token';
-const USERS_KEY = 'boletoclick_users';
-const TICKETS_KEY = 'boletoclick_tickets';
+const ROLE_KEY = 'user_role';
+const COOKIE_MAX_AGE = 60 * 60 * 24 * 7; // 7 días
 
 export interface User {
   id: string;
-  name: string;
   email: string;
+  name?: string;
+  role?: UserRole;
 }
 
 export interface Ticket {
@@ -28,71 +30,40 @@ export interface Ticket {
 }
 
 export function getToken(): string | null {
+  if (typeof window === 'undefined') return null;
   return localStorage.getItem(TOKEN_KEY);
+}
+
+export function saveToken(token: string, role?: UserRole): void {
+  localStorage.setItem(TOKEN_KEY, token);
+  document.cookie = `${TOKEN_KEY}=${token}; path=/; SameSite=Strict; max-age=${COOKIE_MAX_AGE}`;
+  if (role) {
+    localStorage.setItem(ROLE_KEY, role);
+    document.cookie = `${ROLE_KEY}=${role}; path=/; SameSite=Strict; max-age=${COOKIE_MAX_AGE}`;
+  }
+}
+
+export function clearToken(): void {
+  localStorage.removeItem(TOKEN_KEY);
+  localStorage.removeItem(ROLE_KEY);
+  document.cookie = `${TOKEN_KEY}=; path=/; max-age=0`;
+  document.cookie = `${ROLE_KEY}=; path=/; max-age=0`;
 }
 
 export async function getUserFromToken(): Promise<User | null> {
   const token = getToken();
   if (!token) return null;
-  try {
-    return await verifyToken(token);
-  } catch {
+  const user = await authService.getMe(token);
+  if (!user) {
     clearToken();
     return null;
   }
+  return user;
 }
 
-export async function setSession(user: User): Promise<string> {
-  const token = await createToken(user);
-  localStorage.setItem(TOKEN_KEY, token);
-  return token;
-}
+// --- Tickets (mock hasta Sprint 2) ---
 
-export function clearToken(): void {
-  localStorage.removeItem(TOKEN_KEY);
-}
-
-function getUsers(): (User & { password: string; verified: boolean; createdAt: string })[] {
-  const raw = localStorage.getItem(USERS_KEY);
-  return raw ? JSON.parse(raw) : [];
-}
-
-function saveUsers(users: (User & { password: string; verified: boolean; createdAt: string })[]) {
-  localStorage.setItem(USERS_KEY, JSON.stringify(users));
-}
-
-export function registerUser({ name, email, password }: { name: string; email: string; password: string }): User {
-  const users = getUsers();
-  const normalizedEmail = email.trim().toLowerCase();
-
-  if (users.some((u) => u.email === normalizedEmail)) {
-    throw new Error('Ya existe una cuenta con este correo.');
-  }
-
-  const newUser = {
-    id: crypto.randomUUID(),
-    name: name.trim(),
-    email: normalizedEmail,
-    password,
-    verified: true,
-    createdAt: new Date().toISOString(),
-  };
-
-  users.push(newUser);
-  saveUsers(users);
-
-  return { id: newUser.id, name: newUser.name, email: newUser.email };
-}
-
-export function loginUser({ email, password }: { email: string; password: string }): User {
-  const users = getUsers();
-  const normalizedEmail = email.trim().toLowerCase();
-  const user = users.find((u) => u.email === normalizedEmail && u.password === password);
-
-  if (!user) throw new Error('Correo o contraseña incorrectos.');
-
-  return { id: user.id, name: user.name, email: user.email };
-}
+const TICKETS_KEY = 'boletoclick_tickets';
 
 export function getTicketsByUser(userId: string): Ticket[] {
   const raw = localStorage.getItem(TICKETS_KEY);

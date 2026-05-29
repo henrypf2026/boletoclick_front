@@ -11,8 +11,8 @@ export default function EventGrid({ events, title, emptyMessage }: EventGridProp
   if (!events.length) {
     return (
       <section>
-        {title && <h2 className="mb-4 text-xl font-bold text-white">{title}</h2>}
-        <p className="rounded-2xl border border-dashed border-gray-700 bg-gray-900 p-8 text-center text-gray-400">
+        {title && <h2 className="mb-4 text-xl font-bold text-text">{title}</h2>}
+        <p className="rounded-2xl border border-dashed border-border bg-surface p-8 text-center text-text-soft">
           {emptyMessage}
         </p>
       </section>
@@ -21,7 +21,7 @@ export default function EventGrid({ events, title, emptyMessage }: EventGridProp
 
   return (
     <section>
-      {title && <h2 className="mb-4 text-xl font-bold text-white">{title}</h2>}
+      {title && <h2 className="mb-4 text-xl font-bold text-text">{title}</h2>}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
         {events.map((event) => (
           <EventCard key={event.id} event={event} />

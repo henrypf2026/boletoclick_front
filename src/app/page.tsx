@@ -32,16 +32,16 @@ export default function HomePage() {
   const upcomingEvents = filteredEvents.filter((e) => !e.featured);
 
   return (
-    <div className="min-h-dvh bg-gray-950 -mx-4 -my-8 px-4 py-8">
-      <section className="border-b border-gray-800 bg-gradient-to-b from-gray-900 to-gray-950 -mx-4 px-4 py-10 md:py-14">
+    <div className="min-h-dvh -mx-4 -my-8 px-4 py-8">
+      <section className="border-b border-border bg-surface -mx-4 px-4 py-10 md:py-14">
         <div className="mx-auto max-w-6xl">
           <Badge color="success" className="mb-4 w-fit">
             Preventas y venta oficial
           </Badge>
-          <h1 className="max-w-3xl text-3xl font-bold leading-tight text-white md:text-5xl">
+          <h1 className="max-w-3xl text-3xl font-bold leading-tight text-text md:text-5xl">
             Tus entradas para los mejores eventos en un solo lugar
           </h1>
-          <p className="mt-4 max-w-2xl text-base text-gray-400 md:text-lg">
+          <p className="mt-4 max-w-2xl text-base text-text-soft md:text-lg">
             Compra boletos para partidos, conciertos y shows en vivo. Regístrate,
             elige tu zona y recibe tu QR al instante.
           </p>
@@ -53,10 +53,10 @@ export default function HomePage() {
             ].map((stat) => (
               <div
                 key={stat.label}
-                className="rounded-2xl border border-gray-800 bg-gray-900/50 px-4 py-3"
+                className="rounded-2xl border border-border bg-surface-2 px-4 py-3"
               >
-                <strong className="block text-xl text-white">{stat.value}</strong>
-                <span className="text-sm text-gray-400">{stat.label}</span>
+                <strong className="block text-xl text-text">{stat.value}</strong>
+                <span className="text-sm text-text-soft">{stat.label}</span>
               </div>
             ))}
           </div>
@@ -70,7 +70,7 @@ export default function HomePage() {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Buscar eventos, equipos o venues..."
-            className="w-full rounded-lg border border-gray-700 bg-gray-900 px-4 py-2 text-sm text-white placeholder:text-gray-500 focus:border-gray-500 focus:outline-none"
+            className="w-full rounded-lg border border-border bg-surface px-4 py-2 text-sm text-text placeholder:text-text-soft focus:border-primary focus:outline-none"
           />
           <CategoryFilter categories={categories} activeCategory={category} onChange={setCategory} />
           <TeamFilter teams={teams} activeTeam={team} onChange={setTeam} />
@@ -79,8 +79,8 @@ export default function HomePage() {
         {featuredEvents.length > 0 && (
           <section className="mb-10">
             <div className="mb-4">
-              <h2 className="text-xl font-bold text-white">Destacados</h2>
-              <p className="text-gray-400">Los eventos con mayor demanda ahora mismo</p>
+              <h2 className="text-xl font-bold text-text">Destacados</h2>
+              <p className="text-text-soft">Los eventos con mayor demanda ahora mismo</p>
             </div>
             <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
               {featuredEvents.map((event) => (
@@ -98,7 +98,7 @@ export default function HomePage() {
       </div>
 
       <section className="mx-auto max-w-6xl px-4 py-8" id="faq">
-        <h2 className="mb-4 text-xl font-bold text-white">¿Cómo comprar?</h2>
+        <h2 className="mb-4 text-xl font-bold text-text">¿Cómo comprar?</h2>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
           {[
             ['1', 'Regístrate', 'Crea tu cuenta con correo y contraseña en segundos.'],
@@ -108,13 +108,13 @@ export default function HomePage() {
           ].map(([step, title, text]) => (
             <article
               key={step}
-              className="rounded-2xl border border-gray-800 bg-gray-900 p-4"
+              className="rounded-2xl border border-border bg-surface p-4"
             >
-              <span className="mb-3 inline-flex h-7 w-7 items-center justify-center rounded-full bg-green-500 text-sm font-bold text-gray-950">
+              <span className="mb-3 inline-flex h-7 w-7 items-center justify-center rounded-full bg-success text-sm font-bold text-background">
                 {step}
               </span>
-              <h3 className="mb-2 font-semibold text-white">{title}</h3>
-              <p className="text-sm text-gray-400">{text}</p>
+              <h3 className="mb-2 font-semibold text-text">{title}</h3>
+              <p className="text-sm text-text-soft">{text}</p>
             </article>
           ))}
         </div>

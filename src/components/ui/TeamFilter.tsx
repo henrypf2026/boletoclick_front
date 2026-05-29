@@ -1,7 +1,5 @@
 'use client';
 
-import { Button } from 'flowbite-react';
-
 interface Team {
   id: string;
   name: string;
@@ -17,18 +15,21 @@ interface TeamFilterProps {
 export default function TeamFilter({ teams, activeTeam, onChange }: TeamFilterProps) {
   return (
     <div>
-      <p className="mb-3 text-sm text-gray-400">Filtrar por equipo</p>
+      <p className="mb-3 text-sm text-text-soft">Filtrar por equipo</p>
       <div className="flex gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {teams.map((team) => (
-          <Button
+          <button
             key={team.id}
-            color={activeTeam === team.id ? 'success' : 'gray'}
             onClick={() => onChange(team.id)}
-            className="flex min-w-[88px] shrink-0 flex-col items-center gap-1 py-3"
+            className={`flex min-w-[88px] shrink-0 flex-col items-center gap-1 rounded-lg px-2 py-3 text-center transition-colors ${
+              activeTeam === team.id
+                ? 'bg-primary text-background'
+                : 'bg-surface-2 text-text hover:bg-surface'
+            }`}
           >
             <span className="text-xl">{team.emoji}</span>
-            <span className="text-xs">{team.name}</span>
-          </Button>
+            <span className="text-xs font-medium">{team.name}</span>
+          </button>
         ))}
       </div>
     </div>
