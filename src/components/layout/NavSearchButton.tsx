@@ -56,33 +56,36 @@ export default function NavSearchButton() {
   }, [])
 
   return (
-    <div ref={containerRef} className="flex items-center flex-row-reverse">
+    <div ref={containerRef} className="relative">
       <button
         onClick={() => setIsOpen((v) => !v)}
         aria-label={isOpen ? 'Cerrar búsqueda' : 'Buscar eventos'}
         aria-expanded={isOpen}
-        className="flex items-center justify-center size-9 rounded-md text-text-soft hover:text-text hover:bg-surface-2 transition-colors duration-150"
+        className="flex items-center justify-center size-9 border-2 border-border text-text-soft hover:text-text hover:bg-surface-2 transition-colors duration-100"
       >
         {isOpen ? <CloseIcon /> : <SearchIcon />}
       </button>
 
-      {/* Input que se expande hacia la izquierda */}
       <div
-        aria-hidden={!isOpen}
+        role="search"
         style={{
-          width: isOpen ? '220px' : '0',
           opacity: isOpen ? 1 : 0,
-          overflow: 'hidden',
-          transition: 'width 300ms cubic-bezier(0.25, 1, 0.5, 1), opacity 150ms ease',
+          transform: isOpen ? 'translateY(0)' : 'translateY(-6px)',
+          pointerEvents: isOpen ? 'auto' : 'none',
+          transition: 'opacity 150ms ease, transform 150ms cubic-bezier(0.25, 1, 0.5, 1)',
         }}
+        className="absolute top-full right-0 mt-3 w-72 bg-surface border-4 border-border shadow-[4px_4px_0px_0px_rgba(23,23,23,1)] dark:shadow-[4px_4px_0px_0px_rgba(255,255,255,1)] p-3"
       >
         <input
           ref={inputRef}
           type="text"
           placeholder="Buscar eventos, artistas..."
           tabIndex={isOpen ? 0 : -1}
-          className="block w-full h-9 pl-3 pr-2 text-sm bg-surface-2 text-text placeholder:text-text-soft rounded-md border border-transparent focus:outline-none focus:border-primary transition-colors"
+          className="w-full h-9 px-3 text-sm bg-surface-2 text-text placeholder:text-text-soft border-2 border-border focus:outline-none focus:border-primary transition-colors duration-100"
         />
+        <p className="mt-2 text-xs text-text-soft font-bold uppercase tracking-wider">
+          Esc para cerrar
+        </p>
       </div>
     </div>
   )

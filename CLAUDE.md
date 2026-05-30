@@ -12,7 +12,17 @@
 
 ## Componentes reutilizables
 - Si un elemento UI se usa en más de un lugar, debe ser un componente en `components/ui/`.
+- Componentes de layout global (Navbar, Footer, etc.) van en `components/layout/`.
 - No duplicar código. Antes de crear algo nuevo, revisar si ya existe.
+
+## Estructura de rutas
+- Rutas de admin bajo `/admin/*` → archivos en `app/(admin)/admin/`.
+- Rutas de producer bajo `/producer/*` → archivos en `app/(producer)/producer/`.
+- Los route groups `(admin)`, `(producer)`, `(user)`, `(public)` son solo organizativos y no afectan la URL.
+
+## Configuración de navegación
+- `src/config/navigation.ts` es la fuente única de links de navbar y footer.
+- Agregar, quitar o renombrar un link de navegación = cambio solo en ese archivo.
 
 ## Estilos y diseño
 - Siempre usar las variables globales definidas en `globals.css` para colores y tipografía (`--primary`, `--accent`, `--text`, etc.).
