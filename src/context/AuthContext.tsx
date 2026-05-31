@@ -1,8 +1,8 @@
-'use client';
+"use client";
 
-import { createContext, useContext, useEffect, useMemo, useState } from 'react';
-import { clearToken, getUserFromToken, saveToken, type User } from '@/lib/auth';
-import { authService, type RegisterDto } from '@/services/authService';
+import { createContext, useContext, useEffect, useMemo, useState } from "react";
+import { clearToken, getUserFromToken, saveToken, type User } from "@/lib/auth";
+import { authService, type RegisterDto } from "@/services/authService";
 
 interface AuthContextValue {
   user: User | null;
@@ -25,8 +25,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       .finally(() => setLoading(false));
   }, []);
 
-  const login = async ({ email, password }: { email: string; password: string }) => {
-    const { token, user: account } = await authService.login({ email, password });
+  const login = async ({
+    email,
+    password,
+  }: {
+    email: string;
+    password: string;
+  }) => {
+    const { token, user: account } = await authService.login({
+      email,
+      password,
+    });
     saveToken(token, account.role);
     setUser(account);
     return account;
@@ -45,7 +54,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const value = useMemo(
-    () => ({ user, loading, authenticated: Boolean(user), login, register, logout }),
+    () => ({
+      user,
+      loading,
+      authenticated: Boolean(user),
+      login,
+      register,
+      logout,
+    }),
     [user, loading],
   );
 
@@ -54,6 +70,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
 export function useAuth() {
   const context = useContext(AuthContext);
-  if (!context) throw new Error('useAuth debe usarse dentro de AuthProvider');
+  if (!context) throw new Error("useAuth debe usarse dentro de AuthProvider");
   return context;
 }

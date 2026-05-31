@@ -10,6 +10,13 @@ interface Ticket {
   qr: string;
 }
 
+interface Tarjeta {
+  id: string;
+  tipo: "Crédito" | "Débito";
+  marca: string;
+  ultimosCuatro: string;
+}
+
 export default function UserDashboard() {
   const [seccionActiva, setSeccionActiva] = useState<
     "entradas" | "historial" | "perfil"
@@ -17,7 +24,33 @@ export default function UserDashboard() {
   const [ticketExpandido, setTicketExpandido] = useState<Ticket | null>(null);
 
   const [loading, setLoading] = useState(false);
+
   const [nombreTitular, setNombreTitular] = useState("JUAN PEREZ");
+  const [dni, setDni] = useState("40123456");
+  const [telefono, setTelefono] = useState("1123456789");
+  const [avatar, setAvatar] = useState<string | null>(null);
+  const [passwordActual, setPasswordActual] = useState("");
+  const [passwordNueva, setPasswordNueva] = useState("");
+
+  const [tarjetas, setTarjetas] = useState<Tarjeta[]>([
+    {
+      id: "card-1",
+      tipo: "Débito",
+      marca: "Visa Débito",
+      ultimosCuatro: "4321",
+    },
+    {
+      id: "card-2",
+      tipo: "Crédito",
+      marca: "Mastercard",
+      ultimosCuatro: "8812",
+    },
+  ]);
+  const [nuevaTarjetaNumero, setNuevaTarjetaNumero] = useState("");
+  const [nuevaTarjetaTipo, setNuevaTarjetaTipo] = useState<
+    "Crédito" | "Débito"
+  >("Débito");
+
   const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "success">(
     "idle",
   );
@@ -65,11 +98,46 @@ export default function UserDashboard() {
     },
   ];
 
+  const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setAvatar(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleAgregarTarjeta = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (nuevaTarjetaNumero.length < 4) return;
+
+    const ultimos = nuevaTarjetaNumero.slice(-4);
+    const marca = nuevaTarjetaNumero.startsWith("4") ? "Visa" : "Mastercard";
+
+    const nueva: Tarjeta = {
+      id: `card-${Date.now()}`,
+      tipo: nuevaTarjetaTipo,
+      marca: `${marca} ${nuevaTarjetaTipo}`,
+      ultimosCuatro: ultimos,
+    };
+
+    setTarjetas([...tarjetas, nueva]);
+    setNuevaTarjetaNumero("");
+  };
+
+  const handleEliminarTarjeta = (id: string) => {
+    setTarjetas(tarjetas.filter((t) => t.id !== id));
+  };
+
   const handleGuardarPerfil = (e: React.FormEvent) => {
     e.preventDefault();
     setSaveStatus("saving");
     setTimeout(() => {
       setSaveStatus("success");
+      setPasswordActual("");
+      setPasswordNueva("");
       setTimeout(() => setSaveStatus("idle"), 2500);
     }, 1000);
   };
@@ -118,7 +186,6 @@ export default function UserDashboard() {
         ))}
       </div>
 
-      {/* CONTENEDOR PRINCIPAL CON EFECTO SKELETON */}
       {loading ? (
         <div className="space-y-4 animate-pulse">
           <div className="h-32 bg-surface border-2 border-text w-full"></div>
@@ -126,7 +193,6 @@ export default function UserDashboard() {
         </div>
       ) : (
         <>
-          {/* SECCIÓN ENTRADAS */}
           {seccionActiva === "entradas" && (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
               {tickets.map((ticket) => (
@@ -155,7 +221,6 @@ export default function UserDashboard() {
                     </p>
                   </div>
 
-                  {/* Vista previa mini del QR */}
                   <div className="bg-surface-2 p-3 border-2 border-text flex flex-col items-center justify-center max-w-40 mx-auto w-full transition-transform group-hover:scale-105">
                     <div className="w-full py-3 bg-black text-white flex items-center justify-center font-mono text-[10px] uppercase font-black tracking-widest">
                       [ SCAN CODE ]
@@ -166,7 +231,6 @@ export default function UserDashboard() {
             </div>
           )}
 
-          {/* SECCIÓN HISTORIAL */}
           {seccionActiva === "historial" && (
             <div className="space-y-4">
               <div className="bg-surface border-2 border-text p-3 shadow-[2px_2px_0px_0px_var(--color-text)]">
@@ -233,47 +297,150 @@ export default function UserDashboard() {
             </div>
           )}
 
-          {/* SECCIÓN PERFIL */}
           {seccionActiva === "perfil" && (
-            <div className="bg-surface border-2 border-text p-6 rounded-none shadow-[4px_4px_0px_0px_var(--color-text)] max-w-md relative">
-              {saveStatus === "success" && (
-                <div className="absolute -top-4 right-4 bg-success text-black border-2 border-text font-mono text-xs font-black uppercase px-3 py-1.5 shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] animate-bounce">
-                  ✓ Cambios guardados localmente
-                </div>
-              )}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+              <div className="lg:col-span-2 bg-surface border-2 border-text p-6 shadow-[4px_4px_0px_0px_var(--color-text)] relative">
+                {saveStatus === "success" && (
+                  <div className="absolute -top-4 right-4 bg-success text-black border-2 border-text font-mono text-xs font-black uppercase px-3 py-1.5 shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] z-10">
+                    ✓ Cambios guardados localmente
+                  </div>
+                )}
 
-              <form onSubmit={handleGuardarPerfil} className="space-y-6">
-                <div>
-                  <h2 className="text-xl font-black uppercase tracking-tight border-b-2 border-text pb-2 mb-4">
-                    Datos personales
-                  </h2>
-                  <div className="space-y-4">
-                    <div>
-                      <label className="block text-[10px] font-black uppercase text-text-soft mb-1 font-mono tracking-wider">
-                        Email de usuario (No modificable)
-                      </label>
-                      <input
-                        type="text"
-                        disabled
-                        value="user.techno@boletoclick.com"
-                        className="w-full bg-surface-2 border-2 border-text/40 text-text-soft/70 px-4 py-2.5 text-xs font-mono cursor-not-allowed focus:outline-none uppercase"
-                      />
+                <form onSubmit={handleGuardarPerfil} className="space-y-6">
+                  <div>
+                    <h2 className="text-xl font-black uppercase tracking-tight border-b-2 border-text pb-2 mb-6">
+                      Configuración de Perfil
+                    </h2>
+
+                    <div className="flex flex-col sm:flex-row items-center gap-6 p-4 border-2 border-dashed border-text/40 bg-background/50 mb-6 shadow-[2px_2px_0px_0px_var(--color-text)]">
+                      <div className="shrink-0">
+                        {avatar ? (
+                          <div className="w-24 h-24 border-4 border-text shadow-[3px_3px_0px_0px_rgba(23,23,23,1)] overflow-hidden bg-surface">
+                            <img
+                              src={avatar}
+                              alt="Avatar"
+                              className="w-full h-full object-cover"
+                            />
+                          </div>
+                        ) : (
+                          <div className="w-24 h-24 border-4 border-text bg-secondary flex items-center justify-center text-center p-1 shadow-[3px_3px_0px_0px_rgba(23,23,23,1)]">
+                            <span className="font-mono text-[9px] font-black uppercase text-text/70 tracking-tighter">
+                              SIN FOTO
+                            </span>
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="space-y-2 text-center sm:text-left">
+                        <label className="block text-[10px] font-black uppercase text-text font-mono tracking-wider">
+                          Foto de perfil (Avatar)
+                        </label>
+                        <p className="text-[11px] text-text-soft font-mono uppercase">
+                          JPG, PNG. Máx: 2MB.
+                        </p>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={handleAvatarChange}
+                          className="text-xs text-text file:mr-4 file:py-1.5 file:px-3 file:border-2 file:border-text file:text-xs file:font-mono file:font-black file:uppercase file:bg-surface file:text-text file:cursor-pointer hover:file:bg-surface-2 transition-colors"
+                        />
+                      </div>
                     </div>
-                    <div>
-                      <label className="block text-[10px] font-black uppercase text-text mb-1 font-mono tracking-wider">
-                        Nombre titular de cuenta
-                      </label>
-                      <input
-                        type="text"
-                        required
-                        value={nombreTitular}
-                        onChange={(e) =>
-                          setNombreTitular(e.target.value.toUpperCase())
-                        }
-                        className="w-full bg-background border-2 border-text text-text px-4 py-2.5 text-sm font-black uppercase focus:ring-1 focus:ring-primary focus:outline-none"
-                      />
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div className="sm:col-span-2">
+                        <label className="block text-[10px] font-black uppercase text-text-soft mb-1 font-mono tracking-wider">
+                          Email de usuario (No modificable)
+                        </label>
+                        <input
+                          type="text"
+                          disabled
+                          value="user.techno@boletoclick.com"
+                          className="w-full bg-surface-2 border-2 border-text/40 text-text-soft/70 px-4 py-2.5 text-xs font-mono cursor-not-allowed focus:outline-none uppercase"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-[10px] font-black uppercase text-text mb-1 font-mono tracking-wider">
+                          Nombre completo del titular
+                        </label>
+                        <input
+                          type="text"
+                          required
+                          value={nombreTitular}
+                          onChange={(e) =>
+                            setNombreTitular(e.target.value.toUpperCase())
+                          }
+                          className="w-full bg-background border-2 border-text text-text px-4 py-2.5 text-xs font-black uppercase focus:ring-1 focus:ring-primary focus:outline-none"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-[10px] font-black uppercase text-text mb-1 font-mono tracking-wider">
+                          DNI
+                        </label>
+                        <input
+                          type="text"
+                          required
+                          maxLength={8}
+                          value={dni}
+                          onChange={(e) =>
+                            setDni(e.target.value.replace(/\D/g, ""))
+                          }
+                          className="w-full bg-background border-2 border-text text-text px-4 py-2.5 text-xs font-mono font-bold focus:ring-1 focus:ring-primary focus:outline-none"
+                        />
+                      </div>
+
+                      <div className="sm:col-span-2">
+                        <label className="block text-[10px] font-black uppercase text-text mb-1 font-mono tracking-wider">
+                          Teléfono Móvil
+                        </label>
+                        <input
+                          type="text"
+                          required
+                          placeholder="Ej: 1123456789"
+                          value={telefono}
+                          onChange={(e) =>
+                            setTelefono(e.target.value.replace(/\D/g, ""))
+                          }
+                          className="w-full bg-background border-2 border-text text-text px-4 py-2.5 text-xs font-mono font-bold focus:ring-1 focus:ring-primary focus:outline-none"
+                        />
+                      </div>
                     </div>
-                    <div className="pt-2">
+
+                    <h3 className="text-sm font-black uppercase tracking-tight border-b-2 border-text/40 pb-1 mt-6 mb-4">
+                      Seguridad de la Cuenta
+                    </h3>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-[10px] font-black uppercase text-text mb-1 font-mono tracking-wider">
+                          Contraseña Actual
+                        </label>
+                        <input
+                          type="password"
+                          placeholder="••••••••"
+                          value={passwordActual}
+                          onChange={(e) => setPasswordActual(e.target.value)}
+                          className="w-full bg-background border-2 border-text text-text px-4 py-2.5 text-xs font-mono focus:ring-1 focus:ring-primary focus:outline-none"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-[10px] font-black uppercase text-text mb-1 font-mono tracking-wider">
+                          Nueva Contraseña
+                        </label>
+                        <input
+                          type="password"
+                          placeholder="MÍNIMO 6 CARACTERES"
+                          value={passwordNueva}
+                          onChange={(e) => setPasswordNueva(e.target.value)}
+                          className="w-full bg-background border-2 border-text text-text px-4 py-2.5 text-xs font-mono focus:ring-1 focus:ring-primary focus:outline-none"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="pt-6">
                       <button
                         type="submit"
                         disabled={saveStatus === "saving"}
@@ -285,29 +452,114 @@ export default function UserDashboard() {
                       </button>
                     </div>
                   </div>
-                </div>
-              </form>
+                </form>
 
-              <div className="pt-6 border-t-2 border-dashed border-text/40 mt-6">
-                <p className="font-mono text-[11px] text-text-soft mb-4 leading-relaxed uppercase">
-                  Al eliminar tu cuenta vas a perder el acceso inmediato a todo
-                  tu historial de compras y las entradas que tengas vigentes
-                  para próximos eventos.
-                </p>
-                <button
-                  onClick={() => {
-                    if (
-                      confirm(
-                        "¿De verdad querés eliminar tu cuenta? Esta acción borrará tus entradas activas y es irreversible.",
-                      )
-                    ) {
-                      alert("Cuenta eliminada simulada. Redireccionando...");
-                    }
-                  }}
-                  className="bg-transparent hover:bg-red-500/10 text-red-500 border-2 border-red-500 font-mono font-black px-4 py-2.5 text-xs uppercase tracking-wider transition-colors cursor-pointer w-full text-center"
-                >
-                  Eliminar cuenta de forma permanente
-                </button>
+                <div className="pt-6 border-t-2 border-dashed border-text/40 mt-6">
+                  <p className="font-mono text-[11px] text-text-soft mb-4 leading-relaxed uppercase">
+                    Al eliminar tu cuenta vas a perder el acceso inmediato a tus
+                    entradas vigentes.
+                  </p>
+                  <button
+                    onClick={() => {
+                      if (confirm("¿De verdad querés eliminar tu cuenta?")) {
+                        alert("Cuenta eliminada.");
+                      }
+                    }}
+                    className="bg-transparent hover:bg-red-500/10 text-red-500 border-2 border-red-500 font-mono font-black px-4 py-2.5 text-xs uppercase tracking-wider transition-colors cursor-pointer w-full text-center"
+                  >
+                    Eliminar cuenta de forma permanente
+                  </button>
+                </div>
+              </div>
+
+              <div className="space-y-6">
+                <div className="bg-surface border-2 border-text p-6 shadow-[4px_4px_0px_0px_var(--color-text)]">
+                  <h2 className="text-lg font-black uppercase tracking-tight border-b-2 border-text pb-2 mb-4">
+                    💳 Métodos de Pago
+                  </h2>
+
+                  <div className="space-y-3 mb-6">
+                    {tarjetas.length === 0 ? (
+                      <p className="font-mono text-[10px] uppercase text-text-soft text-center p-4 border border-dashed border-text/30">
+                        No tenés tarjetas vinculadas.
+                      </p>
+                    ) : (
+                      tarjetas.map((card) => (
+                        <div
+                          key={card.id}
+                          className="bg-background border-2 border-text p-3 flex items-center justify-between shadow-[2px_2px_0px_0px_var(--color-text)] font-mono"
+                        >
+                          <div>
+                            <span className="text-[10px] bg-text text-surface px-1.5 py-0.5 font-black uppercase block w-max mb-1">
+                              {card.tipo}
+                            </span>
+                            <p className="text-xs font-black uppercase tracking-tight">
+                              {card.marca}
+                            </p>
+                            <p className="text-[11px] text-text-soft font-bold mt-0.5">
+                              •••• •••• •••• {card.ultimosCuatro}
+                            </p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => handleEliminarTarjeta(card.id)}
+                            className="text-xs font-black text-red-500 hover:bg-red-500/10 border border-transparent hover:border-red-500 px-2 py-1 uppercase tracking-tighter transition-all cursor-pointer"
+                          >
+                            [ Borrar ]
+                          </button>
+                        </div>
+                      ))
+                    )}
+                  </div>
+
+                  <form
+                    onSubmit={handleAgregarTarjeta}
+                    className="border-t-2 border-dashed border-text/30 pt-4 space-y-3"
+                  >
+                    <span className="block text-[11px] font-black uppercase text-text font-mono tracking-wider">
+                      + Vincular nueva tarjeta
+                    </span>
+
+                    <div>
+                      <select
+                        value={nuevaTarjetaTipo}
+                        onChange={(e) =>
+                          setNuevaTarjetaTipo(
+                            e.target.value as "Crédito" | "Débito",
+                          )
+                        }
+                        className="w-full bg-background border-2 border-text text-text p-2 font-mono text-xs font-bold uppercase focus:outline-none"
+                      >
+                        <option value="Débito">Tarjeta de Débito</option>
+                        <option value="Crédito">Tarjeta de Crédito</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <input
+                        type="text"
+                        required
+                        maxLength={16}
+                        placeholder="NÚMERO DE TARJETA (16 DÍGITOS)"
+                        value={nuevaTarjetaNumero}
+                        onChange={(e) =>
+                          setNuevaTarjetaNumero(
+                            e.target.value.replace(/\D/g, ""),
+                          )
+                        }
+                        className="w-full bg-background border-2 border-text text-text p-2 font-mono text-xs font-bold focus:outline-none"
+                      />
+                    </div>
+
+                    <button
+                      type="submit"
+                      disabled={nuevaTarjetaNumero.length < 4}
+                      className="w-full bg-secondary text-text border-2 border-text font-mono font-black py-2 text-xs uppercase tracking-wider shadow-[2px_2px_0px_0px_var(--color-text)] hover:shadow-none hover:translate-x-0.5 hover:translate-y-0.5 transition-all disabled:opacity-40 cursor-pointer"
+                    >
+                      Asociar Tarjeta
+                    </button>
+                  </form>
+                </div>
               </div>
             </div>
           )}
@@ -319,7 +571,6 @@ export default function UserDashboard() {
           className="fixed inset-0 z-50 bg-black/95 backdrop-blur-sm flex items-center justify-center p-4"
           onClick={() => setTicketExpandido(null)}
         >
-          {/* Tarjeta del Ticket simulando troquelado */}
           <div
             className="bg-white text-black border-4 border-black max-w-sm w-full p-6 rounded-none shadow-[8px_8px_0px_0px_#CCFF00] flex flex-col justify-between relative overflow-hidden"
             onClick={(e) => e.stopPropagation()}
@@ -360,16 +611,14 @@ export default function UserDashboard() {
             </div>
 
             <div className="space-y-3">
-              <p className="text-center text-[10px] font-mono font-black text-neutral-600 uppercase tracking-tight animate-pulse">
+              <p className="text-center text-[10px] font-mono font-black text-neutral-600 uppercase tracking-tight">
                 📱 Presentá esta pantalla directamente en los lectores de puerta
               </p>
 
               <div className="grid grid-cols-1 gap-2">
                 <button
                   onClick={() =>
-                    alert(
-                      "Simulación: Agregando pase a Apple Wallet / Google Wallet...",
-                    )
+                    alert("Simulación: Agregando pase a Wallet...")
                   }
                   className="w-full bg-neutral-100 hover:bg-neutral-200 text-black font-mono font-black py-2.5 text-[11px] uppercase tracking-wider border-2 border-black transition-colors cursor-pointer shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]"
                 >
