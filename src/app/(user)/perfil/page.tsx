@@ -253,4 +253,8 @@ export default function PerfilPage() {
       </form>
     </div>
   );
+<<<<<<< HEAD
 }
+=======
+}
+>>>>>>> f000c1937ff7fecfa05efb859f8a3d6c8b9a1d7e
