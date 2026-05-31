@@ -1,12 +1,12 @@
-import { NextResponse } from 'next/server';
-import type { NextRequest } from 'next/server';
+import { NextResponse } from "next/server";
+import type { NextRequest } from "next/server";
 
 // Rutas que requieren cualquier usuario autenticado
-const AUTH_ROUTES = ['/mis-tickets', '/mis-compras', '/checkout', '/perfil'];
+const AUTH_ROUTES = ["/mis-tickets", "/mis-compras", "/checkout", "/perfil"];
 
 // Rutas restringidas por rol
-const ADMIN_ROUTES = ['/admin'];
-const PRODUCER_ROUTES = ['/producer'];
+const ADMIN_ROUTES = ["/admin", "/dashboard-admin"];
+const PRODUCER_ROUTES = ["/producer", "/eventos"];
 
 function matchesRoute(pathname: string, routes: string[]): boolean {
   return routes.some(
@@ -16,28 +16,42 @@ function matchesRoute(pathname: string, routes: string[]): boolean {
 
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
-  const token = request.cookies.get('auth_token')?.value;
-  const role = request.cookies.get('user_role')?.value;
+
+  // 🔓 MODO DESARROLLO / BYPASS PARA PRUEBAS
+  // Si la variable de entorno está activa, dejamos pasar cualquier ruta sin validar cookies ni roles.
+  const isBypassActive = process.env.NEXT_PUBLIC_BYPASS_AUTH === "true";
+  if (isBypassActive) {
+    return NextResponse.next();
+  }
+
+  const token = request.cookies.get("auth_token")?.value;
+  const role = request.cookies.get("user_role")?.value;
 
   const isAuthenticated = Boolean(token);
 
   if (matchesRoute(pathname, AUTH_ROUTES) && !isAuthenticated) {
-    const loginUrl = new URL('/login', request.url);
-    loginUrl.searchParams.set('from', pathname);
+    const loginUrl = new URL("/login", request.url);
+    loginUrl.searchParams.set("from", pathname);
     return NextResponse.redirect(loginUrl);
   }
 
-  if (matchesRoute(pathname, ADMIN_ROUTES) && (!isAuthenticated || role !== 'admin')) {
-    return NextResponse.redirect(new URL('/', request.url));
+  if (
+    matchesRoute(pathname, ADMIN_ROUTES) &&
+    (!isAuthenticated || role !== "admin")
+  ) {
+    return NextResponse.redirect(new URL("/", request.url));
   }
 
-  if (matchesRoute(pathname, PRODUCER_ROUTES) && (!isAuthenticated || role !== 'producer')) {
-    return NextResponse.redirect(new URL('/', request.url));
+  if (
+    matchesRoute(pathname, PRODUCER_ROUTES) &&
+    (!isAuthenticated || role !== "producer")
+  ) {
+    return NextResponse.redirect(new URL("/", request.url));
   }
 
   return NextResponse.next();
 }
 
 export const config = {
-  matcher: ['/((?!_next/static|_next/image|favicon.ico|api/).*)'],
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|api/).*)"],
 };
