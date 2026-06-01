@@ -53,6 +53,12 @@ function LoginForm() {
             <Button type="submit" disabled={isSubmitting} className="bg-primary text-background hover:bg-primary-deep">
               {isSubmitting ? 'Ingresando...' : 'Iniciar sesión'}
             </Button>
+
+            <p className="text-center text-sm text-text-soft">
+              <Link href="/forgot-password" className="text-primary hover:underline">
+                ¿Olvidaste tu contraseña?
+              </Link>
+            </p>
           </Form>
         )}
       </Formik>

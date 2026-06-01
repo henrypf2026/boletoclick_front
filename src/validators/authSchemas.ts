@@ -8,6 +8,22 @@ export const loginSchema = Yup.object({
   password: Yup.string().required('La contraseña es obligatoria'),
 });
 
+export const updatePasswordSchema = Yup.object({
+  password: Yup.string()
+    .min(6, 'La contraseña debe tener al menos 6 caracteres')
+    .required('La contraseña es obligatoria'),
+  confirmPassword: Yup.string()
+    .oneOf([Yup.ref('password')], 'Las contraseñas no coinciden')
+    .required('Confirmá tu contraseña'),
+});
+
+export const forgotPasswordSchema = Yup.object({
+  email: Yup.string()
+    .trim()
+    .email('Ingresa un correo válido')
+    .required('El correo es obligatorio'),
+});
+
 export const registerSchema = Yup.object({
   name: Yup.string()
     .trim()

@@ -59,6 +59,10 @@ export const authService = {
     return { token: data.session.access_token, user: fromUserProfile(data.userProfile) };
   },
 
+  async forgotPassword(email: string): Promise<void> {
+    await api.post('/auth/forgot-password', { email });
+  },
+
   async getMe(token: string): Promise<AuthUser | null> {
     const supabaseUser = await api.get<SupabaseUser>('/auth/me', token);
     if (!supabaseUser?.id) return null;

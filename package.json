@@ -9,6 +9,7 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.106.2",
     "flowbite": "^4.0.2",
     "flowbite-react": "^0.12.17",
     "formik": "^2.4.9",
