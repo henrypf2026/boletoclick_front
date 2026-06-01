@@ -18,23 +18,27 @@ export default function UpdatePasswordPage() {
   const [status, setStatus] = useState<Status>('loading');
 
   useEffect(() => {
-    // Supabase redirige al usuario con un code en la URL (?code=xxx)
-    // exchangeCodeForSession lo intercambia por una sesión activa automáticamente
-    supabase.auth.getSession().then(({ data }) => {
-      if (data.session) {
-        setStatus('ready');
-      } else {
-        // Intentamos detectar el code en la URL (flujo PKCE de Supabase)
-        const code = new URLSearchParams(window.location.search).get('code');
-        if (code) {
-          supabase.auth.exchangeCodeForSession(code).then(({ error }) => {
-            setStatus(error ? 'invalid' : 'ready');
-          });
-        } else {
-          setStatus('invalid');
-        }
-      }
-    });
+    const hashParams = new URLSearchParams(window.location.hash.substring(1));
+    const accessToken = hashParams.get('access_token');
+    const refreshToken = hashParams.get('refresh_token');
+    const type = hashParams.get('type');
+
+    if (type === 'recovery' && accessToken && refreshToken) {
+      // Flujo implícito: tokens vienen en el hash de la URL
+      supabase.auth.setSession({ access_token: accessToken, refresh_token: refreshToken })
+        .then(({ error }) => setStatus(error ? 'invalid' : 'ready'));
+      return;
+    }
+
+    // Flujo PKCE: code viene como query param
+    const code = new URLSearchParams(window.location.search).get('code');
+    if (code) {
+      supabase.auth.exchangeCodeForSession(code)
+        .then(({ error }) => setStatus(error ? 'invalid' : 'ready'));
+      return;
+    }
+
+    setStatus('invalid');
   }, []);
 
   const handleSubmit = async (
@@ -86,27 +90,22 @@ export default function UpdatePasswordPage() {
             validationSchema={updatePasswordSchema}
             onSubmit={handleSubmit}
           >
-            {({ isSubmitting, errors }) => (
+            {({ isSubmitting }) => (
               <Form className="mt-6 flex flex-col gap-4">
                 <FormTextInput
                   label="Nueva contraseña"
                   name="password"
                   type="password"
-                  placeholder="••••••••"
+                  placeholder="Mínimo 6 caracteres"
                   autoComplete="new-password"
                 />
                 <FormTextInput
                   label="Confirmar contraseña"
                   name="confirmPassword"
                   type="password"
-                  placeholder="••••••••"
+                  placeholder="Repite tu contraseña"
                   autoComplete="new-password"
                 />
-
-                {errors.password && (
-                  <Alert color="failure">{errors.password}</Alert>
-                )}
-
                 <Button
                   type="submit"
                   disabled={isSubmitting}
