@@ -17,7 +17,7 @@ export default function UserMenuButton() {
     return (
       <div className="flex items-center gap-2">
         <span className="hidden text-sm font-bold text-text-soft lg:inline">
-          Hola, {(user.name ?? user.email).split(' ')[0]}
+          Hola, {(user.name ?? user.email.split('@')[0]).split(' ')[0]}
         </span>
         <Link
           href="/mis-tickets"
