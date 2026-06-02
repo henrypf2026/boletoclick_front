@@ -6,7 +6,14 @@ const AUTH_ROUTES = ["/mis-tickets", "/mis-compras", "/checkout", "/perfil"];
 
 // Rutas restringidas por rol
 const ADMIN_ROUTES = ["/admin", "/dashboard-admin"];
-const PRODUCER_ROUTES = ["/producer", "/eventos"];
+const PRODUCER_ROUTES = ["/producer"];
+
+function isProducerOnlyRoute(pathname: string): boolean {
+  if (matchesRoute(pathname, PRODUCER_ROUTES)) return true;
+  if (pathname === "/eventos/crear") return true;
+  if (/^\/eventos\/[^/]+\/editar/.test(pathname)) return true;
+  return false;
+}
 
 function matchesRoute(pathname: string, routes: string[]): boolean {
   return routes.some(
@@ -43,7 +50,7 @@ export function middleware(request: NextRequest) {
   }
 
   if (
-    matchesRoute(pathname, PRODUCER_ROUTES) &&
+    isProducerOnlyRoute(pathname) &&
     (!isAuthenticated || role !== "producer")
   ) {
     return NextResponse.redirect(new URL("/", request.url));
