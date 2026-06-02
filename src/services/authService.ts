@@ -17,8 +17,9 @@ export interface RegisterDto {
   email: string;
   password: string;
   birthDate: string;
-  documentNumber: string;
+  documentNumber?: string;
   allowNewsletter: boolean;
+  role?: UserRole;
   profileImageUrl?: string;
   businessName?: string;
 }
@@ -31,7 +32,11 @@ export interface AuthUser {
 }
 
 function fromSupabaseUser(supabaseUser: SupabaseUser): AuthUser {
-  return { id: supabaseUser.id, email: supabaseUser.email ?? '' };
+  return {
+    id: supabaseUser.id,
+    email: supabaseUser.email ?? '',
+    name: supabaseUser.name ?? undefined,
+  };
 }
 
 function fromUserProfile(profile: UserProfile): AuthUser {
@@ -57,6 +62,10 @@ export const authService = {
   async register(dto: RegisterDto): Promise<{ token: string; user: AuthUser }> {
     const data = await api.post<RegisterApiResponse>('/auth/register', dto);
     return { token: data.session.access_token, user: fromUserProfile(data.userProfile) };
+  },
+
+  async forgotPassword(email: string): Promise<void> {
+    await api.post('/auth/forgot-password', { email });
   },
 
   async getMe(token: string): Promise<AuthUser | null> {

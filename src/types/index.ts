@@ -15,10 +15,13 @@ export interface UserProfile {
   updatedAt: string;
 }
 
-// Objeto de usuario que devuelve Supabase Auth — role es de Supabase ("authenticated"), no el de la app
+// Objeto que devuelve GET /auth/me — incluye metadatos de Google cuando el provider es OAuth
 export interface SupabaseUser {
   id: string;
   email: string;
+  provider?: string;
+  name?: string | null;
+  avatarUrl?: string | null;
   aud?: string;
   role?: string;
 }
