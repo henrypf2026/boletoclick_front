@@ -34,6 +34,11 @@
 - El archivo `globals.css` es solo para tokens globales y estilos base. No agregar estilos de componentes ahí.
 - Todo el diseño debe ser responsive desde el inicio. Pensar siempre en mobile primero.
 
+## Entorno local
+- El back corre en el puerto `3001`. El front se levanta con `npm run dev -- -p 3002` para evitar conflictos.
+- Las llamadas a la API van a `/api/backend/*` — Next.js las proxea al back via `next.config.ts`. No llamar al back directamente desde el cliente.
+- Variables de entorno del front en `.env.local`. La variable `NEXT_PUBLIC_API_URL` apunta a la URL base del back.
+
 ## Límites del trabajo
 - Nunca tocar el repositorio del back (`boletoclick_back`). Solo se consulta para ver endpoints.
 
@@ -57,7 +62,7 @@
 - Evitar `any` siempre. Solo como último recurso si no hay alternativa viable.
 
 ## Idioma del código
-- Pendiente de definir con el equipo (variables, funciones y archivos en español o inglés).
+- ingles (variables, funciones y archivos en inglés).
 
 ## Alcance de las tareas
 - Mantenerse estrictamente en la tarea pedida.

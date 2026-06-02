@@ -1,25 +1,43 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useParams } from 'next/navigation';
 import { Alert, Badge, Button, Card, Label, Select, TextInput } from 'flowbite-react';
 import { useAuth } from '@/context/AuthContext';
-import { formatEventDate, formatPrice, getEventById } from '@/mocks/events';
+import { formatEventDate, formatPrice, type Event } from '@/mocks/events';
+import { eventService } from '@/services/eventService';
 import { saveTicket } from '@/lib/auth';
+import EventMap from '@/components/ui/EventMap';
 
 export default function EventoPage() {
   const params = useParams();
   const id = params.id as string;
   const router = useRouter();
   const { authenticated, user } = useAuth();
-  const event = getEventById(id);
 
+  const [event, setEvent] = useState<Event | null>(null);
+  const [loadingEvent, setLoadingEvent] = useState(true);
   const [quantity, setQuantity] = useState(1);
-  const [zoneId, setZoneId] = useState(event?.zones[0]?.id || '');
+  const [zoneId, setZoneId] = useState('');
   const [promoCode, setPromoCode] = useState('');
   const [promoApplied, setPromoApplied] = useState(false);
   const [message, setMessage] = useState('');
+  const [headerSourceIndex, setHeaderSourceIndex] = useState(0);
+
+  useEffect(() => {
+    let active = true;
+    setLoadingEvent(true);
+    eventService.getEventById(id).then((data) => {
+      if (!active) return;
+      setEvent(data);
+      setZoneId(data?.zones[0]?.id ?? '');
+      setLoadingEvent(false);
+    });
+    return () => {
+      active = false;
+    };
+  }, [id]);
 
   const selectedZone = event?.zones.find((zone) => zone.id === zoneId);
   const date = event ? formatEventDate(event.date, event.time) : null;
@@ -29,6 +47,12 @@ export default function EventoPage() {
     const subtotal = selectedZone.price * quantity;
     return promoApplied ? Math.round(subtotal * 0.9) : subtotal;
   }, [selectedZone, quantity, promoApplied]);
+
+  if (loadingEvent) {
+    return (
+      <div className="mx-auto max-w-6xl px-4 py-10 text-text-soft">Cargando evento...</div>
+    );
+  }
 
   if (!event) {
     router.replace('/');
@@ -78,32 +102,72 @@ export default function EventoPage() {
           ← Volver a eventos
         </Link>
 
-        <div
-          className="mt-4 flex flex-col justify-between gap-4 rounded-2xl p-6 md:flex-row md:items-end"
-          style={{ background: event.imageGradient }}
-        >
-          <div>
-            <Badge color="dark" className="mb-2 uppercase">{event.category}</Badge>
-            <h1 className="text-2xl font-bold text-white md:text-4xl">{event.title}</h1>
-            <p className="mt-2 text-white/90">{event.subtitle}</p>
-          </div>
-          <div className="rounded-xl bg-black/45 px-4 py-3 text-center">
-            <strong className="block text-lg text-white">
-              {date!.day} {date!.month}
-            </strong>
-            <span className="text-sm text-white/90">{date!.time} hs</span>
-          </div>
-        </div>
+        {(() => {
+          const headerSources = [event.posterUrl, event.fallbackImageUrl].filter(
+            Boolean,
+          ) as string[];
+          const headerImage = headerSources[headerSourceIndex];
+
+          return (
+            <div
+              className="relative mt-4 flex flex-col justify-between gap-4 overflow-hidden rounded-2xl p-6 md:flex-row md:items-end"
+              style={{ background: event.imageGradient }}
+            >
+              {headerImage && (
+                <>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={headerImage}
+                    alt={event.title}
+                    className="absolute inset-0 h-full w-full object-cover object-center"
+                    referrerPolicy="no-referrer"
+                    onError={() => setHeaderSourceIndex((index) => index + 1)}
+                  />
+                  <div className="absolute inset-0 bg-black/45" />
+                </>
+              )}
+              <div className="relative z-10">
+                <Badge color="dark" className="mb-2 uppercase">{event.category}</Badge>
+                <h1 className="text-2xl font-bold text-white md:text-4xl">{event.title}</h1>
+                <p className="mt-2 text-white/90">{event.subtitle}</p>
+              </div>
+              <div className="relative z-10 rounded-xl bg-black/45 px-4 py-3 text-center">
+                <strong className="block text-lg text-white">
+                  {date!.day} {date!.month}
+                </strong>
+                <span className="text-sm text-white/90">{date!.time} hs</span>
+              </div>
+            </div>
+          );
+        })()}
 
         <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-5">
           <Card className="border-gray-800 bg-gray-900 lg:col-span-3">
             <h2 className="mb-4 text-lg font-bold text-white">Información del evento</h2>
             <ul className="grid list-disc gap-2 pl-5 text-gray-400">
-              <li><strong className="text-white">Venue:</strong> {event.venue}</li>
+              <li><strong className="text-white">Recinto:</strong> {event.venue}</li>
+              {event.address && (
+                <li><strong className="text-white">Dirección:</strong> {event.address}</li>
+              )}
               <li><strong className="text-white">Ciudad:</strong> {event.city}</li>
+              {event.capacity != null && (
+                <li><strong className="text-white">Capacidad:</strong> {event.capacity.toLocaleString('es-MX')} personas</li>
+              )}
               <li><strong className="text-white">Fecha:</strong> {date!.full}</li>
               <li><strong className="text-white">Acceso:</strong> QR digital en Mis entradas</li>
             </ul>
+
+            <div className="mt-6" id="ubicacion-recinto">
+              <h3 className="mb-3 text-sm font-semibold uppercase tracking-wide text-gray-500">
+                Ubicación del recinto
+              </h3>
+              <EventMap
+                coordinates={event.coordinates}
+                venue={event.venue}
+                city={event.city}
+                address={event.address}
+              />
+            </div>
           </Card>
 
           <Card className="border-gray-800 bg-gray-900 lg:col-span-2">

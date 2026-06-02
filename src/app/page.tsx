@@ -1,17 +1,51 @@
 'use client';
 
-import { useMemo, useState } from 'react';
-import { Badge } from 'flowbite-react';
+import { useEffect, useMemo, useState } from 'react';
+import { Alert, Badge } from 'flowbite-react';
 import CategoryFilter from '@/components/ui/CategoryFilter';
 import TeamFilter from '@/components/ui/TeamFilter';
 import EventCard from '@/components/ui/EventCard';
 import EventGrid from '@/components/ui/EventGrid';
-import { categories, events, teams } from '@/mocks/events';
+import { teams, type Event } from '@/mocks/events';
+import { eventService, type CategoryOption } from '@/services/eventService';
+
+const ALL_CATEGORY: CategoryOption = { id: 'all', label: 'Todos' };
 
 export default function HomePage() {
   const [search, setSearch] = useState('');
   const [category, setCategory] = useState('all');
   const [team, setTeam] = useState('all');
+  const [events, setEvents] = useState<Event[]>([]);
+  const [categories, setCategories] = useState<CategoryOption[]>([ALL_CATEGORY]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    setLoading(true);
+
+    Promise.all([eventService.getEvents(), eventService.getCategories()])
+      .then(([eventsData, categoriesData]) => {
+        if (!active) return;
+        setEvents(eventsData);
+        setCategories([ALL_CATEGORY, ...categoriesData]);
+        setError(null);
+      })
+      .catch((err: unknown) => {
+        if (!active) return;
+        setEvents([]);
+        setError(
+          err instanceof Error ? err.message : 'No se pudieron cargar los eventos.',
+        );
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const filteredEvents = useMemo(() => {
     const query = search.trim().toLowerCase();
@@ -26,7 +60,7 @@ export default function HomePage() {
         event.city.toLowerCase().includes(query);
       return matchesCategory && matchesTeam && matchesSearch;
     });
-  }, [search, category, team]);
+  }, [search, category, team, events]);
 
   const featuredEvents = filteredEvents.filter((e) => e.featured);
   const upcomingEvents = filteredEvents.filter((e) => !e.featured);
@@ -76,6 +110,16 @@ export default function HomePage() {
           <TeamFilter teams={teams} activeTeam={team} onChange={setTeam} />
         </section>
 
+        {error && (
+          <Alert color="failure" className="mb-6">
+            <span className="block font-medium">No se pudieron cargar los eventos.</span>
+            <span className="mt-1 block text-sm">{error}</span>
+            <span className="mt-2 block text-sm text-text-soft">
+              Verifica que el backend esté corriendo (puerto 3000) y NEXT_PUBLIC_API_URL.
+            </span>
+          </Alert>
+        )}
+
         {featuredEvents.length > 0 && (
           <section className="mb-10">
             <div className="mb-4">
@@ -93,7 +137,11 @@ export default function HomePage() {
         <EventGrid
           events={upcomingEvents}
           title="Próximos eventos"
-          emptyMessage="No encontramos eventos con esos filtros. Prueba otra búsqueda."
+          emptyMessage={
+            loading
+              ? 'Cargando eventos...'
+              : 'No encontramos eventos con esos filtros. Prueba otra búsqueda.'
+          }
         />
       </div>
 
