@@ -52,6 +52,7 @@ export default function MobileMenu({ navLinks }: { navLinks: NavLinkItem[] }) {
 
   const userLinks: NavLinkItem[] = authenticated && user
     ? [
+        { href: '/mis-tickets', label: 'Mis Tickets' },
         { href: dashboardHref, label: dashboardLabel },
         { href: '/perfil', label: 'Perfil' },
       ]

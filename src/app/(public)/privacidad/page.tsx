@@ -4,12 +4,12 @@ const sections = [
   {
     title: 'Responsable del tratamiento',
     content:
-      'BoletoClick es responsable del tratamiento de los datos personales recopilados a través de esta plataforma. Para cualquier consulta relacionada con tus datos podés contactarnos en soporte@boletoclick.com.',
+      'BoletoClick es responsable del tratamiento de los datos personales recopilados a través de esta plataforma, en cumplimiento de la Ley Federal de Protección de Datos Personales en Posesión de los Particulares (LFPDPPP) y su Reglamento. Para cualquier consulta relacionada con tus datos puedes contactarnos en soporte@boletoclick.com.',
   },
   {
     title: 'Datos que recopilamos',
     content:
-      'Recopilamos los datos que nos proporcionás al registrarte (nombre, correo electrónico, fecha de nacimiento, número de documento) y los que se generan al usar la plataforma (historial de compras, entradas adquiridas, preferencias de eventos). También podemos recopilar datos técnicos como dirección IP, tipo de dispositivo y navegador.',
+      'Recopilamos los datos que nos proporcionas al registrarte (nombre, correo electrónico, fecha de nacimiento, número de identificación oficial) y los que se generan al usar la plataforma (historial de compras, entradas adquiridas, preferencias de eventos). También podemos recopilar datos técnicos como dirección IP, tipo de dispositivo y navegador.',
   },
   {
     title: 'Finalidad del tratamiento',
@@ -19,22 +19,22 @@ const sections = [
   {
     title: 'Base legal',
     content:
-      'El tratamiento de tus datos se basa en la ejecución del contrato de uso de la plataforma, tu consentimiento explícito para comunicaciones opcionales (newsletter), y el cumplimiento de obligaciones legales aplicables.',
+      'El tratamiento de tus datos se basa en la ejecución del contrato de uso de la plataforma, tu consentimiento explícito para comunicaciones opcionales (newsletter), y el cumplimiento de obligaciones legales conforme a la legislación mexicana aplicable.',
   },
   {
     title: 'Compartición de datos',
     content:
-      'No vendemos tus datos personales a terceros. Podemos compartirlos con proveedores de servicios necesarios para operar la plataforma (procesadores de pago, servicios de correo, infraestructura en la nube) bajo contratos que garantizan el mismo nivel de protección. También podemos divulgarlos si lo exige la ley o una autoridad competente.',
+      'No vendemos tus datos personales a terceros. Podemos compartirlos con proveedores de servicios necesarios para operar la plataforma (procesadores de pago, servicios de correo, infraestructura en la nube) bajo contratos que garantizan el mismo nivel de protección. También podemos divulgarlos si lo exige la ley o una autoridad competente en México.',
   },
   {
     title: 'Retención de datos',
     content:
-      'Conservamos tus datos mientras tu cuenta esté activa y por el tiempo necesario para cumplir con obligaciones legales o resolver disputas. Si eliminás tu cuenta, tus datos personales serán eliminados en un plazo máximo de 30 días, salvo los que debamos conservar por ley.',
+      'Conservamos tus datos mientras tu cuenta esté activa y por el tiempo necesario para cumplir con obligaciones legales o resolver disputas. Si eliminas tu cuenta, tus datos personales serán suprimidos en un plazo máximo de 30 días, salvo los que debamos conservar por disposición legal.',
   },
   {
-    title: 'Tus derechos',
+    title: 'Derechos ARCO',
     content:
-      'Tenés derecho a acceder a tus datos, rectificarlos si son inexactos, solicitar su eliminación, oponerte al tratamiento para fines de marketing, y solicitar la portabilidad de tus datos. Para ejercer cualquiera de estos derechos escribinos a soporte@boletoclick.com.',
+      'Conforme a la LFPDPPP, tienes derecho a Acceder a tus datos, Rectificarlos si son inexactos, Cancelar su tratamiento y Oponerte al mismo (derechos ARCO). Para ejercer cualquiera de estos derechos envía tu solicitud a soporte@boletoclick.com indicando tu nombre completo, correo registrado y el derecho que deseas ejercer. Responderemos en un plazo máximo de 20 días hábiles.',
   },
   {
     title: 'Seguridad',
@@ -71,7 +71,7 @@ export default function PrivacidadPage() {
 
       <p className="mt-6 text-base text-text-soft leading-relaxed border-l-2 border-accent pl-4">
         En BoletoClick nos tomamos en serio la privacidad de tus datos. Esta política
-        explica qué información recopilamos, cómo la usamos y qué derechos tenés sobre ella.
+        explica qué información recopilamos, cómo la usamos y qué derechos tienes sobre ella.
       </p>
 
       <div className="mt-10 flex flex-col divide-y divide-border">
@@ -96,7 +96,7 @@ export default function PrivacidadPage() {
 
       <div className="mt-10 border-t-2 border-border pt-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <p className="text-xs text-text-soft font-bold uppercase tracking-wider">
-          ¿Tenés dudas? Escribinos a{' '}
+          ¿Tienes dudas? Escríbenos a{' '}
           <a href="mailto:soporte@boletoclick.com" className="text-primary hover:underline">
             soporte@boletoclick.com
           </a>

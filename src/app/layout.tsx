@@ -3,7 +3,6 @@ import { Inter } from "next/font/google";
 import "./globals.css";
 import Navbar from "@/components/layout/Navbar";
 import Footer from "@/components/layout/Footer";
-import DarkModeToggle from "@/components/layout/DarkModeToggle";
 import { Providers } from "@/components/Providers";
 
 const inter = Inter({
@@ -32,8 +31,6 @@ export default function RootLayout({
           </main>
 
           <Footer />
-
-          <DarkModeToggle />
         </Providers>
       </body>
     </html>

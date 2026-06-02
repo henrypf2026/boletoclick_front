@@ -4,17 +4,17 @@ const sections = [
   {
     title: '1. Aceptación de los términos',
     content:
-      'Al registrarte o utilizar BoletoClick, aceptás estos Términos y Condiciones en su totalidad. Si no estás de acuerdo con alguna de las disposiciones aquí establecidas, te pedimos que no utilices la plataforma.',
+      'Al registrarte o utilizar BoletoClick, aceptas estos Términos y Condiciones en su totalidad. Si no estás de acuerdo con alguna de las disposiciones aquí establecidas, te pedimos que no utilices la plataforma.',
   },
   {
     title: '2. Descripción del servicio',
     content:
-      'BoletoClick es una plataforma de venta de entradas para eventos en vivo (recitales, partidos, espectáculos y similares). Actuamos como intermediario entre los productores de eventos y los compradores, facilitando la emisión y entrega de entradas digitales con código QR.',
+      'BoletoClick es una plataforma de venta de entradas para eventos en vivo (conciertos, partidos, espectáculos y similares). Actuamos como intermediario entre los productores de eventos y los compradores, facilitando la emisión y entrega de entradas digitales con código QR.',
   },
   {
     title: '3. Registro de cuenta',
     content:
-      'Para comprar entradas debés crear una cuenta con datos verídicos. Sos responsable de mantener la confidencialidad de tu contraseña y de todas las actividades realizadas desde tu cuenta. Notificá de inmediato a BoletoClick ante cualquier uso no autorizado.',
+      'Para comprar entradas debes crear una cuenta con datos verídicos. Eres responsable de mantener la confidencialidad de tu contraseña y de todas las actividades realizadas desde tu cuenta. Notifica de inmediato a BoletoClick ante cualquier uso no autorizado.',
   },
   {
     title: '4. Compra de entradas',
@@ -44,7 +44,7 @@ const sections = [
   {
     title: '9. Privacidad',
     content:
-      'El tratamiento de tus datos personales se rige por nuestra Política de Privacidad, disponible en boletoclick.com/privacidad. Al usar la plataforma aceptás dicha política.',
+      'El tratamiento de tus datos personales se rige por nuestra Política de Privacidad, disponible en boletoclick.com/privacidad, y por la Ley Federal de Protección de Datos Personales en Posesión de los Particulares (LFPDPPP). Al usar la plataforma aceptas dicha política.',
   },
   {
     title: '10. Modificaciones',
@@ -54,7 +54,7 @@ const sections = [
   {
     title: '11. Ley aplicable',
     content:
-      'Estos Términos se rigen por las leyes vigentes en la República Argentina. Ante cualquier controversia, las partes se someten a la jurisdicción de los tribunales ordinarios de la Ciudad Autónoma de Buenos Aires.',
+      'Estos Términos se rigen por las leyes vigentes en los Estados Unidos Mexicanos. Ante cualquier controversia, las partes se someten a la jurisdicción de los tribunales competentes de la Ciudad de México.',
   },
 ];
 
@@ -76,7 +76,7 @@ export default function TerminosPage() {
 
       <p className="mt-6 text-base text-text-soft leading-relaxed border-l-2 border-accent pl-4">
         Estos Términos y Condiciones regulan el uso de la plataforma BoletoClick.
-        Leelos con atención antes de registrarte o realizar una compra.
+        Léelos con atención antes de registrarte o realizar una compra.
       </p>
 
       <div className="mt-10 flex flex-col divide-y divide-border">
@@ -101,7 +101,7 @@ export default function TerminosPage() {
 
       <div className="mt-10 border-t-2 border-border pt-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <p className="text-xs text-text-soft font-bold uppercase tracking-wider">
-          ¿Tenés dudas? Escribinos a{' '}
+          ¿Tienes dudas? Escríbenos a{' '}
           <a href="mailto:soporte@boletoclick.com" className="text-primary hover:underline">
             soporte@boletoclick.com
           </a>
