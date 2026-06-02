@@ -14,16 +14,23 @@ export default function UserMenuButton() {
   };
 
   if (authenticated && user) {
+    const dashboardHref = user.role === 'producer' ? '/producer/dashboard' : '/dashboard-user';
+    const dashboardLabel = user.role === 'producer' ? 'Mi Dashboard' : 'Mi Cuenta';
+    const firstName = (user.name ?? user.email.split('@')[0]).split(' ')[0];
+
     return (
       <div className="flex items-center gap-2">
-        <span className="hidden text-sm font-bold text-text-soft lg:inline">
-          Hola, {(user.name ?? user.email.split('@')[0]).split(' ')[0]}
-        </span>
         <Link
-          href="/mis-tickets"
+          href="/perfil"
+          className="hidden text-sm font-bold text-text-soft transition-colors hover:text-text lg:inline"
+        >
+          Hola, {firstName}
+        </Link>
+        <Link
+          href={dashboardHref}
           className="hidden sm:flex items-center h-9 px-3 text-sm font-bold text-text border-2 border-border hover:bg-surface-2 transition-colors duration-100 whitespace-nowrap"
         >
-          Mis entradas
+          {dashboardLabel}
         </Link>
         <button
           onClick={handleLogout}
