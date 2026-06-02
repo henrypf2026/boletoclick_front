@@ -4,7 +4,7 @@ import { navItems, legalLinks } from "@/config/navigation";
 export default function Footer() {
   return (
     <footer className="mt-auto w-full bg-surface border-t-4 border-border select-none">
-      <div className="max-w-7xl mx-auto px-6">
+      <div className="mx-auto max-w-7xl px-4 sm:px-6">
         <div className="flex flex-col gap-6 py-8 sm:flex-row sm:items-center sm:justify-between">
           <Link
             href="/"

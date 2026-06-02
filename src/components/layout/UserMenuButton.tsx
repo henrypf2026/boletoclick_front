@@ -45,9 +45,10 @@ export default function UserMenuButton() {
       </Link>
       <Link
         href="/registro"
-        className="flex items-center h-9 px-4 bg-primary text-background text-sm font-black border-2 border-border shadow-[2px_2px_0px_0px_rgba(23,23,23,1)] dark:shadow-[2px_2px_0px_0px_rgba(255,255,255,1)] hover:-translate-y-px hover:shadow-[3px_3px_0px_0px_rgba(23,23,23,1)] transition-all duration-100 whitespace-nowrap"
+        className="flex h-9 items-center border-2 border-border bg-primary px-3 text-sm font-black whitespace-nowrap text-background shadow-[2px_2px_0px_0px_rgba(23,23,23,1)] transition-all duration-100 hover:-translate-y-px hover:shadow-[3px_3px_0px_0px_rgba(23,23,23,1)] dark:shadow-[2px_2px_0px_0px_rgba(255,255,255,1)] sm:px-4"
       >
-        Registrarme
+        <span className="sm:hidden">Registro</span>
+        <span className="hidden sm:inline">Registrarme</span>
       </Link>
     </div>
   );
