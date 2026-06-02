@@ -3,10 +3,9 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Alert, Badge } from 'flowbite-react';
 import CategoryFilter from '@/components/ui/CategoryFilter';
-import TeamFilter from '@/components/ui/TeamFilter';
 import EventCard from '@/components/ui/EventCard';
 import EventGrid from '@/components/ui/EventGrid';
-import { teams, type Event } from '@/mocks/events';
+import { type Event } from '@/mocks/events';
 import { eventService, type CategoryOption } from '@/services/eventService';
 
 const ALL_CATEGORY: CategoryOption = { id: 'all', label: 'Todos' };
@@ -14,7 +13,6 @@ const ALL_CATEGORY: CategoryOption = { id: 'all', label: 'Todos' };
 export default function HomePage() {
   const [search, setSearch] = useState('');
   const [category, setCategory] = useState('all');
-  const [team, setTeam] = useState('all');
   const [events, setEvents] = useState<Event[]>([]);
   const [categories, setCategories] = useState<CategoryOption[]>([ALL_CATEGORY]);
   const [loading, setLoading] = useState(true);
@@ -51,35 +49,34 @@ export default function HomePage() {
     const query = search.trim().toLowerCase();
     return events.filter((event) => {
       const matchesCategory = category === 'all' || event.category === category;
-      const matchesTeam = team === 'all' || event.teamId === team || event.teamId === 'all';
       const matchesSearch =
         !query ||
         event.title.toLowerCase().includes(query) ||
         event.subtitle.toLowerCase().includes(query) ||
         event.venue.toLowerCase().includes(query) ||
         event.city.toLowerCase().includes(query);
-      return matchesCategory && matchesTeam && matchesSearch;
+      return matchesCategory && matchesSearch;
     });
-  }, [search, category, team, events]);
+  }, [search, category, events]);
 
   const featuredEvents = filteredEvents.filter((e) => e.featured);
   const upcomingEvents = filteredEvents.filter((e) => !e.featured);
 
   return (
-    <div className="min-h-dvh -mx-4 -my-8 px-4 py-8">
-      <section className="border-b border-border bg-surface -mx-4 px-4 py-10 md:py-14">
+    <div className="min-h-dvh -my-8">
+      <section className="border-b border-border bg-surface pb-2 md:pb-2">
         <div className="mx-auto max-w-6xl">
           <Badge color="success" className="mb-4 w-fit">
             Preventas y venta oficial
           </Badge>
-          <h1 className="max-w-3xl text-3xl font-bold leading-tight text-text md:text-5xl">
+          <h1 className="max-w-3xl text-[18px] font-bold leading-tight text-text sm:text-[22.5px] md:text-[36px]">
             Tus entradas para los mejores eventos en un solo lugar
           </h1>
-          <p className="mt-4 max-w-2xl text-base text-text-soft md:text-lg">
+          <p className="mt-3 max-w-2xl text-sm text-text-soft sm:mt-4 sm:text-base md:text-lg">
             Compra boletos para partidos, conciertos y shows en vivo. Regístrate,
             elige tu zona y recibe tu QR al instante.
           </p>
-          <div className="mt-8 grid grid-cols-1 gap-3 sm:grid-cols-3">
+          <div className="mt-6 grid grid-cols-3 gap-2 sm:mt-8 sm:gap-3">
             {[
               { value: `${events.length}+`, label: 'Eventos activos' },
               { value: 'QR', label: 'Acceso digital' },
@@ -87,27 +84,26 @@ export default function HomePage() {
             ].map((stat) => (
               <div
                 key={stat.label}
-                className="rounded-2xl border border-border bg-surface-2 px-4 py-3"
+                className="rounded-2xl border border-border bg-surface-2 px-2 py-2 sm:px-4 sm:py-3"
               >
-                <strong className="block text-xl text-text">{stat.value}</strong>
-                <span className="text-sm text-text-soft">{stat.label}</span>
+                <strong className="block text-base text-text sm:text-xl">{stat.value}</strong>
+                <span className="text-[11px] text-text-soft sm:text-sm">{stat.label}</span>
               </div>
             ))}
           </div>
         </div>
       </section>
 
-      <div className="mx-auto max-w-6xl py-8" id="eventos">
-        <section className="mb-8 space-y-6">
+      <div className="mx-auto max-w-6xl pb-8 pt-2" id="eventos">
+        <section className="mb-6 space-y-4 sm:mb-8 sm:space-y-6">
           <input
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Buscar eventos, equipos o venues..."
+            placeholder="Buscar eventos o venues..."
             className="w-full rounded-lg border border-border bg-surface px-4 py-2 text-sm text-text placeholder:text-text-soft focus:border-primary focus:outline-none"
           />
           <CategoryFilter categories={categories} activeCategory={category} onChange={setCategory} />
-          <TeamFilter teams={teams} activeTeam={team} onChange={setTeam} />
         </section>
 
         {error && (
@@ -145,12 +141,12 @@ export default function HomePage() {
         />
       </div>
 
-      <section className="mx-auto max-w-6xl px-4 py-8" id="faq">
+      <section className="mx-auto max-w-6xl py-6 sm:py-8" id="faq">
         <h2 className="mb-4 text-xl font-bold text-text">¿Cómo comprar?</h2>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
           {[
             ['1', 'Regístrate', 'Crea tu cuenta con correo y contraseña en segundos.'],
-            ['2', 'Elige tu evento', 'Filtra por categoría, equipo o busca por nombre.'],
+            ['2', 'Elige tu evento', 'Filtra por categoría o busca por nombre.'],
             ['3', 'Selecciona zona', 'Escoge tribuna, cantidad y aplica códigos promo.'],
             ['4', 'Recibe tu QR', 'Tus entradas quedan en Mis entradas al confirmar.'],
           ].map(([step, title, text]) => (

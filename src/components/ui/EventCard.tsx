@@ -50,14 +50,14 @@ export default function EventCard({ event, featured = false }: EventCardProps) {
           <Badge color="success" className="w-fit uppercase">
             {event.category}
           </Badge>
-          <h3 className="text-lg font-bold text-text">{event.title}</h3>
-          <p className="text-sm text-text-soft">{event.subtitle}</p>
-          <p className="text-sm text-text-soft">
+          <h3 className="line-clamp-2 text-base font-bold text-text sm:text-lg">{event.title}</h3>
+          <p className="line-clamp-2 text-sm text-text-soft">{event.subtitle}</p>
+          <p className="truncate text-sm text-text-soft">
             {event.venue} · {event.city}
           </p>
-          <div className="mt-2 flex items-center justify-between border-t border-border pt-3 text-sm">
-            <span className="text-text-soft">{date.time} hs</span>
-            <strong className="text-primary">Desde {formatPrice(event.priceFrom)}</strong>
+          <div className="mt-2 flex items-center justify-between gap-2 border-t border-border pt-3 text-sm">
+            <span className="shrink-0 text-text-soft">{date.time} hs</span>
+            <strong className="truncate text-primary">Desde {formatPrice(event.priceFrom)}</strong>
           </div>
         </div>
       </Card>
