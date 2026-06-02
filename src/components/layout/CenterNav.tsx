@@ -8,15 +8,17 @@ const baseLinks = [
   { href: '/eventos', label: 'Eventos' },
 ];
 
-const userLinks = [
-  { href: '/mis-tickets', label: 'Mis Tickets' },
-];
-
 export default function CenterNav() {
   const pathname = usePathname();
-  const { authenticated } = useAuth();
+  const { authenticated, user } = useAuth();
 
-  const links = authenticated ? [...baseLinks, ...userLinks] : baseLinks;
+  const contextLink = authenticated
+    ? user?.role === 'producer'
+      ? { href: '/producer/eventos', label: 'Mis Eventos' }
+      : { href: '/mis-tickets', label: 'Mis Tickets' }
+    : null;
+
+  const links = contextLink ? [...baseLinks, contextLink] : baseLinks;
 
   return (
     <ul className="flex items-center gap-0.5 list-none m-0 p-0" role="list">
