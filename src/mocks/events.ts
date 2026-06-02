@@ -21,6 +21,11 @@ export interface Zone {
   available: number;
 }
 
+export interface EventCoordinates {
+  lat: number;
+  lng: number;
+}
+
 export interface Event {
   id: string;
   title: string;
@@ -29,6 +34,9 @@ export interface Event {
   teamId: string;
   venue: string;
   city: string;
+  address?: string;
+  capacity?: number;
+  coordinates: EventCoordinates;
   date: string;
   time: string;
   priceFrom: number;
@@ -36,6 +44,8 @@ export interface Event {
   badge: string | null;
   imageGradient: string;
   zones: Zone[];
+  posterUrl?: string | null;
+  fallbackImageUrl?: string | null;
 }
 
 export const events: Event[] = [
@@ -47,6 +57,7 @@ export const events: Event[] = [
     teamId: 'cruz-azul',
     venue: 'Estadio Ciudad de los Deportes',
     city: 'CDMX',
+    coordinates: { lat: 19.3974, lng: -99.1794 },
     date: '2026-05-30',
     time: '21:00',
     priceFrom: 500,
@@ -67,6 +78,7 @@ export const events: Event[] = [
     teamId: 'america',
     venue: 'Estadio Azteca',
     city: 'CDMX',
+    coordinates: { lat: 19.3029, lng: -99.1506 },
     date: '2026-06-05',
     time: '19:00',
     priceFrom: 450,
@@ -87,6 +99,7 @@ export const events: Event[] = [
     teamId: 'all',
     venue: 'Arena CDMX',
     city: 'CDMX',
+    coordinates: { lat: 19.4326, lng: -99.1332 },
     date: '2026-06-06',
     time: '23:00',
     priceFrom: 350,
@@ -106,6 +119,7 @@ export const events: Event[] = [
     teamId: 'all',
     venue: 'Foro Sol',
     city: 'CDMX',
+    coordinates: { lat: 19.4052, lng: -99.0907 },
     date: '2026-06-12',
     time: '20:30',
     priceFrom: 890,
@@ -126,6 +140,7 @@ export const events: Event[] = [
     teamId: 'chivas',
     venue: 'Estadio Akron',
     city: 'Guadalajara',
+    coordinates: { lat: 20.6818, lng: -103.4624 },
     date: '2026-06-14',
     time: '19:06',
     priceFrom: 280,
@@ -145,6 +160,7 @@ export const events: Event[] = [
     teamId: 'all',
     venue: 'Teatro Metropolitan',
     city: 'CDMX',
+    coordinates: { lat: 19.43, lng: -99.14 },
     date: '2026-06-19',
     time: '23:00',
     priceFrom: 420,
