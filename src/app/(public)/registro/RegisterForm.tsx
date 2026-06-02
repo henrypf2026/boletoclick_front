@@ -23,6 +23,13 @@ const initialValues = {
   acceptTerms: false,
 };
 
+const producerBenefits = [
+  'Crea y publica eventos con múltiples zonas y precios',
+  'Gestiona el aforo y el stock de entradas en tiempo real',
+  'Escanea y valida entradas en el acceso con tu celular',
+  'Consulta reportes de ventas y recaudación por evento',
+];
+
 export function RegisterForm() {
   const { register } = useAuth();
   const router = useRouter();
@@ -52,11 +59,12 @@ export function RegisterForm() {
 
   return (
     <>
-      <div className="mt-4 flex overflow-hidden rounded-lg border border-border">
+      {/* Toggle comprador / productor */}
+      <div className="mt-4 flex overflow-hidden border-2 border-border">
         <button
           type="button"
           onClick={() => setRegisterType('user')}
-          className={`flex-1 py-2 text-sm font-medium transition-colors ${
+          className={`flex-1 py-2 text-sm font-black uppercase tracking-wide transition-colors ${
             !isProducer
               ? 'bg-primary text-background'
               : 'bg-surface text-text-soft hover:text-text'
@@ -67,7 +75,7 @@ export function RegisterForm() {
         <button
           type="button"
           onClick={() => setRegisterType('producer')}
-          className={`flex-1 py-2 text-sm font-medium transition-colors ${
+          className={`flex-1 py-2 text-sm font-black uppercase tracking-wide transition-colors ${
             isProducer
               ? 'bg-primary text-background'
               : 'bg-surface text-text-soft hover:text-text'
@@ -79,9 +87,26 @@ export function RegisterForm() {
 
       <p className="mt-2 text-sm text-text-soft">
         {isProducer
-          ? 'Registrate como productor para crear y gestionar eventos.'
+          ? 'Regístrate como productor para crear y gestionar eventos.'
           : 'Crea tu cuenta para acceder a preventas y comprar entradas.'}
       </p>
+
+      {/* Info bloque productor */}
+      {isProducer && (
+        <div className="mt-3 border-2 border-border bg-surface-2 p-4 shadow-[3px_3px_0px_0px_rgba(23,23,23,1)] dark:shadow-[3px_3px_0px_0px_rgba(255,255,255,1)]">
+          <p className="mb-3 text-[11px] font-black uppercase tracking-widest text-accent">
+            ↗ ¿Qué puede hacer un productor?
+          </p>
+          <ul className="flex flex-col gap-2">
+            {producerBenefits.map((benefit) => (
+              <li key={benefit} className="flex items-start gap-2 text-sm text-text-soft">
+                <span className="mt-0.5 shrink-0 text-xs font-black text-primary">✦</span>
+                {benefit}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       <Formik
         initialValues={initialValues}
@@ -93,7 +118,7 @@ export function RegisterForm() {
             <FormTextInput label="Nombre completo" name="name" type="text" placeholder="Juan Pérez" autoComplete="name" />
             <FormTextInput label="Correo electrónico" name="email" type="email" placeholder="tu@correo.com" autoComplete="email" />
             <FormTextInput label="Fecha de nacimiento" name="birthDate" type="date" autoComplete="bday" />
-            <FormTextInput label="Número de documento" name="documentNumber" type="text" placeholder="DNI o pasaporte" />
+            <FormTextInput label="Número de identificación" name="documentNumber" type="text" placeholder="INE, pasaporte o identificación oficial" />
 
             {isProducer && (
               <FormTextInput label="Nombre de la empresa" name="businessName" type="text" placeholder="Eventos S.A." />

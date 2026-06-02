@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { navItems } from "@/config/navigation";
-import NavLinks from "./NavLinks";
-import NavSearchButton from "./NavSearchButton";
+import CenterNav from "./CenterNav";
+import { NavDarkModeToggle } from "./DarkModeToggle";
 import UserMenuButton from "./UserMenuButton";
 import MobileMenu from "./MobileMenu";
 
@@ -23,11 +23,11 @@ export default function Navbar() {
         </Link>
 
         <div className="hidden md:block absolute left-1/2 -translate-x-1/2">
-          <NavLinks links={navItems} />
+          <CenterNav />
         </div>
 
         <div className="ml-auto flex items-center gap-2">
-          <NavSearchButton />
+          <NavDarkModeToggle />
           <UserMenuButton />
           <div className="md:hidden">
             <MobileMenu navLinks={navItems} />
