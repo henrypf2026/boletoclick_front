@@ -2,8 +2,11 @@
 
 import { useState, useEffect } from "react";
 
+const BASE_OFFSET = 24; // equivalente a bottom-6
+
 export default function DarkModeToggle() {
   const [darkMode, setDarkMode] = useState(false);
+  const [bottomOffset, setBottomOffset] = useState(BASE_OFFSET);
 
   useEffect(() => {
     const root = window.document.documentElement;
@@ -14,10 +17,31 @@ export default function DarkModeToggle() {
     }
   }, [darkMode]);
 
+  useEffect(() => {
+    const footer = document.querySelector("footer");
+    if (!footer) return;
+
+    const updateOffset = () => {
+      const footerTop = footer.getBoundingClientRect().top;
+      const overlap = window.innerHeight - footerTop;
+      setBottomOffset(overlap > 0 ? overlap + BASE_OFFSET : BASE_OFFSET);
+    };
+
+    window.addEventListener("scroll", updateOffset, { passive: true });
+    window.addEventListener("resize", updateOffset, { passive: true });
+    updateOffset();
+
+    return () => {
+      window.removeEventListener("scroll", updateOffset);
+      window.removeEventListener("resize", updateOffset);
+    };
+  }, []);
+
   return (
     <button
       onClick={() => setDarkMode(!darkMode)}
-      className="fixed bottom-6 right-6 z-50 cursor-pointer font-black text-xs uppercase tracking-wider px-4 py-3 bg-accent text-black border-4 border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] hover:-translate-x-0.5 hover:-translate-y-0.5 hover:shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] active:translate-x-1 active:translate-y-1 active:shadow-[0px_0px_0px_0px_rgba(0,0,0,1)] transition-all"
+      style={{ bottom: `${bottomOffset}px` }}
+      className="fixed right-6 z-50 cursor-pointer font-black text-xs uppercase tracking-wider px-4 py-3 bg-accent text-black border-4 border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] hover:-translate-x-0.5 hover:-translate-y-0.5 hover:shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] active:translate-x-1 active:translate-y-1 active:shadow-[0px_0px_0px_0px_rgba(0,0,0,1)] transition-[bottom,box-shadow,transform] duration-200"
     >
       {darkMode ? "☀️ Modo Claro" : "🌙 Modo Oscuro"}
     </button>
