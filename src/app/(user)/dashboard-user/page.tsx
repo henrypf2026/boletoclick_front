@@ -1,6 +1,8 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import { useFormik } from "formik";
+import * as Yup from "yup";
 
 interface Ticket {
   id: string;
@@ -17,21 +19,44 @@ interface Tarjeta {
   ultimosCuatro: string;
 }
 
+interface ProfileFormValues {
+  nombreTitular: string;
+  dni: string;
+  telefono: string;
+  passwordActual: string;
+  passwordNueva: string;
+  allowNewsletter: boolean;
+}
+
+const validationSchema = Yup.object({
+  nombreTitular: Yup.string().required("Requerido"),
+  dni: Yup.string()
+    .matches(/^\d+$/, "Solo números")
+    .min(7, "Mínimo 7 dígitos")
+    .max(8, "Máximo 8 dígitos")
+    .required("Requerido"),
+  telefono: Yup.string().matches(/^\d+$/, "Solo números").required("Requerido"),
+  passwordActual: Yup.string(),
+  passwordNueva: Yup.string().min(6, "Mínimo 6 caracteres"),
+  allowNewsletter: Yup.boolean().required(),
+});
+
 export default function UserDashboard() {
   const [seccionActiva, setSeccionActiva] = useState<
     "entradas" | "historial" | "perfil"
   >("entradas");
   const [ticketExpandido, setTicketExpandido] = useState<Ticket | null>(null);
-
   const [loading, setLoading] = useState(false);
 
-  const [nombreTitular, setNombreTitular] = useState("JUAN PEREZ");
-  const [dni, setDni] = useState("40123456");
-  const [telefono, setTelefono] = useState("1123456789");
-  const [avatar, setAvatar] = useState<string | null>(null);
-  const [passwordActual, setPasswordActual] = useState("");
-  const [passwordNueva, setPasswordNueva] = useState("");
+  // Estados para manejo de archivos e imágenes
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [uploadingImage, setUploadingImage] = useState(false);
+  const [submitStatus, setSubmitStatus] = useState<"success" | "error" | null>(
+    null,
+  );
 
+  // Métodos de pago locales
   const [tarjetas, setTarjetas] = useState<Tarjeta[]>([
     {
       id: "card-1",
@@ -50,10 +75,6 @@ export default function UserDashboard() {
   const [nuevaTarjetaTipo, setNuevaTarjetaTipo] = useState<
     "Crédito" | "Débito"
   >("Débito");
-
-  const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "success">(
-    "idle",
-  );
   const [filtroHistorial, setFiltroHistorial] = useState("");
 
   useEffect(() => {
@@ -98,16 +119,105 @@ export default function UserDashboard() {
     },
   ];
 
-  const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setAvatar(reader.result as string);
-      };
-      reader.readAsDataURL(file);
-    }
+    if (!file) return;
+
+    setImageFile(file);
+    const previewUrl = URL.createObjectURL(file);
+    setImagePreview(previewUrl);
   };
+
+  const uploadImage = async (file: File, userId: number): Promise<string> => {
+    const formData = new FormData();
+    formData.append("file", file);
+
+    const response = await fetch(
+      `http://localhost:3000/files/uploadImage/${userId}`,
+      {
+        method: "POST",
+        body: formData,
+      },
+    );
+
+    if (!response.ok) throw new Error("Error al subir la imagen");
+    return await response.text();
+  };
+
+  const formik = useFormik<ProfileFormValues>({
+    initialValues: {
+      nombreTitular: "JUAN PEREZ",
+      dni: "40123456",
+      telefono: "1123456789",
+      passwordActual: "",
+      passwordNueva: "",
+      allowNewsletter: false,
+    },
+    validationSchema,
+    onSubmit: async (values, { setSubmitting, resetForm }) => {
+      try {
+        setSubmitStatus(null);
+        setUploadingImage(true);
+
+        const token = localStorage.getItem("token");
+        const meResponse = await fetch("http://localhost:3000/auth/me", {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+
+        if (!meResponse.ok) throw new Error("Error al autenticar usuario");
+        const user = await meResponse.json();
+        const userId = user.id;
+
+        let profileImageUrl: string | null = null;
+        if (imageFile) {
+          profileImageUrl = await uploadImage(imageFile, userId);
+        }
+
+        setUploadingImage(false);
+
+        const body: Record<string, unknown> = {
+          nombreTitular: values.nombreTitular,
+          dni: values.dni,
+          telefono: values.telefono,
+          allowNewsletter: values.allowNewsletter,
+        };
+
+        if (profileImageUrl) {
+          body.profileImageUrl = profileImageUrl;
+        }
+
+        if (values.passwordNueva) {
+          body.passwordActual = values.passwordActual;
+          body.passwordNueva = values.passwordNueva;
+        }
+
+        const response = await fetch(`http://localhost:3000/users/${userId}`, {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify(body),
+        });
+
+        if (!response.ok) throw new Error("Error al actualizar el perfil");
+
+        setSubmitStatus("success");
+        resetForm({
+          values: { ...values, passwordActual: "", passwordNueva: "" },
+        });
+        setTimeout(() => setSubmitStatus(null), 3500);
+      } catch (error) {
+        console.error(error);
+        setSubmitStatus("error");
+      } finally {
+        setSubmitting(false);
+        setUploadingImage(false);
+      }
+    },
+  });
+
+  const isProfileLoading = formik.isSubmitting || uploadingImage;
 
   const handleAgregarTarjeta = (e: React.FormEvent) => {
     e.preventDefault();
@@ -131,17 +241,6 @@ export default function UserDashboard() {
     setTarjetas(tarjetas.filter((t) => t.id !== id));
   };
 
-  const handleGuardarPerfil = (e: React.FormEvent) => {
-    e.preventDefault();
-    setSaveStatus("saving");
-    setTimeout(() => {
-      setSaveStatus("success");
-      setPasswordActual("");
-      setPasswordNueva("");
-      setTimeout(() => setSaveStatus("idle"), 2500);
-    }, 1000);
-  };
-
   const comprasFiltradas = compras.filter(
     (c) =>
       c.evento.toLowerCase().includes(filtroHistorial.toLowerCase()) ||
@@ -150,6 +249,7 @@ export default function UserDashboard() {
 
   return (
     <div className="p-4 md:p-8 max-w-4xl mx-auto min-h-screen bg-background text-text transition-colors">
+      {/* Header Dashboard */}
       <div className="mb-8 border-b-4 border-text pb-4 flex flex-col md:flex-row justify-between items-start md:items-end gap-2">
         <div>
           <h1 className="uppercase font-black text-3xl md:text-4xl tracking-tighter">
@@ -164,6 +264,7 @@ export default function UserDashboard() {
         </div>
       </div>
 
+      {/* Tabs */}
       <div className="flex border-b-2 border-text mb-6 gap-2 overflow-x-auto pb-0">
         {(
           [
@@ -193,6 +294,7 @@ export default function UserDashboard() {
         </div>
       ) : (
         <>
+          {/* SECCIÓN: ENTRADAS */}
           {seccionActiva === "entradas" && (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
               {tickets.map((ticket) => (
@@ -220,7 +322,6 @@ export default function UserDashboard() {
                       </span>
                     </p>
                   </div>
-
                   <div className="bg-surface-2 p-3 border-2 border-text flex flex-col items-center justify-center max-w-40 mx-auto w-full transition-transform group-hover:scale-105">
                     <div className="w-full py-3 bg-black text-white flex items-center justify-center font-mono text-[10px] uppercase font-black tracking-widest">
                       [ SCAN CODE ]
@@ -231,6 +332,7 @@ export default function UserDashboard() {
             </div>
           )}
 
+          {/* SECCIÓN: HISTORIAL */}
           {seccionActiva === "historial" && (
             <div className="space-y-4">
               <div className="bg-surface border-2 border-text p-3 shadow-[2px_2px_0px_0px_var(--color-text)]">
@@ -297,27 +399,23 @@ export default function UserDashboard() {
             </div>
           )}
 
+          {/* SECCIÓN: MI PERFIL */}
           {seccionActiva === "perfil" && (
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
               <div className="lg:col-span-2 bg-surface border-2 border-text p-6 shadow-[4px_4px_0px_0px_var(--color-text)] relative">
-                {saveStatus === "success" && (
-                  <div className="absolute -top-4 right-4 bg-success text-black border-2 border-text font-mono text-xs font-black uppercase px-3 py-1.5 shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] z-10">
-                    ✓ Cambios guardados localmente
-                  </div>
-                )}
-
-                <form onSubmit={handleGuardarPerfil} className="space-y-6">
+                <form onSubmit={formik.handleSubmit} className="space-y-6">
                   <div>
                     <h2 className="text-xl font-black uppercase tracking-tight border-b-2 border-text pb-2 mb-6">
                       Configuración de Perfil
                     </h2>
 
+                    {/* Foto de Perfil / Avatar */}
                     <div className="flex flex-col sm:flex-row items-center gap-6 p-4 border-2 border-dashed border-text/40 bg-background/50 mb-6 shadow-[2px_2px_0px_0px_var(--color-text)]">
                       <div className="shrink-0">
-                        {avatar ? (
+                        {imagePreview ? (
                           <div className="w-24 h-24 border-4 border-text shadow-[3px_3px_0px_0px_rgba(23,23,23,1)] overflow-hidden bg-surface">
                             <img
-                              src={avatar}
+                              src={imagePreview}
                               alt="Avatar"
                               className="w-full h-full object-cover"
                             />
@@ -331,22 +429,35 @@ export default function UserDashboard() {
                         )}
                       </div>
 
-                      <div className="space-y-2 text-center sm:text-left">
+                      <div className="space-y-2 text-center sm:text-left w-full">
                         <label className="block text-[10px] font-black uppercase text-text font-mono tracking-wider">
                           Foto de perfil (Avatar)
                         </label>
-                        <p className="text-[11px] text-text-soft font-mono uppercase">
+                        <p className="text-[11px] text-text-soft font-mono uppercase mb-2">
                           JPG, PNG. Máx: 2MB.
                         </p>
+                        <label
+                          htmlFor="profileImage"
+                          className="inline-block px-3 py-1.5 bg-surface-2 border-2 border-text font-mono text-xs font-black uppercase tracking-wider cursor-pointer transition-all shadow-[2px_2px_0px_0px_var(--color-text)] hover:shadow-none hover:translate-x-0.5 hover:translate-y-0.5"
+                        >
+                          Elegir archivo
+                        </label>
                         <input
+                          id="profileImage"
                           type="file"
-                          accept="image/*"
-                          onChange={handleAvatarChange}
-                          className="text-xs text-text file:mr-4 file:py-1.5 file:px-3 file:border-2 file:border-text file:text-xs file:font-mono file:font-black file:uppercase file:bg-surface file:text-text file:cursor-pointer hover:file:bg-surface-2 transition-colors"
+                          accept=".jpg,.png,.jpeg,.gif,.webp"
+                          onChange={handleImageChange}
+                          className="hidden"
                         />
+                        {imageFile && (
+                          <p className="font-mono text-[11px] text-text-soft mt-1 block">
+                            ✔ {imageFile.name}
+                          </p>
+                        )}
                       </div>
                     </div>
 
+                    {/* Inputs de datos del perfil */}
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div className="sm:col-span-2">
                         <label className="block text-[10px] font-black uppercase text-text-soft mb-1 font-mono tracking-wider">
@@ -366,13 +477,15 @@ export default function UserDashboard() {
                         </label>
                         <input
                           type="text"
-                          required
-                          value={nombreTitular}
-                          onChange={(e) =>
-                            setNombreTitular(e.target.value.toUpperCase())
-                          }
+                          {...formik.getFieldProps("nombreTitular")}
                           className="w-full bg-background border-2 border-text text-text px-4 py-2.5 text-xs font-black uppercase focus:ring-1 focus:ring-primary focus:outline-none"
                         />
+                        {formik.touched.nombreTitular &&
+                          formik.errors.nombreTitular && (
+                            <span className="text-red-500 font-mono text-[10px] uppercase mt-0.5 block">
+                              {formik.errors.nombreTitular}
+                            </span>
+                          )}
                       </div>
 
                       <div>
@@ -381,14 +494,21 @@ export default function UserDashboard() {
                         </label>
                         <input
                           type="text"
-                          required
                           maxLength={8}
-                          value={dni}
+                          {...formik.getFieldProps("dni")}
                           onChange={(e) =>
-                            setDni(e.target.value.replace(/\D/g, ""))
+                            formik.setFieldValue(
+                              "dni",
+                              e.target.value.replace(/\D/g, ""),
+                            )
                           }
                           className="w-full bg-background border-2 border-text text-text px-4 py-2.5 text-xs font-mono font-bold focus:ring-1 focus:ring-primary focus:outline-none"
                         />
+                        {formik.touched.dni && formik.errors.dni && (
+                          <span className="text-red-500 font-mono text-[10px] uppercase mt-0.5 block">
+                            {formik.errors.dni}
+                          </span>
+                        )}
                       </div>
 
                       <div className="sm:col-span-2">
@@ -397,17 +517,24 @@ export default function UserDashboard() {
                         </label>
                         <input
                           type="text"
-                          required
-                          placeholder="Ej: 1123456789"
-                          value={telefono}
+                          {...formik.getFieldProps("telefono")}
                           onChange={(e) =>
-                            setTelefono(e.target.value.replace(/\D/g, ""))
+                            formik.setFieldValue(
+                              "telefono",
+                              e.target.value.replace(/\D/g, ""),
+                            )
                           }
                           className="w-full bg-background border-2 border-text text-text px-4 py-2.5 text-xs font-mono font-bold focus:ring-1 focus:ring-primary focus:outline-none"
                         />
+                        {formik.touched.telefono && formik.errors.telefono && (
+                          <span className="text-red-500 font-mono text-[10px] uppercase mt-0.5 block">
+                            {formik.errors.telefono}
+                          </span>
+                        )}
                       </div>
                     </div>
 
+                    {/* Seguridad de la Cuenta */}
                     <h3 className="text-sm font-black uppercase tracking-tight border-b-2 border-text/40 pb-1 mt-6 mb-4">
                       Seguridad de la Cuenta
                     </h3>
@@ -420,8 +547,7 @@ export default function UserDashboard() {
                         <input
                           type="password"
                           placeholder="••••••••"
-                          value={passwordActual}
-                          onChange={(e) => setPasswordActual(e.target.value)}
+                          {...formik.getFieldProps("passwordActual")}
                           className="w-full bg-background border-2 border-text text-text px-4 py-2.5 text-xs font-mono focus:ring-1 focus:ring-primary focus:outline-none"
                         />
                       </div>
@@ -433,27 +559,87 @@ export default function UserDashboard() {
                         <input
                           type="password"
                           placeholder="MÍNIMO 6 CARACTERES"
-                          value={passwordNueva}
-                          onChange={(e) => setPasswordNueva(e.target.value)}
+                          {...formik.getFieldProps("passwordNueva")}
                           className="w-full bg-background border-2 border-text text-text px-4 py-2.5 text-xs font-mono focus:ring-1 focus:ring-primary focus:outline-none"
                         />
+                        {formik.touched.passwordNueva &&
+                          formik.errors.passwordNueva && (
+                            <span className="text-red-500 font-mono text-[10px] uppercase mt-0.5 block">
+                              {formik.errors.passwordNueva}
+                            </span>
+                          )}
                       </div>
                     </div>
 
+                    {/* Preferencias de Comunicación (Newsletter) */}
+                    <h3 className="text-sm font-black uppercase tracking-tight border-b-2 border-text/40 pb-1 mt-6 mb-4">
+                      Preferencias de Comunicación
+                    </h3>
+
+                    <label className="flex items-start gap-4 cursor-pointer group">
+                      <div className="relative mt-0.5 shrink-0">
+                        <input
+                          id="allowNewsletter"
+                          type="checkbox"
+                          {...formik.getFieldProps("allowNewsletter")}
+                          checked={formik.values.allowNewsletter}
+                          className="sr-only"
+                        />
+                        <div
+                          className={`w-6 h-6 border-2 border-text flex items-center justify-center transition-all ${
+                            formik.values.allowNewsletter
+                              ? "bg-primary"
+                              : "bg-surface-2"
+                          }`}
+                        >
+                          {formik.values.allowNewsletter && (
+                            <span className="text-background font-black text-xs">
+                              ✔
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <div>
+                        <p className="font-black uppercase text-sm tracking-wide">
+                          Suscribirme al boletín de noticias
+                        </p>
+                        <p className="text-xs font-mono text-text-soft mt-1">
+                          Recibí novedades, eventos destacados y promociones
+                          exclusivas.
+                        </p>
+                      </div>
+                    </label>
+
+                    {/* Feedback Status */}
+                    {submitStatus === "success" && (
+                      <div className="mt-4 border-2 border-success bg-success/10 p-4 font-mono text-xs font-bold uppercase text-success">
+                        ✅ Perfil actualizado correctamente
+                      </div>
+                    )}
+                    {submitStatus === "error" && (
+                      <div className="mt-4 border-2 border-red-500 bg-red-500/10 p-4 font-mono text-xs font-bold uppercase text-red-500">
+                        ❌ Hubo un error al guardar. Intentá de nuevo.
+                      </div>
+                    )}
+
+                    {/* Botón Submit del Form */}
                     <div className="pt-6">
                       <button
                         type="submit"
-                        disabled={saveStatus === "saving"}
+                        disabled={isProfileLoading}
                         className="bg-primary text-background border-2 border-text font-mono font-black px-5 py-2.5 text-xs uppercase tracking-wider shadow-[3px_3px_0px_0px_var(--color-text)] hover:shadow-none hover:translate-x-0.5 hover:translate-y-0.5 transition-all disabled:opacity-50 cursor-pointer w-full sm:w-auto"
                       >
-                        {saveStatus === "saving"
-                          ? "[ GUARDANDO... ]"
+                        {isProfileLoading
+                          ? uploadingImage
+                            ? "[ SUBIENDO IMAGEN... ]"
+                            : "[ GUARDANDO... ]"
                           : "Guardar Cambios"}
                       </button>
                     </div>
                   </div>
                 </form>
 
+                {/* Zona de Peligro */}
                 <div className="pt-6 border-t-2 border-dashed border-text/40 mt-6">
                   <p className="font-mono text-[11px] text-text-soft mb-4 leading-relaxed uppercase">
                     Al eliminar tu cuenta vas a perder el acceso inmediato a tus
@@ -472,6 +658,7 @@ export default function UserDashboard() {
                 </div>
               </div>
 
+              {/* Métodos de Pago Lateral */}
               <div className="space-y-6">
                 <div className="bg-surface border-2 border-text p-6 shadow-[4px_4px_0px_0px_var(--color-text)]">
                   <h2 className="text-lg font-black uppercase tracking-tight border-b-2 border-text pb-2 mb-4">
@@ -566,6 +753,7 @@ export default function UserDashboard() {
         </>
       )}
 
+      {/* Modal / Expansión de Ticket */}
       {ticketExpandido && (
         <div
           className="fixed inset-0 z-50 bg-black/95 backdrop-blur-sm flex items-center justify-center p-4"
