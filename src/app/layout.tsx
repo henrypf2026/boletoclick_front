@@ -3,7 +3,6 @@ import { Inter } from "next/font/google";
 import "./globals.css";
 import Navbar from "@/components/layout/Navbar";
 import Footer from "@/components/layout/Footer";
-import DarkModeToggle from "@/components/layout/DarkModeToggle";
 import { Providers } from "@/components/Providers";
 
 const inter = Inter({
@@ -23,7 +22,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="es" className={`${inter.variable} h-full antialiased`}>
-      <body className="min-h-full flex flex-col bg-background text-text transition-colors duration-200">
+      <body className="min-h-full flex flex-col overflow-x-hidden bg-background text-text transition-colors duration-200">
         <Providers>
           <Navbar />
 
@@ -32,8 +31,6 @@ export default function RootLayout({
           </main>
 
           <Footer />
-
-          <DarkModeToggle />
         </Providers>
       </body>
     </html>

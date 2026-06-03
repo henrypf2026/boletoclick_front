@@ -2,7 +2,8 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
+import { useAuth } from '@/context/AuthContext'
 
 interface NavLinkItem {
   href: string
@@ -11,12 +12,7 @@ interface NavLinkItem {
 
 function HamburgerIcon() {
   return (
-    <svg
-      width="20" height="20" viewBox="0 0 24 24"
-      fill="none" stroke="currentColor" strokeWidth="2"
-      strokeLinecap="round" strokeLinejoin="round"
-      aria-hidden="true"
-    >
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <line x1="4" x2="20" y1="7" y2="7" />
       <line x1="4" x2="20" y1="12" y2="12" />
       <line x1="4" x2="20" y1="17" y2="17" />
@@ -26,12 +22,7 @@ function HamburgerIcon() {
 
 function CloseIcon() {
   return (
-    <svg
-      width="18" height="18" viewBox="0 0 24 24"
-      fill="none" stroke="currentColor" strokeWidth="2"
-      strokeLinecap="round" strokeLinejoin="round"
-      aria-hidden="true"
-    >
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <path d="M18 6 6 18M6 6l12 12" />
     </svg>
   )
@@ -40,19 +31,38 @@ function CloseIcon() {
 export default function MobileMenu({ navLinks }: { navLinks: NavLinkItem[] }) {
   const [isOpen, setIsOpen] = useState(false)
   const pathname = usePathname()
+  const router = useRouter()
+  const { authenticated, user, logout } = useAuth()
 
-  // Cierra al navegar
-  useEffect(() => {
-    setIsOpen(false)
-  }, [pathname])
+  useEffect(() => { setIsOpen(false) }, [pathname])
 
-  // Bloquea scroll del body mientras está abierto
   useEffect(() => {
     document.body.style.overflow = isOpen ? 'hidden' : ''
-    return () => {
-      document.body.style.overflow = ''
-    }
+    return () => { document.body.style.overflow = '' }
   }, [isOpen])
+
+  const handleLogout = () => {
+    logout()
+    setIsOpen(false)
+    router.push('/')
+  }
+
+  const dashboardHref = user?.role === 'producer' ? '/producer/dashboard' : '/dashboard-user'
+  const dashboardLabel = user?.role === 'producer' ? 'Mi Dashboard' : 'Mi Cuenta'
+
+  const contextLink: NavLinkItem = user?.role === 'producer'
+    ? { href: '/producer/eventos', label: 'Mis Eventos' }
+    : { href: '/mis-tickets', label: 'Mis Tickets' };
+
+  const userLinks: NavLinkItem[] = authenticated && user
+    ? [
+        contextLink,
+        { href: dashboardHref, label: dashboardLabel },
+        { href: '/perfil', label: 'Perfil' },
+      ]
+    : []
+
+  const allLinks = [...navLinks, ...userLinks]
 
   return (
     <>
@@ -86,6 +96,7 @@ export default function MobileMenu({ navLinks }: { navLinks: NavLinkItem[] }) {
           transition: 'transform 300ms cubic-bezier(0.25, 1, 0.5, 1)',
         }}
       >
+        {/* Header */}
         <div className="flex items-center justify-between h-16 px-5 border-b border-surface-2 shrink-0">
           <span className="font-semibold text-[15px] tracking-tight text-text">
             Boleto<span className="text-primary">Click</span>
@@ -99,10 +110,10 @@ export default function MobileMenu({ navLinks }: { navLinks: NavLinkItem[] }) {
           </button>
         </div>
 
+        {/* Nav links */}
         <nav className="flex flex-col px-3 pt-4 pb-2 gap-0.5">
-          {navLinks.map((link) => {
-            const isActive =
-              pathname === link.href || pathname.startsWith(link.href + '/')
+          {allLinks.map((link) => {
+            const isActive = pathname === link.href || pathname.startsWith(link.href + '/')
             return (
               <Link
                 key={link.href}
@@ -123,35 +134,43 @@ export default function MobileMenu({ navLinks }: { navLinks: NavLinkItem[] }) {
 
         <div className="h-px bg-surface-2 mx-4 my-1" />
 
-        <div className="px-4 py-3">
-          <div className="relative">
-            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-text-soft pointer-events-none">
-              <svg
-                width="15" height="15" viewBox="0 0 24 24"
-                fill="none" stroke="currentColor" strokeWidth="2"
-                strokeLinecap="round" strokeLinejoin="round"
-                aria-hidden="true"
-              >
-                <circle cx="11" cy="11" r="8" />
-                <path d="m21 21-4.35-4.35" />
-              </svg>
-            </span>
-            <input
-              type="text"
-              placeholder="Buscar eventos, artistas..."
-              className="w-full h-10 pl-9 pr-3 text-sm bg-surface-2 text-text placeholder:text-text-soft rounded-md border border-transparent focus:outline-none focus:border-primary transition-colors"
-            />
+        {/* Greeting when authenticated */}
+        {authenticated && user && (
+          <div className="px-6 py-2">
+            <p className="text-xs font-bold uppercase tracking-wider text-text-soft">
+              {(user.name ?? user.email.split('@')[0]).split(' ')[0]}
+            </p>
+            <p className="text-xs text-text-soft truncate">{user.email}</p>
           </div>
-        </div>
+        )}
 
-        <div className="mt-auto px-4 pb-8 pt-4">
-          <Link
-            href="/login"
-            onClick={() => setIsOpen(false)}
-            className="flex items-center justify-center h-11 w-full bg-primary hover:bg-primary-deep text-white text-sm font-semibold rounded-md transition-colors duration-150"
-          >
-            Ingresar a tu cuenta
-          </Link>
+        {/* Bottom actions */}
+        <div className="mt-auto px-4 pb-8 pt-4 flex flex-col gap-2">
+          {authenticated ? (
+            <button
+              onClick={handleLogout}
+              className="flex items-center justify-center h-11 w-full border-2 border-border text-text text-sm font-bold transition-colors hover:bg-surface-2"
+            >
+              Cerrar sesión
+            </button>
+          ) : (
+            <>
+              <Link
+                href="/registro"
+                onClick={() => setIsOpen(false)}
+                className="flex items-center justify-center h-11 w-full bg-primary text-background text-sm font-black uppercase tracking-wider border-2 border-border shadow-[2px_2px_0px_0px_rgba(23,23,23,1)] transition-all hover:-translate-y-px"
+              >
+                Registrarme
+              </Link>
+              <Link
+                href="/login"
+                onClick={() => setIsOpen(false)}
+                className="flex items-center justify-center h-11 w-full border-2 border-border text-text text-sm font-bold transition-colors hover:bg-surface-2"
+              >
+                Iniciar sesión
+              </Link>
+            </>
+          )}
         </div>
       </div>
     </>
