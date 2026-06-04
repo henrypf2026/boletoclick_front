@@ -5,9 +5,6 @@ export type NavItem = {
 
 export const navItems: NavItem[] = [
   { href: '/eventos', label: 'Eventos' },
-  { href: '/categorias', label: 'Categorías' },
-  { href: '/mis-tickets', label: 'Mis Tickets' },
-  { href: '/favoritos', label: 'Favoritos' },
 ]
 
 export const legalLinks: NavItem[] = [

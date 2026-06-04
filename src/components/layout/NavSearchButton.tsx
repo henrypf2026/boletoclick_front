@@ -74,7 +74,7 @@ export default function NavSearchButton() {
           pointerEvents: isOpen ? 'auto' : 'none',
           transition: 'opacity 150ms ease, transform 150ms cubic-bezier(0.25, 1, 0.5, 1)',
         }}
-        className="absolute top-full right-0 mt-3 w-72 bg-surface border-4 border-border shadow-[4px_4px_0px_0px_rgba(23,23,23,1)] dark:shadow-[4px_4px_0px_0px_rgba(255,255,255,1)] p-3"
+        className="absolute right-0 top-full mt-3 w-[min(18rem,calc(100vw-1.5rem))] border-4 border-border bg-surface p-3 shadow-[4px_4px_0px_0px_rgba(23,23,23,1)] dark:shadow-[4px_4px_0px_0px_rgba(255,255,255,1)]"
       >
         <input
           ref={inputRef}

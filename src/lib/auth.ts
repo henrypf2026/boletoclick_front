@@ -53,12 +53,17 @@ export function clearToken(): void {
 export async function getUserFromToken(): Promise<User | null> {
   const token = getToken();
   if (!token) return null;
-  const user = await authService.getMe(token);
-  if (!user) {
+  try {
+    const user = await authService.getMe(token);
+    if (!user) {
+      clearToken();
+      return null;
+    }
+    return user;
+  } catch {
     clearToken();
     return null;
   }
-  return user;
 }
 
 // --- Tickets (mock hasta Sprint 2) ---
