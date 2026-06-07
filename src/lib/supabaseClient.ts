@@ -9,6 +9,6 @@ const globalAny = globalThis as typeof globalThis & { _supabase?: ReturnType<typ
 export const supabase = globalAny._supabase ?? (globalAny._supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
     flowType: 'pkce',
-    detectSessionInUrl: false,
+    detectSessionInUrl: true,
   },
 }));
