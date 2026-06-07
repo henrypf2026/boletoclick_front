@@ -7,7 +7,7 @@ async function getBankData() {
     const token = cookieStore.get("token")?.value;
 
     const res = await fetch(
-      `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000"}/bank-accounts/me`,
+      `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001"}/bank-accounts/me`,
       {
         method: "GET",
         headers: {

@@ -45,7 +45,7 @@ export default function BankForm({ initialData }: BankFormProps) {
 
     try {
       const method = initialData ? "PUT" : "POST";
-      const endpoint = `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000"}/bank-accounts/me`;
+      const endpoint = `/api/backend/bank-accounts/me`;
 
       const res = await fetch(endpoint, {
         method: method,

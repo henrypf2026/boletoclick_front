@@ -2,7 +2,6 @@
 
 import { useState } from 'react';
 import { useField } from 'formik';
-import { Checkbox } from 'flowbite-react';
 
 interface FormTextInputProps {
   label: string;
@@ -85,7 +84,13 @@ export function FormCheckbox({ label, name }: FormCheckboxProps) {
         htmlFor={name}
         className="flex cursor-pointer items-start gap-3 rounded-lg border border-border bg-background p-3 hover:bg-surface"
       >
-        <Checkbox id={name} {...field} checked={field.value} className="mt-0.5 shrink-0" />
+        <input
+          id={name}
+          type="checkbox"
+          {...field}
+          checked={field.value}
+          className="mt-0.5 shrink-0 size-4 accent-primary cursor-pointer"
+        />
         <span className="text-sm text-text-soft">{label}</span>
       </label>
       {hasError && <p className="text-sm text-red-500">{meta.error}</p>}
