@@ -6,16 +6,19 @@ const BASE_OFFSET = 24;
 
 export function DarkModeToggle() {
   const [darkMode, setDarkMode] = useState(false);
+  const [mounted, setMounted] = useState(false);
   const [bottomOffset, setBottomOffset] = useState(BASE_OFFSET);
 
   useEffect(() => {
-    const root = window.document.documentElement;
-    if (darkMode) {
-      root.classList.add("dark");
-    } else {
-      root.classList.remove("dark");
-    }
-  }, [darkMode]);
+    setDarkMode(document.documentElement.classList.contains("dark"));
+    setMounted(true);
+  }, []);
+
+  useEffect(() => {
+    if (!mounted) return;
+    document.documentElement.classList.toggle("dark", darkMode);
+    localStorage.setItem("theme", darkMode ? "dark" : "light");
+  }, [darkMode, mounted]);
 
   useEffect(() => {
     const footer = document.querySelector("footer");
@@ -51,15 +54,18 @@ export function DarkModeToggle() {
 
 export function NavDarkModeToggle() {
   const [darkMode, setDarkMode] = useState(false);
+  const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
-    const root = window.document.documentElement;
-    if (darkMode) {
-      root.classList.add("dark");
-    } else {
-      root.classList.remove("dark");
-    }
-  }, [darkMode]);
+    setDarkMode(document.documentElement.classList.contains("dark"));
+    setMounted(true);
+  }, []);
+
+  useEffect(() => {
+    if (!mounted) return;
+    document.documentElement.classList.toggle("dark", darkMode);
+    localStorage.setItem("theme", darkMode ? "dark" : "light");
+  }, [darkMode, mounted]);
 
   return (
     <button
