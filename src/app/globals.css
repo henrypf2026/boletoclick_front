@@ -1,26 +1,110 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --primary: #6750e0;
+  --primary-deep: #4d3bb5;
+  --accent: #ff6b00;
+  --background: #efeede;
+  --bg: #efeede;
+  --surface: #f5f4f0;
+  --surface-2: #e2e1d5;
+  --border: #171717;
+  --success: #16a34a;
+  --text: #171717;
+  --text-soft: #4a4a4a;
+
+  --font-sans: var(--font-inter);
+}
+
+.dark {
+  --primary: #ccff00;
+  --primary-deep: #b3e600;
+  --accent: #ffffff;
+  --background: #000000;
+  --bg: #000000;
+  --surface: #121212;
+  --surface-2: #1e1e1e;
+  --border: #ffffff;
+  --success: #00ff66;
+  --text: #ffffff;
+  --text-soft: #a3a3a3;
 }
 
 @theme inline {
+  --color-primary: var(--primary);
+  --color-primary-deep: var(--primary-deep);
+  --color-accent: var(--accent);
   --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-border: var(--border);
+  --color-success: var(--success);
+  --color-text: var(--text);
+  --color-text-soft: var(--text-soft);
+  --font-sans: var(--font-sans);
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background-color: var(--background);
+  color: var(--text);
+  font-family: var(--font-sans), sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1,
+h2,
+h3,
+h4 {
+  font-weight: 900;
+  letter-spacing: -0.03em;
+  text-transform: uppercase;
+}
+
+h1 {
+  font-size: 2.5rem;
+  line-height: 1;
+}
+h2 {
+  font-size: 2rem;
+  line-height: 1.1;
+}
+h3 {
+  font-size: 1.5rem;
+  line-height: 1.2;
+}
+
+p {
+  font-size: 1rem;
+  font-weight: 500;
+  line-height: 1.5;
+}
+
+.neo-box {
+  background-color: var(--surface);
+  border: 4px solid var(--border);
+  box-shadow: 4px 4px 0px 0px var(--border);
+  transition:
+    transform 0.1s ease,
+    box-shadow 0.1s ease;
+}
+
+.neo-btn-interactive {
+  background-color: var(--primary);
+  color: var(--background);
+  border: 4px solid var(--border);
+  box-shadow: 4px 4px 0px 0px var(--border);
+  font-weight: 900;
+  text-transform: uppercase;
+  transition: all 0.1s ease;
+}
+
+.neo-btn-interactive:hover {
+  transform: translate(-2px, -2px);
+  box-shadow: 6px 6px 0px 0px var(--border);
+}
+
+.neo-btn-interactive:active {
+  transform: translate(4px, 4px);
+  box-shadow: 0px 0px 0px 0px var(--border);
 }
