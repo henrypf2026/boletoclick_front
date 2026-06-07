@@ -88,7 +88,7 @@ export default function EventForm() {
 
     try {
       const res = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000"}/events`,
+        `/api/backend/events`,
         {
           method: "POST",
           headers: {
