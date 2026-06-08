@@ -1,6 +1,8 @@
 import { cookies } from "next/headers";
 import BankForm from "./BankForm";
 
+export const dynamic = 'force-dynamic';
+
 async function getBankData() {
   try {
     const cookieStore = await cookies();
