@@ -8,8 +8,8 @@ import { useAuth } from '@/context/AuthContext';
 import { formatEventDate, formatPrice, type Event } from '@/mocks/events';
 import { eventService } from '@/services/eventService';
 import { saveTicket } from '@/lib/auth';
+import { createTicketQrUrl, type TicketQrData } from '@/lib/ticketQr';
 import EventMap from '@/components/ui/EventMap';
-import { paymentService } from '@/services/paymentService';
 
 export default function EventoPage() {
   const params = useParams();
@@ -77,59 +77,47 @@ export default function EventoPage() {
     setMessage('Código no válido. Probá con BOLETO10.');
   };
 
-  const handlePurchase = async () => {
+  const handlePurchase = () => {
+    if (!authenticated) {
+      router.push(`/login?from=/eventos/${event.id}`);
+      return;
+    }
 
-  if (!authenticated) {
-    router.push(`/login?from=/eventos/${event.id}`);
-    return;
-  }
+    if (!selectedZone || quantity > selectedZone.available) {
+      setMessage('Cantidad no disponible en esa zona.');
+      return;
+    }
 
-  if (!selectedZone || quantity > selectedZone.available) {
-    setMessage('Cantidad no disponible en esa zona.');
-    return;
-  }
+    try {
+      const ticketId = crypto.randomUUID();
+      const purchasedAt = new Date().toISOString();
 
-  try {
+      const qrData: TicketQrData = {
+        id: ticketId,
+        eventId: event.id,
+        eventTitle: event.title,
+        venue: event.venue,
+        city: event.city,
+        address: event.address,
+        coordinates: event.coordinates,
+        date: event.date,
+        time: event.time,
+        zone: selectedZone.name,
+        quantity,
+        total,
+        purchasedAt,
+      };
 
-    const session = await paymentService.createCheckoutSession({
-      id: crypto.randomUUID(),
-      userId: user!.id,
-      eventId: event.id,
-      eventTitle: event.title,
-      venue: event.venue,
-      date: event.date,
-      time: event.time,
-      zone: selectedZone.name,
-      quantity,
-      total,
-      qrCode: `BC-${Date.now()}`,
-      purchasedAt: new Date().toISOString(),
-    });
-
-    window.location.href = session.url;
-
-  } catch {
-
-    setMessage('Error procesando la compra');
-
-  }
-
-};
-    //saveTicket({
-    //id: crypto.randomUUID(),
-    //userId: user!.id,
-    //eventId: event.id,
-    //eventTitle: event.title,
-    //venue: event.venue,
-    //date: event.date,
-    //time: event.time,
-    //zone: selectedZone.name,
-    //quantity,
-    //total,
-    //qrCode: `BC-${Date.now()}`,
-    //purchasedAt: new Date().toISOString(),
-    //});
-    //router.push('/mis-tickets');
+      saveTicket({
+        ...qrData,
+        userId: user!.id,
+        qrCode: createTicketQrUrl(window.location.origin, qrData),
+      });
+      router.push('/mis-tickets');
+    } catch {
+      setMessage('Error procesando la compra');
+    }
+  };
 
   const headerSources = [event.posterUrl, event.fallbackImageUrl].filter(Boolean) as string[];
   const headerImage = headerSources[headerSourceIndex];

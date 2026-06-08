@@ -1,16 +1,13 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
+import Link from "next/link";
 import { useFormik } from "formik";
 import * as Yup from "yup";
-
-interface Ticket {
-  id: string;
-  evento: string;
-  fecha: string;
-  zona: string;
-  qr: string;
-}
+import { useAuth } from "@/context/AuthContext";
+import { getTicketsByUser, type Ticket } from "@/lib/auth";
+import { formatEventDate } from "@/mocks/events";
+import TicketQrCode from "@/components/ui/TicketQrCode";
 
 interface Tarjeta {
   id: string;
@@ -42,6 +39,7 @@ const validationSchema = Yup.object({
 });
 
 export default function UserDashboard() {
+  const { user } = useAuth();
   const [seccionActiva, setSeccionActiva] = useState<
     "entradas" | "historial" | "perfil"
   >("entradas");
@@ -83,22 +81,16 @@ export default function UserDashboard() {
     return () => clearTimeout(timer);
   }, [seccionActiva]);
 
-  const tickets: Ticket[] = [
-    {
-      id: "TK-992",
-      evento: "DUKI - RIVER",
-      fecha: "28 MAY 2026",
-      zona: "CAMPO VIP",
-      qr: "QR-DK-992",
-    },
-    {
-      id: "TK-110",
-      evento: "BABASONICOS - MOVISTAR ARENA",
-      fecha: "15 JUN 2026",
-      zona: "PLATEA ALTA",
-      qr: "QR-BS-110",
-    },
-  ];
+  const tickets = useMemo(() => {
+    if (!user) return [];
+    return getTicketsByUser(user.id).slice().reverse();
+  }, [user, seccionActiva]);
+
+  const formatTicketLabel = (date: string, time: string) => {
+    const formatted = formatEventDate(date, time);
+    const year = new Date(`${date}T${time}:00`).getFullYear();
+    return `${formatted.day} ${formatted.month.toUpperCase()} ${year}`;
+  };
 
   const compras = [
     {
@@ -296,6 +288,19 @@ export default function UserDashboard() {
         <>
           {/* SECCIÓN: ENTRADAS */}
           {seccionActiva === "entradas" && (
+            tickets.length === 0 ? (
+              <div className="border-4 border-dashed border-text bg-surface p-12 text-center">
+                <p className="text-sm font-black uppercase tracking-wide text-text-soft">
+                  Aún no tenés entradas compradas.
+                </p>
+                <Link
+                  href="/eventos"
+                  className="mt-4 inline-block font-mono text-xs font-black uppercase tracking-wider text-primary hover:underline"
+                >
+                  Explorar eventos disponibles →
+                </Link>
+              </div>
+            ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
               {tickets.map((ticket) => (
                 <div
@@ -306,30 +311,37 @@ export default function UserDashboard() {
                   <div className="border-b-2 border-dashed border-text/40 pb-4 mb-4 relative">
                     <div className="flex justify-between items-start gap-2">
                       <h3 className="text-text font-black text-lg uppercase tracking-tight group-hover:text-primary transition-colors">
-                        {ticket.evento}
+                        {ticket.eventTitle}
                       </h3>
                       <span className="text-[9px] font-mono bg-text text-surface px-1.5 py-0.5 font-bold whitespace-nowrap">
                         VER ACCESO
                       </span>
                     </div>
                     <p className="text-primary-deep dark:text-primary font-black mt-2 font-mono text-sm">
-                      {ticket.fecha}
+                      {formatTicketLabel(ticket.date, ticket.time)}
                     </p>
                     <p className="text-text-soft mt-2 text-[11px] uppercase font-bold tracking-wider">
                       SECTOR:{" "}
                       <span className="text-text font-black font-mono bg-surface-2 px-2 py-0.5 border border-text/20">
-                        {ticket.zona}
+                        {ticket.zone}
                       </span>
                     </p>
                   </div>
-                  <div className="bg-surface-2 p-3 border-2 border-text flex flex-col items-center justify-center max-w-40 mx-auto w-full transition-transform group-hover:scale-105">
-                    <div className="w-full py-3 bg-black text-white flex items-center justify-center font-mono text-[10px] uppercase font-black tracking-widest">
-                      [ SCAN CODE ]
+                  <div
+                    className="bg-surface-2 p-3 border-2 border-text flex flex-col items-center justify-center max-w-40 mx-auto w-full transition-transform group-hover:scale-105"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <div className="border-2 border-text bg-background p-1">
+                      <TicketQrCode value={ticket.qrCode} size={100} />
                     </div>
+                    <span className="mt-2 font-mono text-[9px] font-black uppercase tracking-widest text-text-soft">
+                      {ticket.id.slice(0, 8).toUpperCase()}
+                    </span>
                   </div>
                 </div>
               ))}
             </div>
+            )
           )}
 
           {/* SECCIÓN: HISTORIAL */}
@@ -771,31 +783,29 @@ export default function UserDashboard() {
                 PASES DIGITALES BOLETOCLICK
               </span>
               <h2 className="text-black font-black text-2xl uppercase tracking-tighter mt-4 leading-tight">
-                {ticketExpandido.evento}
+                {ticketExpandido.eventTitle}
               </h2>
               <p className="text-black font-mono font-black text-sm mt-1">
-                {ticketExpandido.fecha}
+                {formatTicketLabel(ticketExpandido.date, ticketExpandido.time)}
               </p>
               <div className="mt-3">
                 <span className="text-[10px] font-mono uppercase text-neutral-500 font-bold block mb-1">
                   SECTOR ASIGNADO
                 </span>
                 <span className="bg-black text-white px-3 py-1 text-xs font-mono font-black uppercase tracking-wider">
-                  {ticketExpandido.zona}
+                  {ticketExpandido.zone}
                 </span>
               </div>
             </div>
 
-            <div className="my-6 bg-white p-4 border-4 border-black flex flex-col items-center justify-center aspect-square w-full max-w-60 mx-auto shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
-              <div className="w-full h-full bg-black text-white flex flex-col items-center justify-center p-4 text-center font-mono text-xs uppercase font-black tracking-widest select-none">
-                <span className="text-4xl mb-3">🏁</span>
-                <span className="bg-white text-black px-2 py-0.5 font-mono text-[11px] font-black tracking-normal mb-1">
-                  [{ticketExpandido.qr}]
-                </span>
-                <span className="text-[9px] text-neutral-400 mt-2 tracking-tighter">
-                  DIGITAL TICKET ID
-                </span>
-              </div>
+            <div className="my-6 bg-white p-4 border-4 border-black flex flex-col items-center justify-center w-full max-w-60 mx-auto shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
+              <TicketQrCode value={ticketExpandido.qrCode} size={180} />
+              <span className="mt-3 bg-black text-white px-2 py-0.5 font-mono text-[11px] font-black tracking-normal">
+                {ticketExpandido.id.slice(0, 8).toUpperCase()}
+              </span>
+              <span className="text-[9px] text-neutral-500 mt-2 font-mono font-black uppercase tracking-tighter">
+                Digital ticket id
+              </span>
             </div>
 
             <div className="space-y-3">

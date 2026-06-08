@@ -5,6 +5,8 @@ import Link from 'next/link';
 import { useAuth } from '@/context/AuthContext';
 import { formatEventDate, formatPrice } from '@/mocks/events';
 import { getTicketsByUser } from '@/lib/auth';
+import { getEntryPathFromQrUrl } from '@/lib/ticketQr';
+import TicketQrCode from '@/components/ui/TicketQrCode';
 
 export default function MisTicketsPage() {
   const { user } = useAuth();
@@ -70,6 +72,7 @@ export default function MisTicketsPage() {
           <div className="flex flex-col gap-4">
             {tickets.map((ticket) => {
               const date = formatEventDate(ticket.date, ticket.time);
+              const entryPath = getEntryPathFromQrUrl(ticket.qrCode);
               return (
                 <div
                   key={ticket.id}
@@ -93,9 +96,20 @@ export default function MisTicketsPage() {
                     </div>
 
                     <div className="flex flex-col items-center gap-2">
-                      <div className="flex h-28 w-28 items-center justify-center border-4 border-border bg-background p-2 font-mono text-xs font-black text-text shadow-[2px_2px_0px_0px_rgba(23,23,23,1)] dark:shadow-[2px_2px_0px_0px_rgba(255,255,255,1)]">
-                        {ticket.qrCode}
+                      <div className="border-4 border-border bg-background p-2 shadow-[2px_2px_0px_0px_rgba(23,23,23,1)] dark:shadow-[2px_2px_0px_0px_rgba(255,255,255,1)]">
+                        <TicketQrCode value={ticket.qrCode} size={112} />
                       </div>
+                      {entryPath.startsWith('/entradas/') && (
+                        <Link
+                          href={entryPath}
+                          className="text-[11px] font-black uppercase tracking-wider text-primary hover:underline"
+                        >
+                          Ver detalle de entrada
+                        </Link>
+                      )}
+                      <span className="max-w-[140px] break-all text-center font-mono text-[10px] font-bold text-text-soft">
+                        {ticket.id.slice(0, 8).toUpperCase()}
+                      </span>
                       <span className="max-w-[140px] text-center text-[11px] font-bold uppercase tracking-wide text-text-soft">
                         Presentá este QR en el acceso
                       </span>
