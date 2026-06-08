@@ -9,6 +9,7 @@ import { formatEventDate, formatPrice, type Event } from '@/mocks/events';
 import { eventService } from '@/services/eventService';
 import { saveTicket } from '@/lib/auth';
 import EventMap from '@/components/ui/EventMap';
+import { paymentService } from '@/services/paymentService';
 
 export default function EventoPage() {
   const params = useParams();
@@ -76,16 +77,21 @@ export default function EventoPage() {
     setMessage('Código no válido. Probá con BOLETO10.');
   };
 
-  const handlePurchase = () => {
-    if (!authenticated) {
-      router.push(`/login?from=/eventos/${event.id}`);
-      return;
-    }
-    if (!selectedZone || quantity > selectedZone.available) {
-      setMessage('Cantidad no disponible en esa zona.');
-      return;
-    }
-    saveTicket({
+  const handlePurchase = async () => {
+
+  if (!authenticated) {
+    router.push(`/login?from=/eventos/${event.id}`);
+    return;
+  }
+
+  if (!selectedZone || quantity > selectedZone.available) {
+    setMessage('Cantidad no disponible en esa zona.');
+    return;
+  }
+
+  try {
+
+    const session = await paymentService.createCheckoutSession({
       id: crypto.randomUUID(),
       userId: user!.id,
       eventId: event.id,
@@ -99,8 +105,31 @@ export default function EventoPage() {
       qrCode: `BC-${Date.now()}`,
       purchasedAt: new Date().toISOString(),
     });
-    router.push('/mis-tickets');
-  };
+
+    window.location.href = session.url;
+
+  } catch {
+
+    setMessage('Error procesando la compra');
+
+  }
+
+};
+    //saveTicket({
+    //id: crypto.randomUUID(),
+    //userId: user!.id,
+    //eventId: event.id,
+    //eventTitle: event.title,
+    //venue: event.venue,
+    //date: event.date,
+    //time: event.time,
+    //zone: selectedZone.name,
+    //quantity,
+    //total,
+    //qrCode: `BC-${Date.now()}`,
+    //purchasedAt: new Date().toISOString(),
+    //});
+    //router.push('/mis-tickets');
 
   const headerSources = [event.posterUrl, event.fallbackImageUrl].filter(Boolean) as string[];
   const headerImage = headerSources[headerSourceIndex];
