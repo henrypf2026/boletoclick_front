@@ -90,7 +90,7 @@ export default function EventoPage() {
   }
 
   try {
-
+console.log("entramos a la petición")
     const session = await paymentService.createCheckoutSession({
       id: crypto.randomUUID(),
       userId: user!.id,
@@ -115,21 +115,6 @@ export default function EventoPage() {
   }
 
 };
-    //saveTicket({
-    //id: crypto.randomUUID(),
-    //userId: user!.id,
-    //eventId: event.id,
-    //eventTitle: event.title,
-    //venue: event.venue,
-    //date: event.date,
-    //time: event.time,
-    //zone: selectedZone.name,
-    //quantity,
-    //total,
-    //qrCode: `BC-${Date.now()}`,
-    //purchasedAt: new Date().toISOString(),
-    //});
-    //router.push('/mis-tickets');
 
   const headerSources = [event.posterUrl, event.fallbackImageUrl].filter(Boolean) as string[];
   const headerImage = headerSources[headerSourceIndex];

@@ -38,7 +38,7 @@ useEffect(() => {
       }
 
       const response = await fetch(
-  `${process.env.NEXT_PUBLIC_API_URL}/payments/verify/${sessionId}`
+  `${process.env.NEXT_PUBLIC_API_URL}/stripe/verify/${sessionId}`
 );
 
       if (!response.ok) {

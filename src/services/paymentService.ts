@@ -17,7 +17,7 @@ export const paymentService = {
   async createCheckoutSession(data: PurchaseData) {
 
     const response = await fetch(
-      `${process.env.NEXT_PUBLIC_API_URL}/payments/create-session`,
+      `${process.env.NEXT_PUBLIC_API_URL}/stripe/create-session`,
       {
         method: 'POST',
         headers: {
