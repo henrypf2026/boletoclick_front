@@ -11,6 +11,7 @@ interface AuthContextValue {
   login: (credentials: { email: string; password: string }) => Promise<User>;
   register: (data: RegisterDto) => Promise<User>;
   logout: () => void;
+  setUser: React.Dispatch<React.SetStateAction<User | null>>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -61,6 +62,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       login,
       register,
       logout,
+      setUser,
     }),
     [user, loading],
   );
