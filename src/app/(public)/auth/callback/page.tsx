@@ -21,11 +21,8 @@ export default function AuthCallbackPage() {
 
     let handled = false;
 
-    // Con detectSessionInUrl: true Supabase hace el exchange automáticamente.
-    // Esperamos el evento SIGNED_IN en lugar de hacer el exchange manualmente
-    // para evitar la condición de carrera entre el exchange automático y el manual.
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (handled || event !== 'SIGNED_IN' || !session) return;
+    const processSession = async (session: { access_token: string }) => {
+      if (handled) return;
       handled = true;
 
       const user = await authService.getMe(session.access_token);
@@ -37,6 +34,16 @@ export default function AuthCallbackPage() {
 
       saveToken(session.access_token, user.role);
       window.location.href = '/';
+    };
+
+    // Caso 1: Supabase ya procesó el code antes de que el listener se suscriba
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session) processSession(session);
+    });
+
+    // Caso 2: el exchange ocurre después de montar el componente
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'SIGNED_IN' && session) processSession(session);
     });
 
     const timeout = setTimeout(() => {
