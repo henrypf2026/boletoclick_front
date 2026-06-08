@@ -10,8 +10,8 @@ const PRODUCER_ROUTES = ["/producer"];
 
 function isProducerOnlyRoute(pathname: string): boolean {
   if (matchesRoute(pathname, PRODUCER_ROUTES)) return true;
-  if (pathname === "/eventos/crear") return true;
-  if (/^\/eventos\/[^/]+\/editar/.test(pathname)) return true;
+  if (pathname === "/producer/eventos/crear") return true;
+  if (/^\/producer\/eventos\/[^/]+\/editar/.test(pathname)) return true;
   return false;
 }
 
@@ -24,7 +24,7 @@ function matchesRoute(pathname: string, routes: string[]): boolean {
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  // 🔓 MODO DESARROLLO / BYPASS PARA PRUEBAS
+  // MODO DESARROLLO PARA PRUEBAS
   // Si la variable de entorno está activa, dejamos pasar cualquier ruta sin validar cookies ni roles.
   const isBypassActive = process.env.NEXT_PUBLIC_BYPASS_AUTH === "true";
   if (isBypassActive) {

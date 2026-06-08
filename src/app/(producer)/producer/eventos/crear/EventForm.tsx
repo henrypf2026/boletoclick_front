@@ -1,27 +1,36 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 
-interface Localidad {
-  nombre: string;
-  precio: number;
-  capacidadMax: number;
+interface TicketType {
+  name: string;
+  price: number;
+  stock: number;
+  zone: string;
+}
+
+interface ApiItem {
+  id: string;
+  name: string;
 }
 
 export default function EventForm() {
   const [evento, setEvento] = useState({
-    nombre: "",
-    descripcion: "",
+    title: "",
+    description: "",
     fecha: "",
     hora: "",
-    lugar: "",
-    categoria: "Recitales",
+    venueId: "",
+    categoryId: "",
   });
 
-  const [imagen, setImagen] = useState<string | null>(null);
+  const [categorias, setCategorias] = useState<ApiItem[]>([]);
+  const [locaciones, setLocaciones] = useState<ApiItem[]>([]);
+  const [archivoImagen, setArchivoImagen] = useState<File | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
 
-  const [localidades, setLocalidades] = useState<Localidad[]>([
-    { nombre: "General", precio: 0, capacidadMax: 100 },
+  const [ticketTypes, setTicketTypes] = useState<TicketType[]>([
+    { name: "General", price: 0, stock: 100, zone: "Planta Baja" },
   ]);
 
   const [loading, setLoading] = useState(false);
@@ -29,6 +38,30 @@ export default function EventForm() {
     type: "success" | "error";
     msg: string;
   } | null>(null);
+
+  useEffect(() => {
+    const cargarDatosDesplegables = async () => {
+      try {
+        const [resCat, resVen] = await Promise.all([
+          fetch(`/api/backend/categories`).catch(() => null),
+          fetch(`/api/backend/venues`).catch(() => null),
+        ]);
+
+        if (resCat && resCat.ok) {
+          const dataCat = await resCat.json();
+          setCategorias(dataCat);
+        }
+        if (resVen && resVen.ok) {
+          const dataVen = await resVen.json();
+          setLocaciones(dataVen);
+        }
+      } catch (err) {
+        console.error("Error al cargar datos del servidor:", err);
+      }
+    };
+
+    cargarDatosDesplegables();
+  }, []);
 
   const handleEventoChange = (
     e: React.ChangeEvent<
@@ -41,37 +74,34 @@ export default function EventForm() {
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setImagen(reader.result as string);
-      };
-      reader.readAsDataURL(file);
+      setArchivoImagen(file);
+      setPreviewUrl(URL.createObjectURL(file));
     }
   };
 
   const agregarLocalidad = () => {
-    setLocalidades([
-      ...localidades,
-      { nombre: "", precio: 0, capacidadMax: 50 },
+    setTicketTypes([
+      ...ticketTypes,
+      { name: "", price: 0, stock: 50, zone: "Sector Estándar" },
     ]);
   };
 
   const eliminarLocalidad = (index: number) => {
-    if (localidades.length === 1) return;
-    setLocalidades(localidades.filter((_, i) => i !== index));
+    if (ticketTypes.length === 1) return;
+    setTicketTypes(ticketTypes.filter((_, i) => i !== index));
   };
 
   const handleLocalidadChange = (
     index: number,
-    field: keyof Localidad,
+    field: keyof TicketType,
     value: string | number,
   ) => {
-    const nuevasLocalidades = [...localidades];
-    nuevasLocalidades[index] = {
-      ...nuevasLocalidades[index],
-      [field]: field === "nombre" ? value : Number(value),
+    const nuevosTickets = [...ticketTypes];
+    nuevosTickets[index] = {
+      ...nuevosTickets[index],
+      [field]: field === "name" || field === "zone" ? value : Number(value),
     };
-    setLocalidades(nuevasLocalidades);
+    setTicketTypes(nuevosTickets);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -79,30 +109,80 @@ export default function EventForm() {
     setLoading(true);
     setStatus(null);
 
-    const payloadFinal = {
-      ...evento,
-      fechaHora: `${evento.fecha}T${evento.hora}:00.000Z`,
-      flyerUrl: imagen,
-      sectores: localidades,
-    };
+    if (!archivoImagen) {
+      setStatus({
+        type: "error",
+        msg: "El poster o imagen del evento es obligatorio.",
+      });
+      setLoading(false);
+      return;
+    }
+
+    const rawToken = localStorage.getItem("auth_token");
+    if (!rawToken) {
+      setStatus({
+        type: "error",
+        msg: "No se encontró un token de sesión. Por favor, volvé a iniciar sesión.",
+      });
+      setLoading(false);
+      return;
+    }
+
+    const cleanToken = rawToken.replace(/['"]+/g, "");
 
     try {
-      const res = await fetch(
-        `/api/backend/events`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(payloadFinal),
-        },
-      );
+      // 1. Instanciamos el FormData exigido por el controlador con Multer
+      const formData = new FormData();
 
-      if (!res.ok) throw new Error("Error al procesar la creación del evento.");
+      formData.append("title", evento.title.trim());
+      formData.append("description", evento.description.trim());
+      formData.append("venueId", evento.venueId);
+      formData.append("categoryId", evento.categoryId);
+
+      const combinedDate = new Date(
+        `${evento.fecha}T${evento.hora}:00.000Z`,
+      ).toISOString();
+      formData.append("eventDate", combinedDate);
+
+      // 2. Mapeamos los campos numéricos puros de los tickets
+      const ticketsLimpios = ticketTypes.map((ticket) => ({
+        name: ticket.name.trim(),
+        price: Number(ticket.price),
+        stock: Math.floor(Number(ticket.stock)),
+        zone: ticket.zone.trim(),
+      }));
+
+      // 3. Serializamos como string para activar el nuevo plainToInstance del back
+      formData.append("ticketTypes", JSON.stringify(ticketsLimpios));
+
+      // 4. Adjuntamos el binario de la imagen que capturará el @UploadedFile()
+      formData.append("poster", archivoImagen);
+
+      console.log("🚀 Enviando FormData adaptado al nuevo fix del backend...");
+
+      const res = await fetch(`/api/backend/events`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${cleanToken}`,
+          // NO agregar Content-Type, dejamos que el navegador maneje los boundaries
+        },
+        body: formData,
+      });
+
+      const responseData = await res.json();
+
+      if (!res.ok) {
+        throw new Error(
+          Array.isArray(responseData.message)
+            ? responseData.message.join(" | ")
+            : responseData.message ||
+                "Error al procesar el guardado del evento.",
+        );
+      }
 
       setStatus({
         type: "success",
-        msg: "¡Evento creado con éxito con su Flyer!",
+        msg: "¡Evento creado con éxito e impactado en la base de datos!",
       });
     } catch (error: any) {
       setStatus({
@@ -120,14 +200,13 @@ export default function EventForm() {
         <div
           className={`border-4 border-border p-4 font-bold uppercase text-xs shadow-[2px_2px_0px_0px_rgba(23,23,23,1)] ${
             status.type === "success"
-              ? "bg-success text-white"
+              ? "bg-success text-black"
               : "bg-accent text-white"
           }`}
         >
           {status.msg}
         </div>
       )}
-
       <div className="bg-surface border-4 border-border p-6 shadow-[6px_6px_0px_0px_rgba(23,23,23,1)] dark:shadow-[6px_6px_0px_0px_rgba(255,255,255,1)] space-y-4">
         <h2 className="text-lg font-black uppercase tracking-wider text-text border-b-2 border-border pb-2">
           1. Detalles del Evento
@@ -136,12 +215,8 @@ export default function EventForm() {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-center bg-background border-2 border-dashed border-border p-4 shadow-[3px_3px_0px_0px_rgba(23,23,23,1)]">
           <div className="md:col-span-2 space-y-2">
             <label className="text-xs font-black uppercase tracking-wide text-text block">
-              Flyer / Portada del Evento
+              Poster / Portada del Evento
             </label>
-            <p className="text-[11px] text-text-soft font-medium">
-              Subí una imagen clara en formato JPG o PNG. Tamaño recomendado:
-              1200x630px.
-            </p>
             <input
               type="file"
               accept="image/*"
@@ -151,11 +226,11 @@ export default function EventForm() {
           </div>
 
           <div className="flex justify-center items-center">
-            {imagen ? (
+            {previewUrl ? (
               <div className="border-4 border-border bg-surface p-1 shadow-[4px_4px_0px_0px_rgba(23,23,23,1)] max-h-35 overflow-hidden aspect-video flex justify-center items-center">
                 <img
-                  src={imagen}
-                  alt="Preview del evento"
+                  src={previewUrl}
+                  alt="Preview"
                   className="w-full h-full object-cover"
                 />
               </div>
@@ -169,184 +244,150 @@ export default function EventForm() {
           </div>
         </div>
 
-        <div className="flex flex-col gap-1.5">
-          <label className="text-xs font-black uppercase tracking-wide text-text">
-            Nombre del Evento
-          </label>
+        <input
+          type="text"
+          name="title"
+          value={evento.title}
+          onChange={handleEventoChange}
+          required
+          placeholder="Nombre del Evento"
+          className="w-full p-3 border-2 border-border bg-background text-text font-medium shadow-[2px_2px_0px_0px_rgba(23,23,23,1)] text-sm"
+        />
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <input
-            type="text"
-            name="nombre"
-            value={evento.nombre}
+            type="date"
+            name="fecha"
+            value={evento.fecha}
             onChange={handleEventoChange}
             required
-            placeholder="Ej: Cosquín Rock 2026"
-            className="p-3 border-2 border-border bg-background text-text font-medium focus:outline-none focus:ring-2 focus:ring-primary shadow-[2px_2px_0px_0px_rgba(23,23,23,1)] placeholder:text-text-soft/50 text-sm"
+            className="p-3 border-2 border-border bg-background text-text text-sm"
           />
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-black uppercase tracking-wide text-text">
-              Fecha
-            </label>
-            <input
-              type="date"
-              name="fecha"
-              value={evento.fecha}
-              onChange={handleEventoChange}
-              required
-              className="p-3 border-2 border-border bg-background text-text font-medium focus:outline-none text-sm"
-            />
-          </div>
-          <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-black uppercase tracking-wide text-text">
-              Hora de inicio
-            </label>
-            <input
-              type="time"
-              name="hora"
-              value={evento.hora}
-              onChange={handleEventoChange}
-              required
-              className="p-3 border-2 border-border bg-background text-text font-medium focus:outline-none text-sm"
-            />
-          </div>
-          <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-black uppercase tracking-wide text-text">
-              Categoría
-            </label>
-            <select
-              name="categoria"
-              value={evento.categoria}
-              onChange={handleEventoChange}
-              className="p-3 border-2 border-border bg-background text-text font-bold focus:outline-none shadow-[2px_2px_0px_0px_rgba(23,23,23,1)] text-sm appearance-none cursor-pointer"
-            >
-              <option value="Recitales">Recitales</option>
-              <option value="Teatro">Teatro</option>
-              <option value="Deportes">Deportes</option>
-              <option value="Fiestas">Fiestas</option>
-            </select>
-          </div>
-        </div>
-
-        <div className="flex flex-col gap-1.5">
-          <label className="text-xs font-black uppercase tracking-wide text-text">
-            Estadio / Lugar físico
-          </label>
           <input
-            type="text"
-            name="lugar"
-            value={evento.lugar}
+            type="time"
+            name="hora"
+            value={evento.hora}
             onChange={handleEventoChange}
             required
-            placeholder="Ej: Estadio River Plate"
-            className="p-3 border-2 border-border bg-background text-text font-medium focus:outline-none shadow-[2px_2px_0px_0px_rgba(23,23,23,1)] text-sm"
+            className="p-3 border-2 border-border bg-background text-text text-sm"
           />
         </div>
 
-        <div className="flex flex-col gap-1.5">
-          <label className="text-xs font-black uppercase tracking-wide text-text">
-            Descripción del Evento
-          </label>
-          <textarea
-            name="descripcion"
-            rows={3}
-            value={evento.descripcion}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <select
+            name="categoryId"
+            value={evento.categoryId}
             onChange={handleEventoChange}
-            placeholder="Escribí los detalles de la grilla..."
-            className="p-3 border-2 border-border bg-background text-text font-medium focus:outline-none shadow-[2px_2px_0px_0px_rgba(23,23,23,1)] text-sm resize-none"
-          />
+            required
+            className="p-3 border-2 border-border bg-background text-text font-bold text-sm shadow-[2px_2px_0px_0px_rgba(23,23,23,1)]"
+          >
+            <option value="">-- Seleccioná Categoría --</option>
+            {categorias.map((cat) => (
+              <option key={cat.id} value={cat.id}>
+                {cat.name}
+              </option>
+            ))}
+          </select>
+          <select
+            name="venueId"
+            value={evento.venueId}
+            onChange={handleEventoChange}
+            required
+            className="p-3 border-2 border-border bg-background text-text font-bold text-sm shadow-[2px_2px_0px_0px_rgba(23,23,23,1)]"
+          >
+            <option value="">-- Seleccioná Lugar --</option>
+            {locaciones.map((ven) => (
+              <option key={ven.id} value={ven.id}>
+                {ven.name}
+              </option>
+            ))}
+          </select>
         </div>
+
+        <textarea
+          name="description"
+          rows={3}
+          value={evento.description}
+          onChange={handleEventoChange}
+          required
+          placeholder="Descripción..."
+          className="w-full p-3 border-2 border-border bg-background text-text text-sm shadow-[2px_2px_0px_0px_rgba(23,23,23,1)]"
+        />
       </div>
 
-      <div className="bg-surface border-4 border-border p-6 shadow-[6px_6px_0px_0px_rgba(23,23,23,1)] dark:shadow-[6px_6px_0px_0px_rgba(255,255,255,1)] space-y-4">
+      <div className="bg-surface border-4 border-border p-6 shadow-[6px_6px_0px_0px_rgba(23,23,23,1)] space-y-4">
         <div className="flex justify-between items-center border-b-2 border-border pb-2">
           <h2 className="text-lg font-black uppercase tracking-wider text-text">
-            2. Sectores / Localidades
+            2. Tipos de Entradas
           </h2>
           <button
             type="button"
             onClick={agregarLocalidad}
-            className="cursor-pointer bg-secondary text-text border-2 border-border px-3 py-1 text-xs font-black uppercase tracking-wide shadow-[2px_2px_0px_0px_rgba(23,23,23,1)] hover:-translate-x-0.5 hover:-translate-y-0.5 transition-all"
+            className="bg-secondary text-text border-2 border-border px-3 py-1 text-xs font-black uppercase shadow-[2px_2px_0px_0px_rgba(23,23,23,1)]"
           >
-            + Añadir Sector
+            + Añadir
           </button>
         </div>
-
-        <div className="space-y-4">
-          {localidades.map((localidad, index) => (
-            <div
-              key={index}
-              className="flex flex-col md:flex-row gap-3 items-end bg-background border-2 border-border p-4 shadow-[3px_3px_0px_0px_rgba(23,23,23,1)]"
-            >
-              <div className="flex-1 w-full flex flex-col gap-1">
-                <label className="text-[10px] font-black uppercase text-text-soft">
-                  Nombre del Sector
-                </label>
-                <input
-                  type="text"
-                  value={localidad.nombre}
-                  required
-                  onChange={(e) =>
-                    handleLocalidadChange(index, "nombre", e.target.value)
-                  }
-                  placeholder="Ej:Zona VIP,Boiler,etc..."
-                  className="p-2 border-2 border-border bg-surface text-text font-medium text-xs"
-                />
-              </div>
-
-              <div className="w-full md:w-36 flex flex-col gap-1">
-                <label className="text-[10px] font-black uppercase text-text-soft">
-                  Precio ($)
-                </label>
-                <input
-                  type="number"
-                  min={0}
-                  value={localidad.precio}
-                  required
-                  onChange={(e) =>
-                    handleLocalidadChange(index, "precio", e.target.value)
-                  }
-                  className="p-2 border-2 border-border bg-surface text-text font-bold text-xs"
-                />
-              </div>
-
-              <div className="w-full md:w-36 flex flex-col gap-1">
-                <label className="text-[10px] font-black uppercase text-text-soft">
-                  Capacidad / Stock
-                </label>
-                <input
-                  type="number"
-                  min={1}
-                  value={localidad.capacidadMax}
-                  required
-                  onChange={(e) =>
-                    handleLocalidadChange(index, "capacidadMax", e.target.value)
-                  }
-                  className="p-2 border-2 border-border bg-surface text-text font-bold text-xs"
-                />
-              </div>
-
-              {localidades.length > 1 && (
-                <button
-                  type="button"
-                  onClick={() => eliminarLocalidad(index)}
-                  className="cursor-pointer bg-accent text-white border-2 border-border p-2 text-xs font-black shadow-[2px_2px_0px_0px_rgba(23,23,23,1)] h-9.5 flex items-center justify-center w-full md:w-12 uppercase"
-                >
-                  Borrar
-                </button>
-              )}
-            </div>
-          ))}
-        </div>
+        {ticketTypes.map((ticket, index) => (
+          <div
+            key={index}
+            className="flex flex-col md:flex-row gap-3 items-end bg-background border-2 border-border p-4 shadow-[3px_3px_0px_0px_rgba(23,23,23,1)]"
+          >
+            <input
+              type="text"
+              placeholder="Nombre"
+              value={ticket.name}
+              onChange={(e) =>
+                handleLocalidadChange(index, "name", e.target.value)
+              }
+              className="flex-1 w-full p-2 border-2 border-border text-xs"
+            />
+            <input
+              type="number"
+              placeholder="Precio"
+              value={ticket.price}
+              onChange={(e) =>
+                handleLocalidadChange(index, "price", e.target.value)
+              }
+              className="w-full md:w-28 p-2 border-2 border-border text-xs"
+            />
+            <input
+              type="number"
+              placeholder="Stock"
+              value={ticket.stock}
+              onChange={(e) =>
+                handleLocalidadChange(index, "stock", e.target.value)
+              }
+              className="w-full md:w-28 p-2 border-2 border-border text-xs"
+            />
+            <input
+              type="text"
+              placeholder="Zona"
+              value={ticket.zone}
+              onChange={(e) =>
+                handleLocalidadChange(index, "zone", e.target.value)
+              }
+              className="w-full md:w-40 p-2 border-2 border-border text-xs"
+            />
+            {ticketTypes.length > 1 && (
+              <button
+                type="button"
+                onClick={() => eliminarLocalidad(index)}
+                className="bg-accent text-white p-2 text-xs uppercase font-black w-full md:w-auto"
+              >
+                X
+              </button>
+            )}
+          </div>
+        ))}
       </div>
 
       <button
         type="submit"
         disabled={loading}
-        className="w-full cursor-pointer p-4 font-black text-sm uppercase tracking-wider bg-primary text-background border-4 border-border shadow-[4px_4px_0px_0px_rgba(23,23,23,1)] hover:-translate-x-0.5 hover:-translate-y-0.5 transition-all"
+        className="w-full p-4 font-black text-sm uppercase bg-primary text-background border-4 border-border shadow-[4px_4px_0px_0px_rgba(23,23,23,1)] disabled:opacity-50"
       >
-        {loading ? "Creando Evento en Sistema..." : "Crear Evento"}
+        {loading ? "Creando en Sistema..." : "Crear Evento"}
       </button>
     </form>
   );
