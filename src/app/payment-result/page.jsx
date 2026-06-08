@@ -1,10 +1,10 @@
 'use client';
 
-import { useSearchParams } from 'next/navigation';
+import { useSearchParams, Suspense } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 
-export default function PaymentResultPage() {
+function PaymentResultContent() {
 const searchParams = useSearchParams();
 
 const status = searchParams.get('status');
@@ -38,7 +38,7 @@ useEffect(() => {
       }
 
       const response = await fetch(
-  `${process.env.NEXT_PUBLIC_API_URL}/payments/verify/${sessionId}`
+  `/api/backend/payments/verify/${sessionId}`
 );
 
       if (!response.ok) {
@@ -227,5 +227,13 @@ if (!checkingPayment && status === 'success' && !verified) {
 
       </div>
     </div>
+  );
+}
+
+export default function PaymentResultPage() {
+  return (
+    <Suspense fallback={<div className="flex min-h-screen items-center justify-center"><p>Cargando...</p></div>}>
+      <PaymentResultContent />
+    </Suspense>
   );
 }
