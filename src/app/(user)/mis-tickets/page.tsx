@@ -23,7 +23,7 @@ export default function MisTicketsPage() {
             <Link href="/login" className="text-primary hover:underline">
               iniciar sesión
             </Link>{' '}
-            para ver tus entradas.
+            para ver tus entradas. HOLA
           </p>
         </div>
       </div>

@@ -12,6 +12,10 @@ export interface User {
   email: string;
   name?: string;
   role?: UserRole;
+
+
+  profileImageUrl?: string;
+  allowNewsletter?: boolean;
 }
 
 export interface Ticket {
