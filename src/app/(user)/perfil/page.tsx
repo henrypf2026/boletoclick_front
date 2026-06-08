@@ -163,7 +163,7 @@ export default function PerfilPage() {
       <form onSubmit={formik.handleSubmit} className="space-y-6">
         <div className="bg-surface border-2 border-text p-6 shadow-[4px_4px_0px_0px_var(--color-text)]">
           <h2 className="text-base font-black uppercase tracking-tight border-b-2 border-text pb-2 mb-5">
-            Datos de la cuenta
+            Datos de la cuenta:
           </h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
