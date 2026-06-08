@@ -18,27 +18,34 @@ export default function UpdatePasswordPage() {
   const [status, setStatus] = useState<Status>('loading');
 
   useEffect(() => {
+    // Flujo implícito: tokens vienen en el hash de la URL
     const hashParams = new URLSearchParams(window.location.hash.substring(1));
     const accessToken = hashParams.get('access_token');
     const refreshToken = hashParams.get('refresh_token');
     const type = hashParams.get('type');
 
     if (type === 'recovery' && accessToken && refreshToken) {
-      // Flujo implícito: tokens vienen en el hash de la URL
       supabase.auth.setSession({ access_token: accessToken, refresh_token: refreshToken })
         .then(({ error }) => setStatus(error ? 'invalid' : 'ready'));
       return;
     }
 
-    // Flujo PKCE: code viene como query param
-    const code = new URLSearchParams(window.location.search).get('code');
-    if (code) {
-      supabase.auth.exchangeCodeForSession(code)
-        .then(({ error }) => setStatus(error ? 'invalid' : 'ready'));
-      return;
-    }
+    // Flujo PKCE: con detectSessionInUrl: true Supabase hace el exchange automáticamente.
+    // Esperamos el evento PASSWORD_RECOVERY en lugar de hacer el exchange manualmente.
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'PASSWORD_RECOVERY' && session) {
+        setStatus('ready');
+      }
+    });
 
-    setStatus('invalid');
+    const timeout = setTimeout(() => {
+      setStatus(prev => prev === 'loading' ? 'invalid' : prev);
+    }, 5000);
+
+    return () => {
+      subscription.unsubscribe();
+      clearTimeout(timeout);
+    };
   }, []);
 
   const handleSubmit = async (

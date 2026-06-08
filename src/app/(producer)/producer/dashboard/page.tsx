@@ -1,16 +1,26 @@
 "use client";
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+
+interface TicketType {
+  name: string;
+  price: number;
+  stock: number;
+  zone?: string;
+  sold?: number;
+}
 
 interface Evento {
   id: string;
-  nombre: string;
-  estado: "PROCESO" | "CONCLUIDO";
-  precioBase: number;
-  capacidad: number;
-  ticketsVendidos: number;
-  recaudacion: number;
-  fecha: string;
+  title: string;
+  description: string;
+  eventDate: string;
+  status: "DRAFT" | "ACTIVE" | "CONCLUIDO" | string;
+  ticketTypes: TicketType[];
+  poster?: string;
+  location?: string;
+  category?: any;
+  venue?: any;
 }
 
 interface Acceso {
@@ -24,6 +34,8 @@ export default function DashboardProducer() {
   const router = useRouter();
 
   const [eventos, setEventos] = useState<Evento[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [errorApi, setErrorApi] = useState<string | null>(null);
 
   const [eventoSeleccionado, setEventoSeleccionado] = useState<Evento | null>(
     null,
@@ -35,205 +47,325 @@ export default function DashboardProducer() {
     "idle" | "success" | "error"
   >("idle");
 
-  const [ultimosAccesos, setUltimosAccesos] = useState<Acceso[]>([
-    { id: "#TK-991", sector: "Campo General", hora: "22:15", estado: "VALIDO" },
-    { id: "#TK-990", sector: "Platea Alta", hora: "22:12", estado: "INVALIDO" },
-    { id: "#TK-989", sector: "VIP", hora: "22:08", estado: "VALIDO" },
-  ]);
+  const [ultimosAccesos, setUltimosAccesos] = useState<Acceso[]>([]);
 
-  const [formNombre, setFormNombre] = useState("");
-  const [formPrecio, setFormPrecio] = useState<number | "">("");
-  const [formCapacidad, setFormCapacidad] = useState<number | "">("");
+  const [formTitle, setFormTitle] = useState("");
+  const [formDescription, setFormDescription] = useState("");
+  const [formDate, setFormDate] = useState("");
+  const [formLocation, setFormLocation] = useState("");
+  const [formCategory, setFormCategory] = useState("");
+  const [formTicketTypes, setFormTicketTypes] = useState<TicketType[]>([]);
+
+  const [loadingAccion, setLoadingAccion] = useState<boolean>(false);
+
+  useEffect(() => {
+    const fetchEventosProductor = async () => {
+      try {
+        setLoading(true);
+        const rawToken = localStorage.getItem("auth_token");
+
+        if (!rawToken) {
+          throw new Error("No se encontró token de autenticación.");
+        }
+
+        const cleanToken = rawToken.replace(/['"]+/g, "");
+
+        const response = await fetch("/api/backend/events", {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${cleanToken}`,
+          },
+        });
+
+        if (!response.ok) {
+          throw new Error(`Error al obtener eventos: ${response.status}`);
+        }
+
+        const data = await response.json();
+        setEventos(data);
+        setErrorApi(null);
+      } catch (err: any) {
+        console.error("🚨 Error capturado en Dashboard:", err.message);
+        setErrorApi(err.message);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchEventosProductor();
+  }, []);
 
   const seleccionarEvento = (ev: Evento) => {
     setEventoSeleccionado(ev);
-    setFormNombre(ev.nombre);
-    setFormPrecio(ev.precioBase);
-    setFormCapacidad(ev.capacidad);
+
+    setFormTitle(ev.title);
+    setFormDescription(ev.description || "");
+    setFormDate(ev.eventDate ? ev.eventDate.split("T")[0] : "");
+
+    if (ev.venue && typeof ev.venue === "object") {
+      setFormLocation(ev.venue.name || ev.venue.address || "");
+    } else {
+      setFormLocation(ev.location || ev.venue || "");
+    }
+
+    if (ev.category && typeof ev.category === "object") {
+      setFormCategory(ev.category.name || "");
+    } else {
+      setFormCategory(ev.category || "");
+    }
+
+    setFormTicketTypes(ev.ticketTypes ? [...ev.ticketTypes] : []);
     setStatusScanner("idle");
 
-    if (ev.estado === "CONCLUIDO") {
+    if (ev.status === "CONCLUIDO") {
       setSeccionActiva("ajustes");
     }
   };
 
-  const irAlCreadorDeEventos = () => {
-    router.push("/producer/eventos/crear");
-  };
-
-  const procesarFormulario = () => {
-    if (!eventoSeleccionado || !formNombre) return;
-
-    setEventos((prev) =>
-      prev.map((ev) =>
-        ev.id === eventoSeleccionado.id
-          ? {
-              ...ev,
-              nombre: formNombre,
-              precioBase: Number(formPrecio) || ev.precioBase,
-              capacidad: Number(formCapacidad) || ev.capacidad,
-            }
-          : ev,
-      ),
-    );
-
-    setEventoSeleccionado((prev) =>
-      prev
-        ? {
-            ...prev,
-            nombre: formNombre,
-            precioBase: Number(formPrecio) || prev.precioBase,
-            capacidad: Number(formCapacidad) || prev.capacidad,
-          }
-        : null,
-    );
-
-    alert("Cambios aplicados correctamente en el Front-End.");
-  };
-
-  const simularEscaneo = (resultado: "success" | "error") => {
-    setStatusScanner(resultado);
-
-    const nuevoAcceso: Acceso = {
-      id:
-        resultado === "success"
-          ? `#TK-${Math.floor(Math.random() * 900) + 100}`
-          : "#TK-ERR",
-      sector: resultado === "success" ? "Campo General" : "Desconocido",
-      hora: new Date().toLocaleTimeString("es-AR", {
-        hour: "2-digit",
-        minute: "2-digit",
-      }),
-      estado: resultado === "success" ? "VALIDO" : "INVALIDO",
+  const handleTicketTypeChange = (
+    index: number,
+    field: keyof TicketType,
+    value: any,
+  ) => {
+    const updated = [...formTicketTypes];
+    updated[index] = {
+      ...updated[index],
+      [field]: value,
     };
-
-    setUltimosAccesos((prev) => [nuevoAcceso, ...prev.slice(0, 4)]);
+    setFormTicketTypes(updated);
   };
 
-  const esConcluido = eventoSeleccionado?.estado === "CONCLUIDO";
-  const tieneVentas = eventoSeleccionado
-    ? eventoSeleccionado.ticketsVendidos > 0
-    : false;
+  const guardarCambios = async () => {
+    if (!eventoSeleccionado) return;
+
+    for (let i = 0; i < formTicketTypes.length; i++) {
+      const original = eventoSeleccionado.ticketTypes?.[i];
+      const modificado = formTicketTypes[i];
+      const vendidos = original?.sold || 0;
+
+      if (vendidos > 0) {
+        if (original && original.price !== Number(modificado.price)) {
+          alert(
+            `Error de Seguridad: No podés cambiar el precio de "${modificado.name}" porque ya tiene ${vendidos} entradas vendidas.`,
+          );
+          return;
+        }
+        if (Number(modificado.stock) < vendidos) {
+          alert(
+            `Error de Seguridad: El stock de "${modificado.name}" no puede ser menor a las entradas ya vendidas (${vendidos}).`,
+          );
+          return;
+        }
+      }
+    }
+
+    setLoadingAccion(true);
+
+    try {
+      const rawToken = localStorage.getItem("auth_token");
+      if (!rawToken)
+        throw new Error(
+          "Sesión expirada. Por favor, reingresá a la aplicación.",
+        );
+      const cleanToken = rawToken.replace(/['"]+/g, "");
+
+      const payloadDto = {
+        title: formTitle,
+        description: formDescription,
+        eventDate: formDate ? new Date(formDate).toISOString() : undefined,
+        ticketTypes: formTicketTypes.map((ticket) => ({
+          name: ticket.name,
+          zone: ticket.zone || ticket.name,
+          price: Number(ticket.price),
+          stock: Number(ticket.stock),
+        })),
+      };
+
+      const response = await fetch(
+        `/api/backend/events/${eventoSeleccionado.id}`,
+        {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${cleanToken}`,
+          },
+          body: JSON.stringify(payloadDto),
+        },
+      );
+
+      if (!response.ok) {
+        throw new Error(`Error del servidor al actualizar: ${response.status}`);
+      }
+
+      const eventoActualizadoServidor = await response.json();
+
+      const eventosActualizados = eventos.map((ev) =>
+        ev.id === eventoSeleccionado.id
+          ? { ...ev, ...eventoActualizadoServidor }
+          : ev,
+      );
+      setEventos(eventosActualizados);
+      setEventoSeleccionado(eventoActualizadoServidor);
+
+      alert(
+        "¡Ajustes de evento sincronizados y guardados en la base de datos!",
+      );
+    } catch (error: any) {
+      console.error("🚨 Error al guardar cambios en DB:", error);
+      alert(
+        error.message || "No se pudieron guardar los cambios en el servidor.",
+      );
+    } finally {
+      setLoadingAccion(false);
+    }
+  };
+
+  const eliminarEvento = async () => {
+    if (!eventoSeleccionado) return;
+
+    const confirmar = window.confirm(
+      `¿Estás seguro de que querés dar de baja el evento "${eventoSeleccionado.title}"?`,
+    );
+    if (!confirmar) return;
+
+    const copiaEventosPrevios = [...eventos];
+    const idABorrar = eventoSeleccionado.id;
+
+    setEventos(eventos.filter((ev) => ev.id !== idABorrar));
+    setEventoSeleccionado(null);
+    setLoadingAccion(true);
+
+    try {
+      const rawToken = localStorage.getItem("auth_token");
+      if (!rawToken)
+        throw new Error(
+          "No se encontró sesión activa. Por favor, reingresá a la app.",
+        );
+
+      const cleanToken = rawToken.replace(/['"]+/g, "");
+
+      const response = await fetch(`/api/backend/events/${idABorrar}`, {
+        method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${cleanToken}`,
+        },
+      });
+
+      if (!response.ok) {
+        if (response.status === 401) {
+          alert(
+            "Error 401: Tu sesión expiró o no tenés permisos de Productor activos para borrar este evento. Intentá cerrar sesión y volver a entrar.",
+          );
+          setEventos(copiaEventosPrevios);
+          return;
+        }
+        throw new Error(`Error del servidor: ${response.status}`);
+      }
+
+      alert("El evento fue dado de baja correctamente en el sistema.");
+    } catch (error: any) {
+      console.error("🚨 Error en la petición de borrado:", error);
+      alert(error.message || "No se pudo completar la baja.");
+      setEventos(copiaEventosPrevios);
+    } finally {
+      setLoadingAccion(false);
+    }
+  };
+
+  const esConcluido = eventoSeleccionado?.status === "CONCLUIDO";
+
+  const capacidadTotalPantalla = formTicketTypes.reduce(
+    (acc, curr) => acc + (Number(curr.stock) || 0),
+    0,
+  );
 
   return (
-    <div className="p-4 md:p-8 max-w-7xl mx-auto min-h-screen bg-background text-text transition-colors">
+    <div className="p-4 md:p-8 max-w-7xl mx-auto min-h-screen bg-background text-text selection:bg-primary selection:text-background">
+      <div className="mb-6 flex flex-wrap gap-3 p-4 bg-surface border-4 border-text shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
+        <button
+          onClick={() => router.push("/producer/eventos/crear")}
+          className="px-4 py-2 bg-success text-black border-2 border-text font-mono text-xs font-black uppercase tracking-wider hover:translate-x-0.5 hover:translate-y-0.5 transition-all shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] hover:shadow-none"
+        >
+          ➕ Crear Nuevo Evento
+        </button>
+        <button
+          onClick={() => router.push("/producer/bank-accounts")}
+          className="px-4 py-2 bg-background text-text border-2 border-text font-mono text-xs font-black uppercase tracking-wider hover:translate-x-0.5 hover:translate-y-0.5 transition-all shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] hover:shadow-none"
+        >
+          🏦 Configurar Cuenta Bancaria
+        </button>
+      </div>
+
       <div className="mb-8 border-b-4 border-text pb-6 flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
         <div>
-          <div className="flex items-center gap-2 mb-1.5">
-            <span className="w-2 h-2 rounded-full bg-success animate-pulse"></span>
-            <span className="font-mono text-xs font-bold uppercase tracking-widest text-text-soft">
-              Panel de control del organizador
-            </span>
-          </div>
+          <span className="font-mono text-xs font-bold uppercase tracking-widest text-text-soft block mb-1">
+            BoletoClick / Panel de Control
+          </span>
           <h1 className="uppercase tracking-tighter text-3xl md:text-4xl font-black">
-            Dashboard de Gestión de Eventos
+            Dashboard del Productor
           </h1>
         </div>
-        <div className="flex gap-3">
-          <button
-            onClick={() => router.push("/producer/bank-accounts")}
-            className="cursor-pointer bg-secondary text-text border-2 border-text px-3 py-1.5 font-mono text-xs font-black uppercase tracking-wider shadow-[2px_2px_0px_0px_var(--color-text)] hover:shadow-none hover:translate-x-0.5 hover:translate-y-0.5"
-          >
-            🏦 Ver Cuentas Bancarias
-          </button>
-          <div className="bg-surface border-2 border-text px-4 py-2 font-mono text-xs font-bold shadow-[2px_2px_0px_0px_var(--color-text)] flex items-center">
-            PRODUCER_ID: <span className="text-primary ml-1">#BC-84910</span>
-          </div>
+        <div className="bg-surface border-2 border-text px-4 py-2 font-mono text-xs font-bold shadow-[2px_2px_0px_0px_var(--color-text)]">
+          STATUS: <span className="text-success font-black">CONECTADO</span>
         </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-        <div className="lg:col-span-5 space-y-4">
-          <div className="flex justify-between items-center border-b-2 border-text pb-2">
-            <h2 className="text-xl uppercase font-black tracking-tight">
-              Mis Eventos
-            </h2>
+        <div className="lg:col-span-4 space-y-4">
+          <h2 className="text-xl uppercase font-black tracking-tight border-b-2 border-text pb-2">
+            Mis Shows ({eventos.length})
+          </h2>
 
-            <button
-              onClick={irAlCreadorDeEventos}
-              className="px-3 py-1 bg-primary text-background border-2 border-text font-mono text-xs font-black uppercase tracking-wider transition-all shadow-[2px_2px_0px_0px_var(--color-text)] hover:shadow-none hover:translate-x-0.5 hover:translate-y-0.5 active:bg-primary/90 cursor-pointer"
-              title="Ir al formulario dinámico de creación"
-            >
-              Nuevo Evento
-            </button>
-          </div>
+          {errorApi && (
+            <div className="p-3 bg-red-500/10 border-2 border-red-500 text-red-600 font-mono text-xs uppercase font-bold">
+              ⚠ {errorApi}
+            </div>
+          )}
 
           <div className="grid grid-cols-1 gap-4">
-            {eventos.length === 0 ? (
-              <div className="border-2 border-dashed border-text p-8 text-center bg-surface-2/50 font-mono text-xs uppercase text-text-soft font-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] dark:shadow-[4px_4px_0px_0px_var(--color-text)]">
-                [ No tenés eventos publicados. Hacé click en "Nuevo Evento" para
-                empezar ]
+            {loading ? (
+              <div className="border-2 border-text p-8 text-center bg-surface font-mono text-xs uppercase font-black animate-pulse">
+                [ Cargando eventos... ]
+              </div>
+            ) : eventos.length === 0 ? (
+              <div className="border-2 border-dashed border-text p-8 text-center bg-surface/50 font-mono text-xs uppercase font-bold text-text-soft">
+                No hay eventos para mostrar.
               </div>
             ) : (
               eventos.map((ev) => {
                 const esEste = eventoSeleccionado?.id === ev.id;
-                const porc = Math.round(
-                  (ev.ticketsVendidos / ev.capacidad) * 100,
-                );
-
                 return (
                   <div
                     key={ev.id}
                     onClick={() => seleccionarEvento(ev)}
-                    className={`border-2 border-text p-5 rounded-none transition-all cursor-pointer flex flex-col gap-3 ${
+                    className={`border-2 border-text p-5 transition-all cursor-pointer flex flex-col gap-3 ${
                       esEste
-                        ? "bg-text text-surface shadow-none"
-                        : "bg-surface text-text hover:shadow-[4px_4px_0px_0px_var(--color-text)] hover:-translate-y-0.5"
+                        ? "bg-text text-surface"
+                        : "bg-surface text-text hover:shadow-[4px_4px_0px_0px_var(--color-text)]"
                     }`}
                   >
                     <div className="flex justify-between items-start">
-                      <div className="space-y-1">
+                      <div>
                         <span
                           className={`font-mono text-[10px] font-black px-1.5 py-0.5 border uppercase ${
                             esEste
                               ? "bg-surface text-text border-surface"
-                              : ev.estado === "PROCESO"
-                                ? "bg-success/10 text-success border-success/30"
-                                : "bg-red-500/10 text-red-500 border-red-500/20"
+                              : "bg-success/10 text-success border-success/30"
                           }`}
                         >
-                          {ev.estado}
+                          {ev.status}
                         </span>
-                        <h3 className="uppercase font-black text-lg mt-1.5">
-                          {ev.nombre}
+                        <h3 className="uppercase font-black text-sm mt-1.5 line-clamp-2">
+                          {ev.title}
                         </h3>
-                        <p
-                          className={`text-xs font-mono ${esEste ? "text-surface/80" : "text-text-soft"}`}
-                        >
-                          ID: {ev.id} | Base: $
-                          {ev.precioBase.toLocaleString("es-AR")}
-                        </p>
                       </div>
-                      <span className="text-xs font-mono opacity-90">
-                        {ev.fecha}
+                      <span className="text-[10px] font-mono whitespace-nowrap">
+                        {ev.eventDate
+                          ? new Date(ev.eventDate).toLocaleDateString("es-AR")
+                          : "S/F"}
                       </span>
-                    </div>
-
-                    <div className="space-y-1">
-                      <div className="flex justify-between text-xs font-mono font-bold">
-                        <span
-                          className={
-                            esEste ? "text-surface/80" : "text-text-soft"
-                          }
-                        >
-                          Aforo: {ev.ticketsVendidos} / {ev.capacidad}
-                        </span>
-                        <span>{porc}%</span>
-                      </div>
-                      <div
-                        className={`w-full h-3 border p-0.5 overflow-hidden ${esEste ? "border-surface bg-text" : "border-text bg-surface-2"}`}
-                      >
-                        <div
-                          className={`h-full transition-all ${
-                            esEste
-                              ? "bg-surface"
-                              : ev.estado === "CONCLUIDO"
-                                ? "bg-red-500"
-                                : "bg-text"
-                          }`}
-                          style={{ width: `${porc}%` }}
-                        />
-                      </div>
                     </div>
                   </div>
                 );
@@ -241,304 +373,235 @@ export default function DashboardProducer() {
             )}
           </div>
         </div>
-        <div className="lg:col-span-7 space-y-6">
-          <div className="flex gap-2 border-b border-border pb-2 overflow-x-auto">
+
+        <div className="lg:col-span-8 space-y-6">
+          <div className="flex gap-2">
             <button
               disabled={!eventoSeleccionado}
               onClick={() => setSeccionActiva("ajustes")}
-              className={`px-4 py-2.5 font-mono text-xs font-black uppercase tracking-wider transition-all border-2 border-text rounded-none ${
+              className={`px-4 py-2 font-mono text-xs font-black uppercase border-2 border-text ${
                 !eventoSeleccionado
-                  ? "opacity-30 cursor-not-allowed bg-surface-2 text-text-soft"
+                  ? "opacity-30"
                   : seccionActiva === "ajustes"
-                    ? "bg-text text-surface shadow-none translate-x-0.5 translate-y-0.5"
-                    : "bg-surface text-text hover:bg-surface-2 shadow-[3px_3px_0px_0px_var(--color-text)] -translate-y-0.5 cursor-pointer"
+                    ? "bg-text text-surface"
+                    : "bg-surface"
               }`}
             >
-              {esConcluido ? "📊 Resumen Histórico" : "🛠️ Ajustes del Show"}
+              🛠️ Ajustes Avanzados
             </button>
-
             <button
               disabled={!eventoSeleccionado || esConcluido}
               onClick={() => setSeccionActiva("scanner")}
-              className={`px-4 py-2.5 font-mono text-xs font-black uppercase tracking-wider transition-all border-2 rounded-none ${
-                !eventoSeleccionado
-                  ? "opacity-30 cursor-not-allowed bg-surface-2 text-text-soft border-text"
-                  : esConcluido
-                    ? "bg-neutral-800 text-red-500/60 border-red-900/50 cursor-not-allowed shadow-none font-bold"
-                    : seccionActiva === "scanner"
-                      ? "bg-text text-surface border-text shadow-none translate-x-0.5 translate-y-0.5"
-                      : "bg-surface text-text border-text hover:bg-surface-2 shadow-[3px_3px_0px_0px_var(--color-text)] -translate-y-0.5 cursor-pointer"
+              className={`px-4 py-2 font-mono text-xs font-black uppercase border-2 border-text ${
+                !eventoSeleccionado || esConcluido
+                  ? "opacity-30"
+                  : seccionActiva === "scanner"
+                    ? "bg-text text-surface"
+                    : "bg-surface"
               }`}
             >
-              {esConcluido ? "🔒 Scanner Bloqueado" : "📷 Scanner Control"}
+              📷 Scanner
             </button>
           </div>
 
-          {!eventoSeleccionado && (
-            <div className="border-2 border-dashed border-border p-12 text-center bg-surface/30">
-              <p className="font-mono text-sm uppercase text-text-soft font-bold tracking-wide">
-                [ Seleccioná un evento de la lista para gestionar su estado
-                operativo ]
-              </p>
+          {!eventoSeleccionado ? (
+            <div className="border-2 border-dashed border-text p-12 text-center bg-surface/30 font-mono text-xs uppercase text-text-soft font-bold">
+              [ Seleccioná un show de la lista para auditar o editár ]
             </div>
-          )}
-
-          {eventoSeleccionado && (
+          ) : (
             <div>
               {seccionActiva === "ajustes" && (
-                <div className="space-y-6">
-                  {esConcluido ? (
-                    <div className="bg-surface border-2 border-text p-6 space-y-6 shadow-[4px_4px_0px_0px_var(--color-text)]">
-                      <div className="border-b-2 border-text pb-2">
-                        <h2 className="text-xl font-black uppercase mt-1 tracking-tight">
-                          Balance Estadístico del Show Concluido
-                        </h2>
-                      </div>
+                <div className="bg-surface border-2 border-text p-6 space-y-5 shadow-[4px_4px_0px_0px_var(--color-text)]">
+                  <div className="flex justify-between items-center border-b-2 border-text pb-1">
+                    <h3 className="text-lg font-black uppercase">
+                      Editor Maestro del Evento
+                    </h3>
+                    <span className="font-mono text-xs bg-secondary/10 border border-text px-2 py-0.5 font-bold uppercase">
+                      Capacidad total: {capacidadTotalPantalla} pax
+                    </span>
+                  </div>
 
-                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                        <div className="border-2 border-text p-4 bg-background shadow-[2px_2px_0px_0px_var(--color-text)]">
-                          <p className="text-text-soft font-mono text-[10px] font-bold uppercase">
-                            Cierre de Caja Total
-                          </p>
-                          <p className="text-xl font-mono font-black text-success mt-1">
-                            $
-                            {eventoSeleccionado.recaudacion.toLocaleString(
-                              "es-AR",
-                            )}
-                          </p>
-                        </div>
-                        <div className="border-2 border-text p-4 bg-background shadow-[2px_2px_0px_0px_var(--color-text)]">
-                          <p className="text-text-soft font-mono text-[10px] font-bold uppercase">
-                            Tickets Totales Vendidos
-                          </p>
-                          <p className="text-xl font-mono font-black mt-1">
-                            {eventoSeleccionado.ticketsVendidos.toLocaleString(
-                              "es-AR",
-                            )}
-                          </p>
-                        </div>
-                        <div className="border-2 border-text p-4 bg-background shadow-[2px_2px_0px_0px_var(--color-text)]">
-                          <p className="text-text-soft font-mono text-[10px] font-bold uppercase">
-                            Ocupación Final
-                          </p>
-                          <p className="text-xl font-mono font-black mt-1">
-                            {Math.round(
-                              (eventoSeleccionado.ticketsVendidos /
-                                eventoSeleccionado.capacidad) *
-                                100,
-                            )}
-                            %
-                          </p>
-                        </div>
-                      </div>
-
-                      <div className="bg-surface-2 h-6 border-2 border-text rounded-none p-0.5 overflow-hidden">
-                        <div
-                          className="h-full bg-red-500 transition-all duration-500"
-                          style={{
-                            width: `${Math.round((eventoSeleccionado.ticketsVendidos / eventoSeleccionado.capacidad) * 100)}%`,
-                          }}
-                        />
-                      </div>
-                      <p className="font-mono text-[11px] text-text-soft leading-relaxed uppercase">
-                        Los datos operativos de este show no admiten cambios
-                        porque su estado es concluido.
-                      </p>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-mono font-bold uppercase text-text-soft">
+                        Título Comercial
+                      </label>
+                      <input
+                        type="text"
+                        value={formTitle}
+                        onChange={(e) => setFormTitle(e.target.value)}
+                        className="w-full border-2 border-text p-2 bg-background font-bold text-xs uppercase shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] focus:outline-none"
+                      />
                     </div>
-                  ) : (
-                    <div className="bg-surface border-2 border-text p-6 space-y-5 shadow-[4px_4px_0px_0px_var(--color-text)]">
-                      <h2 className="text-xl font-black uppercase border-b-2 border-text pb-2 tracking-tight">
-                        Configurar Espectáculo
-                      </h2>
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-mono font-bold uppercase text-text-soft">
+                        Categoría del Show
+                      </label>
+                      <input
+                        type="text"
+                        value={formCategory}
+                        onChange={(e) => setFormCategory(e.target.value)}
+                        className="w-full border-2 border-text p-2 bg-background font-bold text-xs uppercase shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] focus:outline-none"
+                      />
+                    </div>
+                  </div>
 
-                      {tieneVentas && (
-                        <div className="p-4 bg-yellow-500/10 border-l-4 border-yellow-500 font-mono text-xs text-yellow-700 dark:text-yellow-500 font-bold uppercase">
-                          🔒: Ya hay entradas vendidas. Solo podés cambiar el
-                          nombre.
-                        </div>
-                      )}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-mono font-bold uppercase text-text-soft">
+                        Fecha del Evento
+                      </label>
+                      <input
+                        type="date"
+                        value={formDate}
+                        onChange={(e) => setFormDate(e.target.value)}
+                        className="w-full border-2 border-text p-2 bg-background font-mono text-xs shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] focus:outline-none"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-mono font-bold uppercase text-text-soft">
+                        Locación / Estadio
+                      </label>
+                      <input
+                        type="text"
+                        value={formLocation}
+                        onChange={(e) => setFormLocation(e.target.value)}
+                        className="w-full border-2 border-text p-2 bg-background font-bold text-xs uppercase shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] focus:outline-none"
+                      />
+                    </div>
+                  </div>
 
-                      <div className="space-y-4">
-                        <div>
-                          <label className="block text-xs font-black uppercase font-mono mb-1 tracking-wide">
-                            Nombre del show
-                          </label>
-                          <input
-                            type="text"
-                            value={formNombre}
-                            onChange={(e) => setFormNombre(e.target.value)}
-                            className="w-full border-2 border-text p-2.5 bg-background font-bold uppercase text-sm focus:outline-none"
-                          />
-                        </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-mono font-bold uppercase text-text-soft">
+                      Descripción de Cartelera
+                    </label>
+                    <textarea
+                      rows={3}
+                      value={formDescription}
+                      onChange={(e) => setFormDescription(e.target.value)}
+                      className="w-full border-2 border-text p-2 bg-background font-medium text-xs shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] focus:outline-none resize-none"
+                    />
+                  </div>
 
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                          <div>
-                            <label className="block text-xs font-black uppercase font-mono mb-1 tracking-wide">
-                              Precio Entrada
-                            </label>
-                            <input
-                              type="number"
-                              value={formPrecio}
-                              onChange={(e) =>
-                                setFormPrecio(
-                                  e.target.value !== ""
-                                    ? Number(e.target.value)
-                                    : "",
-                                )
-                              }
-                              disabled={tieneVentas}
-                              className={`w-full border-2 border-text p-2.5 font-mono text-sm focus:outline-none ${
-                                tieneVentas
-                                  ? "bg-surface-2 text-text-soft cursor-not-allowed"
-                                  : "bg-background"
-                              }`}
-                            />
-                          </div>
-                          <div>
-                            <label className="block text-xs font-black uppercase font-mono mb-1 tracking-wide">
-                              Capacidad Máxima
-                            </label>
-                            <input
-                              type="number"
-                              value={formCapacidad}
-                              onChange={(e) =>
-                                setFormCapacidad(
-                                  e.target.value !== ""
-                                    ? Number(e.target.value)
-                                    : "",
-                                )
-                              }
-                              disabled={tieneVentas}
-                              className={`w-full border-2 border-text p-2.5 font-mono text-sm focus:outline-none ${
-                                tieneVentas
-                                  ? "bg-surface-2 text-text-soft cursor-not-allowed"
-                                  : "bg-background"
-                              }`}
-                            />
-                          </div>
-                        </div>
+                  <div className="pt-2 space-y-3">
+                    <h4 className="text-xs font-mono font-black uppercase tracking-tight text-primary">
+                      🔒 Gestión Macroeconómica de Tickets
+                    </h4>
 
-                        <div className="pt-2">
-                          <button
-                            onClick={procesarFormulario}
-                            className="bg-primary text-background border-2 border-text px-5 py-3 font-mono font-black text-xs uppercase w-full cursor-pointer transition-all hover:brightness-105"
+                    <div className="space-y-3">
+                      {formTicketTypes.map((ticket, idx) => {
+                        const entradasVendidas = ticket.sold || 0;
+                        const tieneVentas = entradasVendidas > 0;
+
+                        return (
+                          <div
+                            key={idx}
+                            className={`p-4 border-2 border-text shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] ${tieneVentas ? "bg-secondary/5" : "bg-background"}`}
                           >
-                            [ APLICAR CAMBIOS ]
-                          </button>
-                        </div>
-                      </div>
+                            <div className="flex justify-between items-center mb-2">
+                              <span className="text-xs font-mono font-black uppercase text-text">
+                                {ticket.name}
+                              </span>
+                              {tieneVentas && (
+                                <span className="text-[10px] font-mono bg-accent text-white font-black px-2 py-0.5 uppercase tracking-tighter">
+                                  ⚠️ BLOQUEO ACTIVO: {entradasVendidas} VENDIDAS
+                                </span>
+                              )}
+                            </div>
+
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                              <div>
+                                <label className="text-[9px] font-mono font-bold text-text-soft uppercase">
+                                  Sector
+                                </label>
+                                <input
+                                  type="text"
+                                  value={ticket.zone || ""}
+                                  disabled={tieneVentas}
+                                  onChange={(e) =>
+                                    handleTicketTypeChange(
+                                      idx,
+                                      "zone",
+                                      e.target.value,
+                                    )
+                                  }
+                                  className="w-full border border-text p-1.5 bg-background font-bold text-xs uppercase disabled:opacity-50 disabled:bg-surface"
+                                />
+                              </div>
+
+                              <div>
+                                <label className="text-[9px] font-mono font-bold text-text-soft uppercase">
+                                  Precio ($)
+                                </label>
+                                <input
+                                  type="number"
+                                  value={ticket.price}
+                                  disabled={tieneVentas}
+                                  onChange={(e) =>
+                                    handleTicketTypeChange(
+                                      idx,
+                                      "price",
+                                      Number(e.target.value),
+                                    )
+                                  }
+                                  className="w-full border border-text p-1.5 bg-background font-mono text-xs disabled:opacity-50 disabled:bg-surface"
+                                />
+                              </div>
+
+                              <div>
+                                <label className="text-[9px] font-mono font-bold text-text-soft uppercase">
+                                  Stock Disponible
+                                </label>
+                                <input
+                                  type="number"
+                                  value={ticket.stock}
+                                  min={entradasVendidas}
+                                  onChange={(e) =>
+                                    handleTicketTypeChange(
+                                      idx,
+                                      "stock",
+                                      Number(e.target.value),
+                                    )
+                                  }
+                                  className="w-full border border-text p-1.5 bg-background font-mono text-xs"
+                                />
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
                     </div>
-                  )}
+                  </div>
+
+                  <div className="pt-4 flex flex-col sm:flex-row gap-3">
+                    <button
+                      onClick={guardarCambios}
+                      disabled={loadingAccion}
+                      className="flex-1 bg-primary text-background border-2 border-text py-2.5 font-mono text-xs font-black uppercase shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] hover:translate-x-0.5 hover:translate-y-0.5 transition-all active:shadow-none"
+                    >
+                      {loadingAccion
+                        ? "[ ACTUALIZANDO... ]"
+                        : "💾 GUARDAR AJUSTES AVANZADOS"}
+                    </button>
+
+                    <button
+                      onClick={eliminarEvento}
+                      disabled={loadingAccion}
+                      className="bg-accent text-white border-2 border-text px-4 py-2.5 font-mono text-xs font-black uppercase shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] hover:translate-x-0.5 hover:translate-y-0.5 transition-all active:shadow-none"
+                    >
+                      {loadingAccion ? "[ PROCESANDO... ]" : "🗑️ DAR DE BAJA"}
+                    </button>
+                  </div>
                 </div>
               )}
 
               {seccionActiva === "scanner" && (
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                  <div className="md:col-span-2 bg-surface border-2 border-text p-6 flex flex-col justify-between shadow-[4px_4px_0px_0px_var(--color-text)]">
-                    <div>
-                      <h2 className="uppercase font-black tracking-tight text-xl mb-1">
-                        Cámara de Validación
-                      </h2>
-                      <p className="text-text-soft font-mono text-xs mb-4 uppercase">
-                        [ Lector de Puerta Integrado ]
-                      </p>
-                    </div>
-
-                    <div
-                      className={`w-full aspect-video border-2 border-text flex flex-col items-center justify-center p-6 relative overflow-hidden transition-all duration-300 ${
-                        statusScanner === "success"
-                          ? "bg-success/20 border-success"
-                          : statusScanner === "error"
-                            ? "bg-red-600/20 border-red-500"
-                            : "bg-black"
-                      }`}
-                    >
-                      {statusScanner === "idle" && (
-                        <div className="absolute inset-x-0 h-0.5 bg-primary shadow-[0_0_8px_1px_rgba(204,255,0,0.6)] top-1/2 -translate-y-1/2 animate-bounce" />
-                      )}
-                      {statusScanner === "idle" && (
-                        <p className="font-mono text-xs text-neutral-400 tracking-widest uppercase font-bold animate-pulse">
-                          [ ENFOQUE EL QR DEL COMPROBANTE ]
-                        </p>
-                      )}
-                      {statusScanner === "success" && (
-                        <div className="text-center font-mono space-y-1">
-                          <p className="text-2xl">🟢</p>
-                          <p className="text-green-700 dark:text-success font-black tracking-wider text-sm uppercase">
-                            ACCESO PERMITIDO ✔️
-                          </p>
-                          <p className="text-text text-xs font-bold bg-surface-2 border border-text px-3 py-1 mt-2 inline-block">
-                            TICKET VERIFICADO #TK-992
-                          </p>
-                        </div>
-                      )}
-                      {statusScanner === "error" && (
-                        <div className="text-center font-mono space-y-1">
-                          <p className="text-2xl">🔴</p>
-                          <p className="text-red-700 dark:text-red-400 font-black tracking-wider text-sm uppercase">
-                            ACCESO DENEGADO ✖️
-                          </p>
-                          <p className="text-text text-xs font-bold bg-surface-2 border border-text px-3 py-1 mt-2 inline-block">
-                            CÓDIGO REPETIDO O INVÁLIDO
-                          </p>
-                        </div>
-                      )}
-                    </div>
-
-                    <div className="mt-4 pt-4 border-t border-border grid grid-cols-2 gap-3">
-                      <button
-                        onClick={() => simularEscaneo("success")}
-                        className="bg-success text-black border-2 border-text py-2.5 font-mono font-black text-xs uppercase tracking-wider hover:brightness-105 transition-all cursor-pointer"
-                      >
-                        Simular Éxito ✔️
-                      </button>
-                      <button
-                        onClick={() => simularEscaneo("error")}
-                        className="bg-red-500 text-white border-2 border-text py-2.5 font-mono font-black text-xs uppercase tracking-wider hover:brightness-105 transition-all cursor-pointer"
-                      >
-                        Simular Error ✖️
-                      </button>
-                    </div>
-                  </div>
-
-                  <div className="bg-surface border-2 border-text p-4 shadow-[4px_4px_0px_0px_var(--color-text)] flex flex-col justify-between">
-                    <div>
-                      <h3 className="uppercase font-black text-sm tracking-wide font-mono mb-3 border-b-2 border-text pb-1">
-                        Ingresos de Puerta
-                      </h3>
-                      <div className="space-y-3">
-                        {ultimosAccesos.map((acceso, idx) => (
-                          <div
-                            key={idx}
-                            className="p-2.5 bg-background border border-border text-xs font-mono flex justify-between items-center"
-                          >
-                            <div>
-                              <p className="font-bold text-text">
-                                {acceso.id} -{" "}
-                                <span className="text-text-soft font-normal">
-                                  {acceso.sector}
-                                </span>
-                              </p>
-                              <p className="text-[10px] text-text-soft mt-0.5">
-                                {acceso.hora}
-                              </p>
-                            </div>
-                            <span
-                              className={`px-1.5 py-0.5 text-[10px] font-black tracking-tight ${
-                                acceso.estado === "VALIDO"
-                                  ? "bg-success/10 text-success border border-success/20"
-                                  : "bg-red-500/10 text-red-600 dark:text-red-500 border border-red-500/20"
-                              }`}
-                            >
-                              {acceso.estado}
-                            </span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                    <p className="text-[10px] font-mono text-text-soft mt-4 leading-snug uppercase">
-                      * Sincronización activa.
-                    </p>
+                <div className="bg-surface border-2 border-text p-6 space-y-4 shadow-[4px_4px_0px_0px_var(--color-text)]">
+                  <h3 className="text-lg font-black uppercase">
+                    Módulo de Control de Accesos
+                  </h3>
+                  <div className="border-2 border-dashed border-text p-8 text-center font-mono text-xs font-bold text-text-soft">
+                    [ Aquí se inicializa la cámara para el escaneo de QRs ]
                   </div>
                 </div>
               )}
