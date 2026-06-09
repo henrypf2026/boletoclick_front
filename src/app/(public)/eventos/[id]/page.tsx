@@ -8,7 +8,6 @@ import { useAuth } from '@/context/AuthContext';
 import { formatEventDate, formatPrice, type Event } from '@/mocks/events';
 import { eventService } from '@/services/eventService';
 import EventMap from '@/components/ui/EventMap';
-import { ticketService } from '@/services/ticketService';
 
 export default function EventoPage() {
   const params = useParams();
@@ -23,7 +22,6 @@ export default function EventoPage() {
   const [promoCode, setPromoCode] = useState('');
   const [promoApplied, setPromoApplied] = useState(false);
   const [message, setMessage] = useState('');
-  const [purchasing, setPurchasing] = useState(false);
   const [headerSourceIndex, setHeaderSourceIndex] = useState(0);
 
   useEffect(() => {
@@ -77,7 +75,7 @@ export default function EventoPage() {
     setMessage('Código no válido. Probá con BOLETO10.');
   };
 
-  const handlePurchase = async () => {
+  const handlePurchase = () => {
     if (!authenticated || !user) {
       router.push(`/login?from=/eventos/${event.id}`);
       return;
@@ -88,21 +86,27 @@ export default function EventoPage() {
       return;
     }
 
-    try {
-      setPurchasing(true);
-      await ticketService.purchaseTickets({
-        userId: user.id,
-        event,
-        zone: selectedZone,
-        quantity,
-        total,
-      });
-      router.push('/mis-tickets');
-    } catch {
-      setMessage('Error al confirmar la compra. Intentá de nuevo.');
-    } finally {
-      setPurchasing(false);
+    const params = new URLSearchParams({
+      ticketTypeId: selectedZone.ticketTypeId,
+      eventId: event.id,
+      nombre: event.title,
+      venue: event.venue,
+      city: event.city,
+      date: event.date,
+      time: event.time,
+      tribuna: selectedZone.zone,
+      tipo: selectedZone.name,
+      precio: String(selectedZone.price),
+      cantidad: String(quantity),
+      lat: String(event.coordinates.lat),
+      lng: String(event.coordinates.lng),
+    });
+
+    if (event.address) {
+      params.set('address', event.address);
     }
+
+    router.push(`/checkout?${params.toString()}`);
   };
 
   const headerSources = [event.posterUrl, event.fallbackImageUrl].filter(Boolean) as string[];
@@ -264,14 +268,10 @@ export default function EventoPage() {
 
             <button
               onClick={handlePurchase}
-              disabled={purchasing || !selectedZone || event.zones.length === 0}
+              disabled={!selectedZone || event.zones.length === 0}
               className="w-full border-4 border-border bg-primary py-3 text-sm font-black uppercase tracking-wider text-background shadow-[4px_4px_0px_0px_rgba(23,23,23,1)] transition-all hover:-translate-y-0.5 hover:shadow-[6px_6px_0px_0px_rgba(23,23,23,1)] active:translate-y-0.5 active:shadow-none disabled:opacity-50 disabled:pointer-events-none dark:shadow-[4px_4px_0px_0px_rgba(255,255,255,1)]"
             >
-              {purchasing
-                ? 'Procesando...'
-                : authenticated
-                  ? 'Confirmar compra'
-                  : 'Iniciá sesión para comprar'}
+              {authenticated ? 'Confirmar compra' : 'Iniciá sesión para comprar'}
             </button>
           </div>
 
