@@ -1,27 +1,32 @@
 import { cookies } from "next/headers";
 import BankForm from "./BankForm";
+import { mapApiToForm, type ApiBankAccount } from "./bankAccountMapper";
 
-export const dynamic = 'force-dynamic';
+export const dynamic = "force-dynamic";
+
+const BACKEND_URL =
+  process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3000";
 
 async function getBankData() {
   try {
     const cookieStore = await cookies();
-    const token = cookieStore.get("token")?.value;
+    const token = cookieStore.get("auth_token")?.value;
 
-    const res = await fetch(
-      `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001"}/bank-accounts/me`,
-      {
-        method: "GET",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: token ? `Bearer ${token}` : "",
-        },
-        cache: "no-store",
+    if (!token) return null;
+
+    const res = await fetch(`${BACKEND_URL}/bank-accounts/me`, {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
       },
-    );
+      cache: "no-store",
+    });
 
     if (!res.ok) return null;
-    return await res.json();
+
+    const account = (await res.json()) as ApiBankAccount;
+    return mapApiToForm(account);
   } catch (error) {
     console.error("Error cargando datos bancarios:", error);
     return null;
