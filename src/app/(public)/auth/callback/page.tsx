@@ -25,15 +25,19 @@ export default function AuthCallbackPage() {
       if (handled) return;
       handled = true;
 
-      const user = await authService.getMe(session.access_token);
-      if (!user || !user.name) {
-        await supabase.auth.signOut();
-        setError('No encontramos una cuenta registrada con ese correo. Registrate primero desde el formulario.');
-        return;
-      }
+      try {
+        const user = await authService.getMe(session.access_token);
+        if (!user || !user.name) {
+          await supabase.auth.signOut();
+          setError('No encontramos una cuenta registrada con ese correo. Registrate primero desde el formulario.');
+          return;
+        }
 
-      saveToken(session.access_token, user.role);
-      window.location.href = '/';
+        saveToken(session.access_token, user.role);
+        window.location.href = '/';
+      } catch {
+        setError('No se pudo conectar con el servidor. Verifica que el backend esté corriendo en el puerto 3000.');
+      }
     };
 
     // Caso 1: Supabase ya procesó el code antes de que el listener se suscriba
