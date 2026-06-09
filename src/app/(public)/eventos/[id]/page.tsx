@@ -7,9 +7,9 @@ import { Alert } from 'flowbite-react';
 import { useAuth } from '@/context/AuthContext';
 import { formatEventDate, formatPrice, type Event } from '@/mocks/events';
 import { eventService } from '@/services/eventService';
-import { saveTicket } from '@/lib/auth';
+import { getToken } from '@/lib/auth';
 import EventMap from '@/components/ui/EventMap';
-import { paymentService } from '@/services/paymentService';
+import { favoritesService } from '@/services/favoritesService';
 
 export default function EventoPage() {
   const params = useParams();
@@ -25,6 +25,8 @@ export default function EventoPage() {
   const [promoApplied, setPromoApplied] = useState(false);
   const [message, setMessage] = useState('');
   const [headerSourceIndex, setHeaderSourceIndex] = useState(0);
+  const [isFavorite, setIsFavorite] = useState(false);
+  const [loadingFav, setLoadingFav] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -37,6 +39,30 @@ export default function EventoPage() {
     });
     return () => { active = false; };
   }, [id]);
+
+  useEffect(() => {
+    if (!authenticated) return;
+    const token = getToken();
+    if (!token) return;
+    favoritesService.getAll(token).then((favs) => {
+      setIsFavorite(favs.some((f) => f.eventId === id));
+    }).catch(() => {});
+  }, [authenticated, id]);
+
+  const handleToggleFavorite = async () => {
+    if (!authenticated) { router.push(`/login?from=/eventos/${id}`); return; }
+    const token = getToken();
+    if (!token) return;
+    setLoadingFav(true);
+    try {
+      const { added } = await favoritesService.toggle(id, token);
+      setIsFavorite(added);
+    } catch {
+      setMessage('No se pudo actualizar favoritos. Intentá de nuevo.');
+    } finally {
+      setLoadingFav(false);
+    }
+  };
 
   const selectedZone = event?.zones.find((zone) => zone.id === zoneId);
   const date = event ? formatEventDate(event.date, event.time) : null;
@@ -77,59 +103,39 @@ export default function EventoPage() {
     setMessage('Código no válido. Probá con BOLETO10.');
   };
 
-  const handlePurchase = async () => {
+  const handlePurchase = () => {
+    if (!authenticated || !user) {
+      router.push(`/login?from=/eventos/${event.id}`);
+      return;
+    }
 
-  if (!authenticated) {
-    router.push(`/login?from=/eventos/${event.id}`);
-    return;
-  }
+    if (!selectedZone || quantity > selectedZone.available) {
+      setMessage('Cantidad no disponible en esa zona.');
+      return;
+    }
 
-  if (!selectedZone || quantity > selectedZone.available) {
-    setMessage('Cantidad no disponible en esa zona.');
-    return;
-  }
-
-  try {
-
-    const session = await paymentService.createCheckoutSession({
-      id: crypto.randomUUID(),
-      userId: user!.id,
+    const params = new URLSearchParams({
+      ticketTypeId: selectedZone.ticketTypeId,
       eventId: event.id,
-      eventTitle: event.title,
+      nombre: event.title,
       venue: event.venue,
+      city: event.city,
       date: event.date,
       time: event.time,
-      zone: selectedZone.name,
-      quantity,
-      total,
-      qrCode: `BC-${Date.now()}`,
-      purchasedAt: new Date().toISOString(),
+      tribuna: selectedZone.zone,
+      tipo: selectedZone.name,
+      precio: String(selectedZone.price),
+      cantidad: String(quantity),
+      lat: String(event.coordinates.lat),
+      lng: String(event.coordinates.lng),
     });
 
-    window.location.href = session.url;
+    if (event.address) {
+      params.set('address', event.address);
+    }
 
-  } catch {
-
-    setMessage('Error procesando la compra');
-
-  }
-
-};
-    //saveTicket({
-    //id: crypto.randomUUID(),
-    //userId: user!.id,
-    //eventId: event.id,
-    //eventTitle: event.title,
-    //venue: event.venue,
-    //date: event.date,
-    //time: event.time,
-    //zone: selectedZone.name,
-    //quantity,
-    //total,
-    //qrCode: `BC-${Date.now()}`,
-    //purchasedAt: new Date().toISOString(),
-    //});
-    //router.push('/mis-tickets');
+    router.push(`/checkout?${params.toString()}`);
+  };
 
   const headerSources = [event.posterUrl, event.fallbackImageUrl].filter(Boolean) as string[];
   const headerImage = headerSources[headerSourceIndex];
@@ -246,13 +252,18 @@ export default function EventoPage() {
                 id="zone"
                 value={zoneId}
                 onChange={(e) => setZoneId(e.target.value)}
-                className="w-full border-2 border-border bg-background px-3 py-2.5 text-sm font-bold text-text focus:outline-none focus:border-primary transition-colors"
+                disabled={event.zones.length === 0}
+                className="w-full border-2 border-border bg-background px-3 py-2.5 text-sm font-bold text-text focus:outline-none focus:border-primary transition-colors disabled:opacity-50"
               >
-                {event.zones.map((zone) => (
-                  <option key={zone.id} value={zone.id}>
-                    {zone.name} · {formatPrice(zone.price)} ({zone.available} disp.)
-                  </option>
-                ))}
+                {event.zones.length === 0 ? (
+                  <option value="">Sin zonas disponibles</option>
+                ) : (
+                  event.zones.map((zone) => (
+                    <option key={zone.id} value={zone.id}>
+                      {zone.zone} · {zone.name} · {formatPrice(zone.price)} ({zone.available} disp.)
+                    </option>
+                  ))
+                )}
               </select>
             </div>
 
@@ -285,9 +296,22 @@ export default function EventoPage() {
 
             <button
               onClick={handlePurchase}
-              className="w-full border-4 border-border bg-primary py-3 text-sm font-black uppercase tracking-wider text-background shadow-[4px_4px_0px_0px_rgba(23,23,23,1)] transition-all hover:-translate-y-0.5 hover:shadow-[6px_6px_0px_0px_rgba(23,23,23,1)] active:translate-y-0.5 active:shadow-none dark:shadow-[4px_4px_0px_0px_rgba(255,255,255,1)]"
+              disabled={!selectedZone || event.zones.length === 0}
+              className="w-full border-4 border-border bg-primary py-3 text-sm font-black uppercase tracking-wider text-background shadow-[4px_4px_0px_0px_rgba(23,23,23,1)] transition-all hover:-translate-y-0.5 hover:shadow-[6px_6px_0px_0px_rgba(23,23,23,1)] active:translate-y-0.5 active:shadow-none disabled:opacity-50 disabled:pointer-events-none dark:shadow-[4px_4px_0px_0px_rgba(255,255,255,1)]"
             >
               {authenticated ? 'Confirmar compra' : 'Iniciá sesión para comprar'}
+            </button>
+
+            <button
+              onClick={handleToggleFavorite}
+              disabled={loadingFav}
+              className={`mt-2 w-full border-2 border-border py-2.5 text-sm font-black uppercase tracking-wider transition-all hover:-translate-y-0.5 disabled:opacity-50 ${
+                isFavorite
+                  ? "bg-red-500 text-white border-red-500"
+                  : "bg-surface text-text hover:bg-surface-2"
+              }`}
+            >
+              {isFavorite ? "♥ Guardado en favoritos" : "♡ Guardar en favoritos"}
             </button>
           </div>
 
