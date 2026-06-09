@@ -13,6 +13,8 @@ export default function AuthCallbackPage() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    let mounted = true;
+
     const code = new URLSearchParams(window.location.search).get('code');
     if (!code) {
       setError('El enlace no es válido o ya fue utilizado.');
@@ -22,21 +24,22 @@ export default function AuthCallbackPage() {
     let handled = false;
 
     const processSession = async (session: { access_token: string }) => {
-      if (handled) return;
+      if (!mounted || handled) return;
       handled = true;
 
       try {
         const user = await authService.getMe(session.access_token);
+        if (!mounted) return;
         if (!user || !user.name) {
           await supabase.auth.signOut();
-          setError('No encontramos una cuenta registrada con ese correo. Registrate primero desde el formulario.');
+          if (mounted) setError('No encontramos una cuenta registrada con ese correo. Registrate primero desde el formulario.');
           return;
         }
 
         saveToken(session.access_token, user.role);
         window.location.href = '/';
       } catch {
-        setError('No se pudo conectar con el servidor. Verifica que el backend esté corriendo en el puerto 3000.');
+        if (mounted) setError('No se pudo conectar con el servidor. Verifica que el backend esté corriendo en el puerto 3000.');
       }
     };
 
@@ -51,10 +54,11 @@ export default function AuthCallbackPage() {
     });
 
     const timeout = setTimeout(() => {
-      if (!handled) setError('No se pudo completar el inicio de sesión. Intentá de nuevo.');
+      if (mounted && !handled) setError('No se pudo completar el inicio de sesión. Intentá de nuevo.');
     }, 10000);
 
     return () => {
+      mounted = false;
       subscription.unsubscribe();
       clearTimeout(timeout);
     };
