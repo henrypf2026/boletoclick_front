@@ -10,3 +10,4 @@ export const ticketService = {
     return res.json();
   },
 };
+

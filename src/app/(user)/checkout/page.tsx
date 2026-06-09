@@ -7,13 +7,12 @@ import { getToken } from "@/lib/auth";
 import Swal from "sweetalert2";
 import Link from "next/link";
 
-
 const TIMER_SECONDS = 10 * 60; // 10 minutos
 
-
-
 function formatTime(seconds: number) {
-  const m = Math.floor(seconds / 60).toString().padStart(2, "0");
+  const m = Math.floor(seconds / 60)
+    .toString()
+    .padStart(2, "0");
   const s = (seconds % 60).toString().padStart(2, "0");
   return `${m}:${s}`;
 }
@@ -21,15 +20,13 @@ function formatTime(seconds: number) {
 function CheckoutContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { user, authenticated } = useAuth();
-
+  const { user, authenticated, loading } = useAuth();
 
   const ticketTypeId = searchParams.get("ticketTypeId") ?? "";
   const ticketTypeName = searchParams.get("nombre") ?? "Entrada";
   const ticketTypeZone = searchParams.get("zona") ?? "";
   const ticketPrice = Number(searchParams.get("precio") ?? 0);
   const initialQuantity = Number(searchParams.get("cantidad") ?? 1);
-
 
   const [quantity] = useState(initialQuantity);
   const [timerSeconds, setTimerSeconds] = useState(TIMER_SECONDS);
@@ -40,20 +37,19 @@ function CheckoutContent() {
   const [discount, setDiscount] = useState(0);
   const [loadingPurchase, setLoadingPurchase] = useState(false);
 
-  
   useEffect(() => {
+    if (loading) return;
+
     if (!authenticated) {
       router.push(`/login?from=/checkout?ticketTypeId=${ticketTypeId}`);
     }
-  }, [authenticated, router, ticketTypeId]);
+  }, [authenticated, loading, router, ticketTypeId]);
 
- 
   useEffect(() => {
     if (!ticketTypeId) {
       router.push("/eventos");
     }
   }, [ticketTypeId, router]);
-
 
   useEffect(() => {
     if (timerExpired) return;
@@ -73,9 +69,11 @@ function CheckoutContent() {
             color: "#171717",
             allowOutsideClick: false,
             customClass: {
-              popup: "border-4 border-[#171717] rounded-none shadow-[6px_6px_0px_0px_#171717] font-mono",
+              popup:
+                "border-4 border-[#171717] rounded-none shadow-[6px_6px_0px_0px_#171717] font-mono",
               title: "uppercase font-black tracking-tighter",
-              confirmButton: "font-mono font-black uppercase tracking-wider border-2 border-[#171717] rounded-none",
+              confirmButton:
+                "font-mono font-black uppercase tracking-wider border-2 border-[#171717] rounded-none",
             },
           }).then(() => router.push("/eventos"));
           return 0;
@@ -87,139 +85,130 @@ function CheckoutContent() {
     return () => clearInterval(interval);
   }, [timerExpired, router]);
 
-  
   const subtotal = ticketPrice * quantity;
   const totalFinal = Math.max(0, subtotal - discount);
 
-  
-
   const handleApplyCoupon = async () => {
-  if (!couponCode.trim()) return;
+    if (!couponCode.trim()) return;
 
-  try {
-    const token = getToken();
-    const res = await fetch(`/api/backend/coupons/validate/${couponCode.trim()}`, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-
-    if (!res.ok) throw new Error("Cupón inválido, vencido o apagado.");
-
-    const coupon = await res.json();
-
-    // Calcular descuento según el tipo
-    let descuento = 0;
-    if (coupon.discountType === "PERCENTAGE") {
-      descuento = Math.round(subtotal * (coupon.discountValue / 100));
-    } else {
-      descuento = coupon.discountValue;
-    }
-
-    setDiscount(descuento);
-    setCouponApplied(true);
-    setCouponId(coupon.id); // para mandarlo en el POST /orders
-
-    Swal.fire({
-      title: "CUPÓN APLICADO",
-      text: coupon.discountType === "PERCENTAGE"
-        ? `Descuento del ${coupon.discountValue}%: -$${descuento.toLocaleString("es-MX")}`
-        : `Descuento fijo: -$${descuento.toLocaleString("es-MX")}`,
-      icon: "success",
-      confirmButtonText: "OK",
-      confirmButtonColor: "#6750e0",
-      background: "#f5f4f0",
-      color: "#171717",
-      customClass: {
-        popup: "border-4 border-[#171717] rounded-none shadow-[6px_6px_0px_0px_#171717] font-mono",
-        title: "uppercase font-black tracking-tighter",
-        confirmButton: "font-mono font-black uppercase tracking-wider border-2 border-[#171717] rounded-none",
-      },
-    });
-  } catch {
-    Swal.fire({
-      title: "CUPÓN INVÁLIDO",
-      text: "El código ingresado no es válido, está vencido o ya fue usado.",
-      icon: "error",
-      confirmButtonText: "REINTENTAR",
-      confirmButtonColor: "#6750e0",
-      background: "#f5f4f0",
-      color: "#171717",
-      customClass: {
-        popup: "border-4 border-[#171717] rounded-none shadow-[6px_6px_0px_0px_#171717] font-mono",
-        title: "uppercase font-black tracking-tighter",
-        confirmButton: "font-mono font-black uppercase tracking-wider border-2 border-[#171717] rounded-none",
-      },
-    });
-  }
-};
-
-  const handlePurchase = useCallback(async () => {
-    if (!user || timerExpired) return;
-
-    setLoadingPurchase(true);
     try {
       const token = getToken();
-      const body: { ticketTypeId: string; quantity: number; couponId?: string } = {
-        ticketTypeId,
-        quantity,
-        ...(couponId ? { couponId } : {}),
-      };
-
-      const res = await fetch("/api/backend/orders", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
+      const res = await fetch(
+        `/api/backend/coupons/validate/${couponCode.trim()}`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
         },
-        body: JSON.stringify(body),
-      });
+      );
 
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.message ?? "Error al procesar la compra");
+      if (!res.ok) throw new Error("Cupón inválido, vencido o apagado.");
+
+      const coupon = await res.json();
+
+      // Calcular descuento según el tipo
+      let descuento = 0;
+      if (coupon.discountType === "PERCENTAGE") {
+        descuento = Math.round(subtotal * (coupon.discountValue / 100));
+      } else {
+        descuento = coupon.discountValue;
       }
 
-      await Swal.fire({
-        title: "COMPRA EXITOSA",
-        text: "Tus entradas fueron generadas. Podés verlas en Mis Entradas.",
+      setDiscount(descuento);
+      setCouponApplied(true);
+      setCouponId(coupon.id); // para mandarlo en el POST /orders
+
+      Swal.fire({
+        title: "CUPÓN APLICADO",
+        text:
+          coupon.discountType === "PERCENTAGE"
+            ? `Descuento del ${coupon.discountValue}%: -$${descuento.toLocaleString("es-MX")}`
+            : `Descuento fijo: -$${descuento.toLocaleString("es-MX")}`,
         icon: "success",
-        confirmButtonText: "VER MIS ENTRADAS",
+        confirmButtonText: "OK",
         confirmButtonColor: "#6750e0",
         background: "#f5f4f0",
         color: "#171717",
-        allowOutsideClick: false,
         customClass: {
-          popup: "border-4 border-[#171717] rounded-none shadow-[6px_6px_0px_0px_#171717] font-mono",
+          popup:
+            "border-4 border-[#171717] rounded-none shadow-[6px_6px_0px_0px_#171717] font-mono",
           title: "uppercase font-black tracking-tighter",
-          confirmButton: "font-mono font-black uppercase tracking-wider border-2 border-[#171717] rounded-none",
+          confirmButton:
+            "font-mono font-black uppercase tracking-wider border-2 border-[#171717] rounded-none",
         },
       });
-
-      router.push("/mis-tickets");
-    } catch (error: unknown) {
-      const msg = error instanceof Error ? error.message : "Error desconocido";
+    } catch {
       Swal.fire({
-        title: "ERROR",
-        text: msg,
+        title: "CUPÓN INVÁLIDO",
+        text: "El código ingresado no es válido, está vencido o ya fue usado.",
         icon: "error",
         confirmButtonText: "REINTENTAR",
         confirmButtonColor: "#6750e0",
         background: "#f5f4f0",
         color: "#171717",
         customClass: {
-          popup: "border-4 border-[#171717] rounded-none shadow-[6px_6px_0px_0px_#171717] font-mono",
+          popup:
+            "border-4 border-[#171717] rounded-none shadow-[6px_6px_0px_0px_#171717] font-mono",
           title: "uppercase font-black tracking-tighter",
-          confirmButton: "font-mono font-black uppercase tracking-wider border-2 border-[#171717] rounded-none",
+          confirmButton:
+            "font-mono font-black uppercase tracking-wider border-2 border-[#171717] rounded-none",
         },
+      });
+    }
+  };
+
+  const handlePurchase = useCallback(async () => {
+    if (!user || timerExpired) return;
+
+    setLoadingPurchase(true);
+
+    try {
+      const token = getToken();
+
+      const res = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/payments/create-session`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            userId: user?.id,
+            ticketTypeId: ticketTypeId === "undefined" ? "" : ticketTypeId,
+            quantity,
+            total: totalFinal,
+            couponId,
+          }),
+        },
+      );
+
+      if (!res.ok) {
+        throw new Error();
+      }
+
+      const session = await res.json();
+
+      window.location.href = session.url;
+    } catch {
+      Swal.fire({
+        title: "ERROR",
+        text: "No se pudo iniciar el pago",
+        icon: "error",
       });
     } finally {
       setLoadingPurchase(false);
     }
-  }, [user, timerExpired, ticketTypeId, quantity, couponId, router]);
+  }, [ticketTypeId, quantity, couponId, user, timerExpired, totalFinal]);
 
-  
+  if (loading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        Verificando sesión...
+      </div>
+    );
+  }
+
   return (
     <div className="p-4 md:p-8 max-w-2xl mx-auto min-h-screen bg-background text-text transition-colors">
-
       {/* Header */}
       <div className="mb-8 border-b-4 border-text pb-4">
         <Link
@@ -237,20 +226,24 @@ function CheckoutContent() {
       </div>
 
       {/* Temporizador */}
-      <div className={`border-4 p-4 mb-6 flex items-center justify-between shadow-[4px_4px_0px_0px_var(--color-text)] ${
-        timerSeconds <= 60
-          ? "border-red-500 bg-red-500/10"
-          : timerSeconds <= 180
-          ? "border-yellow-500 bg-yellow-400/10"
-          : "border-text bg-surface"
-      }`}>
+      <div
+        className={`border-4 p-4 mb-6 flex items-center justify-between shadow-[4px_4px_0px_0px_var(--color-text)] ${
+          timerSeconds <= 60
+            ? "border-red-500 bg-red-500/10"
+            : timerSeconds <= 180
+              ? "border-yellow-500 bg-yellow-400/10"
+              : "border-text bg-surface"
+        }`}
+      >
         <div>
           <p className="font-mono text-[10px] font-black uppercase tracking-widest text-text-soft">
             Tiempo restante para completar tu compra
           </p>
-          <p className={`font-mono font-black text-3xl tracking-tighter ${
-            timerSeconds <= 60 ? "text-red-500 animate-pulse" : "text-text"
-          }`}>
+          <p
+            className={`font-mono font-black text-3xl tracking-tighter ${
+              timerSeconds <= 60 ? "text-red-500 animate-pulse" : "text-text"
+            }`}
+          >
             {formatTime(timerSeconds)}
           </p>
         </div>
@@ -268,7 +261,9 @@ function CheckoutContent() {
         <div className="space-y-3">
           <div className="flex justify-between items-start">
             <div>
-              <p className="font-black uppercase text-sm tracking-tight">{ticketTypeName}</p>
+              <p className="font-black uppercase text-sm tracking-tight">
+                {ticketTypeName}
+              </p>
               {ticketTypeZone && (
                 <p className="text-text-soft text-[11px] font-mono uppercase mt-0.5">
                   Sector: {ticketTypeZone}
@@ -293,13 +288,14 @@ function CheckoutContent() {
             )}
             <div className="flex justify-between font-black text-lg font-mono border-t-2 border-text pt-2">
               <span>TOTAL</span>
-              <span className="text-success">${totalFinal.toLocaleString("es-MX")}</span>
+              <span className="text-success">
+                ${totalFinal.toLocaleString("es-MX")}
+              </span>
             </div>
           </div>
         </div>
       </div>
 
-     
       <div className="bg-surface border-2 border-text p-6 shadow-[4px_4px_0px_0px_var(--color-text)] mb-6">
         <h2 className="text-base font-black uppercase tracking-tight border-b-2 border-text pb-2 mb-5">
           🏷️ Código de descuento
@@ -337,7 +333,6 @@ function CheckoutContent() {
         )}
       </div>
 
-     
       <button
         onClick={handlePurchase}
         disabled={loadingPurchase || timerExpired}
@@ -346,8 +341,8 @@ function CheckoutContent() {
         {loadingPurchase
           ? "[ PROCESANDO... ]"
           : timerExpired
-          ? "[ TIEMPO AGOTADO ]"
-          : `Confirmar compra · $${totalFinal.toLocaleString("es-MX")}`}
+            ? "[ TIEMPO AGOTADO ]"
+            : `Confirmar compra · $${totalFinal.toLocaleString("es-MX")}`}
       </button>
 
       <p className="text-center font-mono text-[10px] text-text-soft uppercase tracking-wide mt-4">
@@ -359,7 +354,13 @@ function CheckoutContent() {
 
 export default function CheckoutPage() {
   return (
-    <Suspense fallback={<div className="flex min-h-screen items-center justify-center"><p className="text-text-soft">Cargando...</p></div>}>
+    <Suspense
+      fallback={
+        <div className="flex min-h-screen items-center justify-center">
+          <p className="text-text-soft">Cargando...</p>
+        </div>
+      }
+    >
       <CheckoutContent />
     </Suspense>
   );
