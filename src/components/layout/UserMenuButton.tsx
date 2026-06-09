@@ -32,6 +32,15 @@ export default function UserMenuButton() {
         >
           {dashboardLabel}
         </Link>
+        {user.role?.toLowerCase() !== 'producer' && (
+          <Link
+            href="/mis-favoritos"
+            className="hidden sm:flex items-center h-9 px-3 text-sm font-bold text-text border-2 border-border hover:bg-surface-2 transition-colors duration-100 whitespace-nowrap"
+            aria-label="Mis favoritos"
+          >
+            ♡
+          </Link>
+        )}
         <button
           onClick={handleLogout}
           className="flex items-center h-9 px-3 text-sm font-bold text-text border-2 border-border hover:bg-surface-2 transition-colors duration-100 whitespace-nowrap"

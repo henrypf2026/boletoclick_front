@@ -7,7 +7,9 @@ import { Alert } from 'flowbite-react';
 import { useAuth } from '@/context/AuthContext';
 import { formatEventDate, formatPrice, type Event } from '@/mocks/events';
 import { eventService } from '@/services/eventService';
+import { getToken } from '@/lib/auth';
 import EventMap from '@/components/ui/EventMap';
+import { favoritesService } from '@/services/favoritesService';
 
 export default function EventoPage() {
   const params = useParams();
@@ -23,6 +25,8 @@ export default function EventoPage() {
   const [promoApplied, setPromoApplied] = useState(false);
   const [message, setMessage] = useState('');
   const [headerSourceIndex, setHeaderSourceIndex] = useState(0);
+  const [isFavorite, setIsFavorite] = useState(false);
+  const [loadingFav, setLoadingFav] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -35,6 +39,30 @@ export default function EventoPage() {
     });
     return () => { active = false; };
   }, [id]);
+
+  useEffect(() => {
+    if (!authenticated) return;
+    const token = getToken();
+    if (!token) return;
+    favoritesService.getAll(token).then((favs) => {
+      setIsFavorite(favs.some((f) => f.eventId === id));
+    }).catch(() => {});
+  }, [authenticated, id]);
+
+  const handleToggleFavorite = async () => {
+    if (!authenticated) { router.push(`/login?from=/eventos/${id}`); return; }
+    const token = getToken();
+    if (!token) return;
+    setLoadingFav(true);
+    try {
+      const { added } = await favoritesService.toggle(id, token);
+      setIsFavorite(added);
+    } catch {
+      setMessage('No se pudo actualizar favoritos. Intentá de nuevo.');
+    } finally {
+      setLoadingFav(false);
+    }
+  };
 
   const selectedZone = event?.zones.find((zone) => zone.id === zoneId);
   const date = event ? formatEventDate(event.date, event.time) : null;
@@ -272,6 +300,18 @@ export default function EventoPage() {
               className="w-full border-4 border-border bg-primary py-3 text-sm font-black uppercase tracking-wider text-background shadow-[4px_4px_0px_0px_rgba(23,23,23,1)] transition-all hover:-translate-y-0.5 hover:shadow-[6px_6px_0px_0px_rgba(23,23,23,1)] active:translate-y-0.5 active:shadow-none disabled:opacity-50 disabled:pointer-events-none dark:shadow-[4px_4px_0px_0px_rgba(255,255,255,1)]"
             >
               {authenticated ? 'Confirmar compra' : 'Iniciá sesión para comprar'}
+            </button>
+
+            <button
+              onClick={handleToggleFavorite}
+              disabled={loadingFav}
+              className={`mt-2 w-full border-2 border-border py-2.5 text-sm font-black uppercase tracking-wider transition-all hover:-translate-y-0.5 disabled:opacity-50 ${
+                isFavorite
+                  ? "bg-red-500 text-white border-red-500"
+                  : "bg-surface text-text hover:bg-surface-2"
+              }`}
+            >
+              {isFavorite ? "♥ Guardado en favoritos" : "♡ Guardar en favoritos"}
             </button>
           </div>
 
