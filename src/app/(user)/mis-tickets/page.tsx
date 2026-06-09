@@ -3,36 +3,12 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
-import { getToken } from "@/lib/auth";
-import Swal from "sweetalert2";
+import { ticketService, type ApiTicket } from "@/services/ticketService";
+import TicketQrCode from "@/components/ui/TicketQrCode";
+import AddToWalletButton from "@/components/ui/AddToWalletButton";
 
 
-interface TicketType {
-  id: string;
-  name: string;
-  price: number;
-  zone: string | null;
-}
-
-interface Order {
-  id: string;
-  total: number;
-  status: "PENDING" | "PAID" | "FAILED" | "REFUNDED";
-  createdAt: string;
-}
-
-interface Ticket {
-  id: string;
-  qrCode: string;
-  allowEntrance: boolean;
-  usedAt: string | null;
-  createdAt: string;
-  ticketType: TicketType;
-  order: Order;
-}
-
-
-function statusStyle(status: Order["status"]) {
+function statusStyle(status: ApiTicket["order"]["status"]) {
   switch (status) {
     case "PAID": return "text-success bg-success/10 border-success";
     case "PENDING": return "text-yellow-600 bg-yellow-400/10 border-yellow-500";
@@ -41,7 +17,7 @@ function statusStyle(status: Order["status"]) {
   }
 }
 
-function statusLabel(status: Order["status"]) {
+function statusLabel(status: ApiTicket["order"]["status"]) {
   switch (status) {
     case "PAID": return "PAGADO";
     case "PENDING": return "PENDIENTE";
@@ -53,39 +29,18 @@ function statusLabel(status: Order["status"]) {
 export default function MisTicketsPage() {
   const { user } = useAuth();
 
-  const [tickets, setTickets] = useState<Ticket[]>([]);
+  const [tickets, setTickets] = useState<ApiTicket[]>([]);
   const [loading, setLoading] = useState(true);
-  const [ticketExpandido, setTicketExpandido] = useState<Ticket | null>(null);
+  const [ticketExpandido, setTicketExpandido] = useState<ApiTicket | null>(null);
 
   
   useEffect(() => {
     if (!user) return;
-    const token = getToken();
-    
-    fetch("/api/backend/tickets/me", {
-      headers: { Authorization: `Bearer ${token}` },
-    })
-      .then((res) => {
-        if (!res.ok) throw new Error("Error al traer tickets");
-        return res.json();
-      })
+
+    ticketService
+      .getMyTickets(user.id)
       .then((data) => setTickets(data))
-      .catch(() => {
-        Swal.fire({
-          title: "ERROR",
-          text: "No pudimos cargar tus entradas. Intentá de nuevo.",
-          icon: "error",
-          confirmButtonText: "OK",
-          confirmButtonColor: "#6750e0",
-          background: "#f5f4f0",
-          color: "#171717",
-          customClass: {
-            popup: "border-4 border-[#171717] rounded-none shadow-[6px_6px_0px_0px_#171717] font-mono",
-            title: "uppercase font-black tracking-tighter",
-            confirmButton: "font-mono font-black uppercase tracking-wider border-2 border-[#171717] rounded-none",
-          },
-        });
-      })
+      .catch(() => setTickets([]))
       .finally(() => setLoading(false));
   }, [user]);
 
@@ -169,7 +124,7 @@ export default function MisTicketsPage() {
                 <div className="flex flex-col gap-1.5">
                   <div className="flex items-center gap-2 flex-wrap">
                     <h2 className="text-lg font-black uppercase tracking-tight text-text group-hover:text-primary transition-colors">
-                      {ticket.ticketType.name}
+                      {ticket.eventTitle ?? ticket.ticketType.name}
                     </h2>
                     <span className={`text-[10px] font-mono font-black uppercase border px-2 py-0.5 ${statusStyle(ticket.order.status)}`}>
                       {statusLabel(ticket.order.status)}
@@ -201,13 +156,8 @@ export default function MisTicketsPage() {
 
                 {/* QR */}
                 <div className="flex flex-col items-center gap-2 shrink-0">
-                  <div className="flex h-28 w-28 items-center justify-center border-4 border-text bg-background p-2 font-mono text-xs font-black text-text shadow-[2px_2px_0px_0px_var(--color-text)] group-hover:scale-105 transition-transform">
-                    <div className="w-full h-full bg-black text-white flex flex-col items-center justify-center text-center">
-                      <span className="text-2xl mb-1">🏁</span>
-                      <span className="text-[8px] uppercase tracking-tighter break-all px-1">
-                        {ticket.qrCode.slice(0, 10)}...
-                      </span>
-                    </div>
+                  <div className="flex h-28 w-28 items-center justify-center border-4 border-text bg-background p-2 shadow-[2px_2px_0px_0px_var(--color-text)] group-hover:scale-105 transition-transform">
+                    <TicketQrCode value={ticket.qrCode} size={96} className="w-full h-full" />
                   </div>
                   <span className="text-center text-[10px] font-bold uppercase tracking-wide text-text-soft font-mono">
                     Tocá para ver
@@ -237,7 +187,7 @@ export default function MisTicketsPage() {
                 PASES DIGITALES BOLETOCLICK
               </span>
               <h2 className="text-black font-black text-2xl uppercase tracking-tighter mt-4 leading-tight">
-                {ticketExpandido.ticketType.name}
+                {ticketExpandido.eventTitle ?? ticketExpandido.ticketType.name}
               </h2>
               {ticketExpandido.ticketType.zone && (
                 <div className="mt-3">
@@ -260,15 +210,7 @@ export default function MisTicketsPage() {
 
             {/* QR expandido */}
             <div className="my-6 bg-white p-4 border-4 border-black flex flex-col items-center justify-center aspect-square w-full max-w-60 mx-auto shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
-              <div className="w-full h-full bg-black text-white flex flex-col items-center justify-center p-4 text-center font-mono text-xs uppercase font-black tracking-widest select-none">
-                <span className="text-4xl mb-3">🏁</span>
-                <span className="bg-white text-black px-2 py-0.5 font-mono text-[11px] font-black tracking-normal mb-1 break-all">
-                  {ticketExpandido.qrCode.slice(0, 16)}...
-                </span>
-                <span className="text-[9px] text-neutral-400 mt-2 tracking-tighter">
-                  DIGITAL TICKET ID
-                </span>
-              </div>
+              <TicketQrCode value={ticketExpandido.qrCode} size={200} className="w-full h-full" />
             </div>
 
             <div className="space-y-3">
@@ -276,12 +218,15 @@ export default function MisTicketsPage() {
                 📱 Presentá esta pantalla en los lectores de puerta
               </p>
               <div className="grid grid-cols-1 gap-2">
-                <button
-                  onClick={() => alert("Simulación: Agregando pase a Wallet...")}
-                  className="w-full bg-neutral-100 hover:bg-neutral-200 text-black font-mono font-black py-2.5 text-[11px] uppercase tracking-wider border-2 border-black transition-colors cursor-pointer shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]"
-                >
-                  💼 AGREGAR A WALLET
-                </button>
+                <AddToWalletButton
+                  ticket={{
+                    id: ticketExpandido.id,
+                    qrCode: ticketExpandido.qrCode,
+                    eventTitle: ticketExpandido.eventTitle,
+                    ticketTypeName: ticketExpandido.ticketType.name,
+                    zone: ticketExpandido.ticketType.zone,
+                  }}
+                />
                 <button
                   onClick={() => setTicketExpandido(null)}
                   className="w-full bg-black hover:bg-neutral-900 text-white font-mono font-black py-2.5 text-[11px] uppercase tracking-wider border-2 border-black transition-colors cursor-pointer"

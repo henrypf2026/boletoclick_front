@@ -91,7 +91,9 @@ function mapApiEvent(apiEvent: ApiEvent): Event {
 
   const zones: Zone[] = ticketTypes.map((ticket) => ({
     id: ticket.id,
+    ticketTypeId: ticket.id,
     name: ticket.name,
+    zone: ticket.zone?.trim() || ticket.name,
     price: Number(ticket.price),
     available: ticket.stock,
   }));

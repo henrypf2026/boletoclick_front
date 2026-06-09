@@ -16,9 +16,21 @@ export const teams = [
 
 export interface Zone {
   id: string;
+  ticketTypeId: string;
   name: string;
+  zone: string;
   price: number;
   available: number;
+}
+
+function mockZone(
+  id: string,
+  name: string,
+  price: number,
+  available: number,
+  tribuna = name,
+): Zone {
+  return { id, ticketTypeId: id, name, zone: tribuna, price, available };
 }
 
 export interface EventCoordinates {
@@ -65,9 +77,9 @@ export const events: Event[] = [
     badge: 'Preventa',
     imageGradient: 'linear-gradient(135deg, #0046ad 0%, #c8102e 100%)',
     zones: [
-      { id: 'general', name: 'General', price: 500, available: 120 },
-      { id: 'preferente', name: 'Preferente', price: 950, available: 80 },
-      { id: 'vip', name: 'VIP', price: 1850, available: 40 },
+      mockZone('general', 'General', 500, 120, 'Tribuna Norte'),
+      mockZone('preferente', 'Preferente', 950, 80, 'Tribuna Sur'),
+      mockZone('vip', 'VIP', 1850, 40, 'Palco VIP'),
     ],
   },
   {
@@ -86,9 +98,9 @@ export const events: Event[] = [
     badge: 'Alta demanda',
     imageGradient: 'linear-gradient(135deg, #ffcc00 0%, #003087 100%)',
     zones: [
-      { id: 'general', name: 'General', price: 450, available: 200 },
-      { id: 'preferente', name: 'Preferente', price: 890, available: 90 },
-      { id: 'palco', name: 'Palco', price: 2200, available: 20 },
+      mockZone('general', 'General', 450, 200, 'Tribuna Oriente'),
+      mockZone('preferente', 'Preferente', 890, 90, 'Tribuna Poniente'),
+      mockZone('palco', 'Palco', 2200, 20, 'Palco Presidencial'),
     ],
   },
   {
@@ -107,8 +119,8 @@ export const events: Event[] = [
     badge: 'Nuevo',
     imageGradient: 'linear-gradient(135deg, #1a1a2e 0%, #e94560 100%)',
     zones: [
-      { id: 'general', name: 'General', price: 350, available: 300 },
-      { id: 'ringside', name: 'Ringside', price: 1200, available: 50 },
+      mockZone('general', 'General', 350, 300, 'Grada General'),
+      mockZone('ringside', 'Ringside', 1200, 50, 'Ringside'),
     ],
   },
   {
@@ -127,9 +139,9 @@ export const events: Event[] = [
     badge: 'Agotándose',
     imageGradient: 'linear-gradient(135deg, #7b2cbf 0%, #ff006e 100%)',
     zones: [
-      { id: 'gramilla', name: 'Gramilla', price: 890, available: 45 },
-      { id: 'preferente', name: 'Preferente', price: 1450, available: 120 },
-      { id: 'vip', name: 'VIP', price: 3200, available: 15 },
+      mockZone('gramilla', 'Gramilla', 890, 45, 'Campo'),
+      mockZone('preferente', 'Preferente', 1450, 120, 'Tribuna Alta'),
+      mockZone('vip', 'VIP', 3200, 15, 'VIP Lounge'),
     ],
   },
   {
@@ -148,8 +160,8 @@ export const events: Event[] = [
     badge: null,
     imageGradient: 'linear-gradient(135deg, #c8102e 0%, #000000 100%)',
     zones: [
-      { id: 'general', name: 'General', price: 280, available: 500 },
-      { id: 'preferente', name: 'Preferente', price: 620, available: 150 },
+      mockZone('general', 'General', 280, 500, 'Tribuna Popular'),
+      mockZone('preferente', 'Preferente', 620, 150, 'Tribuna Preferente'),
     ],
   },
   {
@@ -168,8 +180,8 @@ export const events: Event[] = [
     badge: null,
     imageGradient: 'linear-gradient(135deg, #2d6a4f 0%, #ffd166 100%)',
     zones: [
-      { id: 'general', name: 'General', price: 420, available: 180 },
-      { id: 'premium', name: 'Premium', price: 780, available: 60 },
+      mockZone('general', 'General', 420, 180, 'Platea Baja'),
+      mockZone('premium', 'Premium', 780, 60, 'Platea Alta'),
     ],
   },
 ];
