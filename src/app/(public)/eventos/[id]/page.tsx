@@ -85,35 +85,37 @@ export default function EventoPage() {
   }
 
   if (!selectedZone || quantity > selectedZone.available) {
-    setMessage('Cantidad no disponible en esa zona.');
+    setMessage("Cantidad no disponible en esa zona.");
     return;
   }
 
   try {
-console.log("entramos a la petición")
-    const session = await paymentService.createCheckoutSession({
-      id: crypto.randomUUID(),
-      userId: user!.id,
-      eventId: event.id,
-      eventTitle: event.title,
-      venue: event.venue,
-      date: event.date,
-      time: event.time,
-      zone: selectedZone.name,
-      quantity,
-      total,
-      qrCode: `BC-${Date.now()}`,
-      purchasedAt: new Date().toISOString(),
+
+    const response = await fetch(
+      `${process.env.NEXT_PUBLIC_API_URL}/ticket-types/by-zone/${selectedZone.id}`
+    );
+
+    if (!response.ok) {
+      throw new Error();
+    }
+
+    const ticketType = await response.json();
+
+    const params = new URLSearchParams({
+      ticketTypeId: ticketType.id,
+      nombre: event.title,
+      zona: selectedZone.name,
+      precio: String(selectedZone.price),
+      cantidad: String(quantity)
     });
 
-    window.location.href = session.url;
+    router.push(`/checkout?${params.toString()}`);
 
   } catch {
 
-    setMessage('Error procesando la compra');
+    setMessage("No se pudo obtener el tipo de ticket");
 
   }
-
 };
 
   const headerSources = [event.posterUrl, event.fallbackImageUrl].filter(Boolean) as string[];

@@ -214,7 +214,7 @@ if (!checkingPayment && status === 'success' && !verified) {
 
             {isSuccess && (
               <Link
-                href="/mis-compras"
+                href="/mis-tickets"
                 className="rounded-lg bg-primary px-6 py-3 font-bold text-white"
               >
                 Ver mis tickets
