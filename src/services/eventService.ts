@@ -90,8 +90,10 @@ function mapApiEvent(apiEvent: ApiEvent): Event {
   const categoryImage = getCategoryImage(categorySlug, apiEvent.id);
 
   const zones: Zone[] = ticketTypes.map((ticket) => ({
-    id: ticket.zone || ticket.id,
+    id: ticket.id,
+    ticketTypeId: ticket.id,
     name: ticket.name,
+    zone: ticket.zone?.trim() || ticket.name,
     price: Number(ticket.price),
     available: ticket.stock,
   }));

@@ -7,9 +7,8 @@ import { Alert } from 'flowbite-react';
 import { useAuth } from '@/context/AuthContext';
 import { formatEventDate, formatPrice, type Event } from '@/mocks/events';
 import { eventService } from '@/services/eventService';
-import { saveTicket } from '@/lib/auth';
 import EventMap from '@/components/ui/EventMap';
-import { paymentService } from '@/services/paymentService';
+import { ticketService } from '@/services/ticketService';
 
 export default function EventoPage() {
   const params = useParams();
@@ -24,6 +23,7 @@ export default function EventoPage() {
   const [promoCode, setPromoCode] = useState('');
   const [promoApplied, setPromoApplied] = useState(false);
   const [message, setMessage] = useState('');
+  const [purchasing, setPurchasing] = useState(false);
   const [headerSourceIndex, setHeaderSourceIndex] = useState(0);
 
   useEffect(() => {
@@ -78,45 +78,32 @@ export default function EventoPage() {
   };
 
   const handlePurchase = async () => {
-
-  if (!authenticated) {
-    router.push(`/login?from=/eventos/${event.id}`);
-    return;
-  }
-
-  if (!selectedZone || quantity > selectedZone.available) {
-    setMessage("Cantidad no disponible en esa zona.");
-    return;
-  }
-
-  try {
-
-    const response = await fetch(
-      `${process.env.NEXT_PUBLIC_API_URL}/ticket-types/by-zone/${selectedZone.id}`
-    );
-
-    if (!response.ok) {
-      throw new Error();
+    if (!authenticated || !user) {
+      router.push(`/login?from=/eventos/${event.id}`);
+      return;
     }
 
-    const ticketType = await response.json();
+    if (!selectedZone || quantity > selectedZone.available) {
+      setMessage('Cantidad no disponible en esa zona.');
+      return;
+    }
 
-    const params = new URLSearchParams({
-      ticketTypeId: ticketType.id,
-      nombre: event.title,
-      zona: selectedZone.name,
-      precio: String(selectedZone.price),
-      cantidad: String(quantity)
-    });
-
-    router.push(`/checkout?${params.toString()}`);
-
-  } catch {
-
-    setMessage("No se pudo obtener el tipo de ticket");
-
-  }
-};
+    try {
+      setPurchasing(true);
+      await ticketService.purchaseTickets({
+        userId: user.id,
+        event,
+        zone: selectedZone,
+        quantity,
+        total,
+      });
+      router.push('/mis-tickets');
+    } catch {
+      setMessage('Error al confirmar la compra. Intentá de nuevo.');
+    } finally {
+      setPurchasing(false);
+    }
+  };
 
   const headerSources = [event.posterUrl, event.fallbackImageUrl].filter(Boolean) as string[];
   const headerImage = headerSources[headerSourceIndex];
@@ -233,13 +220,18 @@ export default function EventoPage() {
                 id="zone"
                 value={zoneId}
                 onChange={(e) => setZoneId(e.target.value)}
-                className="w-full border-2 border-border bg-background px-3 py-2.5 text-sm font-bold text-text focus:outline-none focus:border-primary transition-colors"
+                disabled={event.zones.length === 0}
+                className="w-full border-2 border-border bg-background px-3 py-2.5 text-sm font-bold text-text focus:outline-none focus:border-primary transition-colors disabled:opacity-50"
               >
-                {event.zones.map((zone) => (
-                  <option key={zone.id} value={zone.id}>
-                    {zone.name} · {formatPrice(zone.price)} ({zone.available} disp.)
-                  </option>
-                ))}
+                {event.zones.length === 0 ? (
+                  <option value="">Sin zonas disponibles</option>
+                ) : (
+                  event.zones.map((zone) => (
+                    <option key={zone.id} value={zone.id}>
+                      {zone.zone} · {zone.name} · {formatPrice(zone.price)} ({zone.available} disp.)
+                    </option>
+                  ))
+                )}
               </select>
             </div>
 
@@ -272,9 +264,14 @@ export default function EventoPage() {
 
             <button
               onClick={handlePurchase}
-              className="w-full border-4 border-border bg-primary py-3 text-sm font-black uppercase tracking-wider text-background shadow-[4px_4px_0px_0px_rgba(23,23,23,1)] transition-all hover:-translate-y-0.5 hover:shadow-[6px_6px_0px_0px_rgba(23,23,23,1)] active:translate-y-0.5 active:shadow-none dark:shadow-[4px_4px_0px_0px_rgba(255,255,255,1)]"
+              disabled={purchasing || !selectedZone || event.zones.length === 0}
+              className="w-full border-4 border-border bg-primary py-3 text-sm font-black uppercase tracking-wider text-background shadow-[4px_4px_0px_0px_rgba(23,23,23,1)] transition-all hover:-translate-y-0.5 hover:shadow-[6px_6px_0px_0px_rgba(23,23,23,1)] active:translate-y-0.5 active:shadow-none disabled:opacity-50 disabled:pointer-events-none dark:shadow-[4px_4px_0px_0px_rgba(255,255,255,1)]"
             >
-              {authenticated ? 'Confirmar compra' : 'Iniciá sesión para comprar'}
+              {purchasing
+                ? 'Procesando...'
+                : authenticated
+                  ? 'Confirmar compra'
+                  : 'Iniciá sesión para comprar'}
             </button>
           </div>
 
