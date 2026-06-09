@@ -329,4 +329,84 @@ export const ticketService = {
 
     return created.map(toApiTicket);
   },
+
+  async generateQrAfterPayment(userId: string, input: PurchaseInput): Promise<void> {
+    const token = getToken();
+    let apiTickets: ApiTicket[] = [];
+
+    if (token) {
+      try {
+        const res = await fetch('/api/backend/tickets/me', {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (res.ok) {
+          apiTickets = (await res.json()) as ApiTicket[];
+        }
+      } catch {
+        // Continúa con QR local
+      }
+    }
+
+    const recentForType = apiTickets
+      .filter((ticket) => ticket.ticketType?.id === input.zone.ticketTypeId)
+      .sort(
+        (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+      )
+      .slice(0, input.quantity);
+
+    if (recentForType.length > 0) {
+      const orderId = recentForType[0].order?.id;
+      if (orderId) {
+        enrichApiTicketsFromPurchase(
+          apiTickets,
+          userId,
+          input.event,
+          input.zone,
+          orderId,
+          input.total,
+        );
+        return;
+      }
+
+      const origin = typeof window !== 'undefined' ? window.location.origin : '';
+      const storedBatch = recentForType.map((ticket) =>
+        buildStoredTicket(
+          userId,
+          ticket.id,
+          input.event,
+          input.zone,
+          input.zone.price,
+          recentForType.length === 1 ? input.total : input.zone.price,
+          ticket.createdAt,
+          origin,
+        ),
+      );
+      upsertLocalTickets(storedBatch);
+      return;
+    }
+
+    const purchasedAt = new Date().toISOString();
+    const origin = typeof window !== 'undefined' ? window.location.origin : '';
+    const unitPrice = input.zone.price;
+    const created: StoredTicket[] = [];
+
+    for (let i = 0; i < input.quantity; i += 1) {
+      const ticketId = crypto.randomUUID();
+      const ticketTotal = input.quantity === 1 ? input.total : unitPrice;
+      created.push(
+        buildStoredTicket(
+          userId,
+          ticketId,
+          input.event,
+          input.zone,
+          unitPrice,
+          ticketTotal,
+          purchasedAt,
+          origin,
+        ),
+      );
+    }
+
+    upsertLocalTickets(created);
+  },
 };

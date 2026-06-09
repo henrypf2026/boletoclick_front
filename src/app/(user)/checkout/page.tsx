@@ -4,6 +4,8 @@ import { useState, useEffect, useCallback, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import { getToken } from "@/lib/auth";
+import { savePendingPurchase } from "@/lib/pendingPurchase";
+import type { Event, Zone } from "@/mocks/events";
 import Swal from "sweetalert2";
 import Link from "next/link";
 
@@ -23,10 +25,19 @@ function CheckoutContent() {
   const { user, authenticated, loading } = useAuth();
 
   const ticketTypeId = searchParams.get("ticketTypeId") ?? "";
+  const eventId = searchParams.get("eventId") ?? "";
   const ticketTypeName = searchParams.get("nombre") ?? "Entrada";
-  const ticketTypeZone = searchParams.get("zona") ?? "";
+  const ticketTypeZone = searchParams.get("tribuna") ?? searchParams.get("zona") ?? "";
+  const ticketTypeLabel = searchParams.get("tipo") ?? ticketTypeName;
   const ticketPrice = Number(searchParams.get("precio") ?? 0);
   const initialQuantity = Number(searchParams.get("cantidad") ?? 1);
+  const venue = searchParams.get("venue") ?? "";
+  const city = searchParams.get("city") ?? "";
+  const address = searchParams.get("address") ?? undefined;
+  const eventDate = searchParams.get("date") ?? "";
+  const eventTime = searchParams.get("time") ?? "";
+  const lat = Number(searchParams.get("lat") ?? 0);
+  const lng = Number(searchParams.get("lng") ?? 0);
 
   const [quantity] = useState(initialQuantity);
   const [timerSeconds, setTimerSeconds] = useState(TIMER_SECONDS);
@@ -46,10 +57,10 @@ function CheckoutContent() {
   }, [authenticated, loading, router, ticketTypeId]);
 
   useEffect(() => {
-    if (!ticketTypeId) {
+    if (!ticketTypeId || !eventId) {
       router.push("/eventos");
     }
-  }, [ticketTypeId, router]);
+  }, [ticketTypeId, eventId, router]);
 
   useEffect(() => {
     if (timerExpired) return;
@@ -163,41 +174,108 @@ function CheckoutContent() {
     try {
       const token = getToken();
 
-      const res = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/payments/create-session`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({
-            userId: user?.id,
-            ticketTypeId: ticketTypeId === "undefined" ? "" : ticketTypeId,
-            quantity,
-            total: totalFinal,
-            couponId,
-          }),
+      const checkoutEvent: Event = {
+        id: eventId,
+        title: ticketTypeName,
+        subtitle: "",
+        category: "otros",
+        teamId: "all",
+        venue,
+        city,
+        address,
+        coordinates: { lat: lat || 19.4326, lng: lng || -99.1332 },
+        date: eventDate,
+        time: eventTime,
+        priceFrom: ticketPrice,
+        featured: false,
+        badge: null,
+        imageGradient: "linear-gradient(135deg, #1a1a2e 0%, #e94560 100%)",
+        zones: [],
+      };
+
+      const checkoutZone: Zone = {
+        id: ticketTypeId,
+        ticketTypeId,
+        name: ticketTypeLabel,
+        zone: ticketTypeZone || ticketTypeLabel,
+        price: ticketPrice,
+        available: initialQuantity,
+      };
+
+      savePendingPurchase({
+        userId: user.id,
+        event: checkoutEvent,
+        zone: checkoutZone,
+        quantity,
+        total: totalFinal,
+      });
+
+      const res = await fetch("/api/backend/payments/create-session", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
         },
-      );
+        body: JSON.stringify({
+          userId: user.id,
+          ticketTypeId,
+          quantity,
+          total: totalFinal,
+          ...(couponId ? { couponId } : {}),
+        }),
+      });
+
+      const session = await res.json().catch(() => null);
 
       if (!res.ok) {
-        throw new Error();
+        const message = session?.message;
+        const detail =
+          typeof message === "string"
+            ? message
+            : Array.isArray(message)
+              ? message.join(". ")
+              : "No se pudo iniciar el pago";
+        throw new Error(detail);
       }
 
-      const session = await res.json();
+      if (!session?.url) {
+        throw new Error("Stripe no devolvió una URL de pago");
+      }
 
       window.location.href = session.url;
-    } catch {
+    } catch (error) {
       Swal.fire({
         title: "ERROR",
-        text: "No se pudo iniciar el pago",
+        text:
+          error instanceof Error
+            ? error.message
+            : "No se pudo iniciar el pago",
         icon: "error",
       });
     } finally {
       setLoadingPurchase(false);
     }
-  }, [ticketTypeId, quantity, couponId, user, timerExpired, totalFinal]);
+  }, [
+    user,
+    timerExpired,
+    eventId,
+    ticketTypeName,
+    venue,
+    city,
+    address,
+    lat,
+    lng,
+    eventDate,
+    eventTime,
+    ticketTypeId,
+    ticketTypeLabel,
+    ticketTypeZone,
+    ticketPrice,
+    initialQuantity,
+    quantity,
+    totalFinal,
+    couponId,
+  ]);
 
   if (loading) {
     return (
@@ -266,7 +344,7 @@ function CheckoutContent() {
               </p>
               {ticketTypeZone && (
                 <p className="text-text-soft text-[11px] font-mono uppercase mt-0.5">
-                  Sector: {ticketTypeZone}
+                  Sector: {ticketTypeZone} · {ticketTypeLabel}
                 </p>
               )}
             </div>
