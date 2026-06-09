@@ -6,6 +6,7 @@ export interface PurchaseData {
   venue: string;
   date: string;
   time: string;
+  zone: string;
   quantity: number;
   total: number;
   qrCode: string;
@@ -17,7 +18,7 @@ export const paymentService = {
   async createCheckoutSession(data: PurchaseData) {
 
     const response = await fetch(
-      `${process.env.NEXT_PUBLIC_API_URL}/stripe/create-session`,
+      `/api/backend/payments/create-session`,
       {
         method: 'POST',
         headers: {
