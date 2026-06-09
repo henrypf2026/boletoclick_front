@@ -156,12 +156,12 @@ export const eventService = {
       .filter((category) => category?.slug && category?.name)
       .map((category) => ({ id: category.slug, label: category.name }));
   },
-  async getEventsByProducerId(producerId: string): Promise<Event[]> {
+  async getMyProducerEvents(token: string): Promise<Event[]> {
     try {
-      const data = await api.get<ApiEvent[]>(`/events/producer/${producerId}`);
+      const data = await api.get<ApiEvent[]>('/events/producer', token);
       return Array.isArray(data) ? data.map(mapApiEvent) : [];
     } catch (error) {
-      console.error("Error en getEventsByProducerId:", error);
+      console.error("Error en getMyProducerEvents:", error);
       return [];
     }
   },

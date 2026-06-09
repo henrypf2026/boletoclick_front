@@ -26,7 +26,7 @@ export default function MisFavoritosPage() {
 
     favoritesService.getAll(token)
       .then(setFavorites)
-      .catch(() => setError('No se pudieron cargar tus favoritos.'))
+      .catch(() => setFavorites([]))
       .finally(() => setLoadingFavorites(false));
   }, [authenticated, loading, router]);
 
