@@ -21,7 +21,7 @@ function formatTime(seconds: number) {
 function CheckoutContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { user, authenticated } = useAuth();
+  const { user, authenticated, loading } = useAuth();
 
 
   const ticketTypeId = searchParams.get("ticketTypeId") ?? "";
@@ -41,11 +41,14 @@ function CheckoutContent() {
   const [loadingPurchase, setLoadingPurchase] = useState(false);
 
   
-  useEffect(() => {
-    if (!authenticated) {
-      router.push(`/login?from=/checkout?ticketTypeId=${ticketTypeId}`);
-    }
-  }, [authenticated, router, ticketTypeId]);
+useEffect(() => {
+  if (loading) return;
+
+  if (!authenticated) {
+    router.push(`/login?from=/checkout?ticketTypeId=${ticketTypeId}`);
+  }
+
+}, [authenticated, loading, router, ticketTypeId]);
 
  
   useEffect(() => {
@@ -152,71 +155,69 @@ function CheckoutContent() {
   }
 };
 
-  const handlePurchase = useCallback(async () => {
-    if (!user || timerExpired) return;
+const handlePurchase = useCallback(async()=>{
 
-    setLoadingPurchase(true);
-    try {
-      const token = getToken();
-      const body: { ticketTypeId: string; quantity: number; couponId?: string } = {
-        ticketTypeId,
-        quantity,
-        ...(couponId ? { couponId } : {}),
-      };
+if (!user || timerExpired) return;
 
-      const res = await fetch("/api/backend/orders", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify(body),
-      });
+setLoadingPurchase(true);
 
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.message ?? "Error al procesar la compra");
-      }
+try{
 
-      await Swal.fire({
-        title: "COMPRA EXITOSA",
-        text: "Tus entradas fueron generadas. Podés verlas en Mis Entradas.",
-        icon: "success",
-        confirmButtonText: "VER MIS ENTRADAS",
-        confirmButtonColor: "#6750e0",
-        background: "#f5f4f0",
-        color: "#171717",
-        allowOutsideClick: false,
-        customClass: {
-          popup: "border-4 border-[#171717] rounded-none shadow-[6px_6px_0px_0px_#171717] font-mono",
-          title: "uppercase font-black tracking-tighter",
-          confirmButton: "font-mono font-black uppercase tracking-wider border-2 border-[#171717] rounded-none",
-        },
-      });
+const token=getToken();
 
-      router.push("/mis-tickets");
-    } catch (error: unknown) {
-      const msg = error instanceof Error ? error.message : "Error desconocido";
-      Swal.fire({
-        title: "ERROR",
-        text: msg,
-        icon: "error",
-        confirmButtonText: "REINTENTAR",
-        confirmButtonColor: "#6750e0",
-        background: "#f5f4f0",
-        color: "#171717",
-        customClass: {
-          popup: "border-4 border-[#171717] rounded-none shadow-[6px_6px_0px_0px_#171717] font-mono",
-          title: "uppercase font-black tracking-tighter",
-          confirmButton: "font-mono font-black uppercase tracking-wider border-2 border-[#171717] rounded-none",
-        },
-      });
-    } finally {
-      setLoadingPurchase(false);
-    }
-  }, [user, timerExpired, ticketTypeId, quantity, couponId, router]);
+const res=await fetch(
+`${process.env.NEXT_PUBLIC_API_URL}/payments/create-session`,
+{
+method:"POST",
+headers:{
+"Content-Type":"application/json",
+Authorization:`Bearer ${token}`
+},
+body:JSON.stringify({
+ticketTypeId,
+quantity,
+couponId
+})
+}
+);
 
-  
+if(!res.ok){
+throw new Error();
+}
+
+const session=await res.json();
+
+window.location.href=session.url;
+
+}catch{
+
+Swal.fire({
+title:"ERROR",
+text:"No se pudo iniciar el pago",
+icon:"error"
+});
+
+}
+finally{
+setLoadingPurchase(false);
+}
+
+},[
+ticketTypeId,
+quantity,
+couponId,
+user,
+timerExpired
+]);
+
+  if (loading) {
+  return (
+    <div className="flex min-h-screen items-center justify-center">
+      Verificando sesión...
+    </div>
+  );
+}
+
   return (
     <div className="p-4 md:p-8 max-w-2xl mx-auto min-h-screen bg-background text-text transition-colors">
 
