@@ -13,6 +13,8 @@ export default function AuthCallbackPage() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    let mounted = true;
+
     const code = new URLSearchParams(window.location.search).get('code');
     if (!code) {
       setError('El enlace no es válido o ya fue utilizado.');
@@ -21,33 +23,42 @@ export default function AuthCallbackPage() {
 
     let handled = false;
 
-    // Con detectSessionInUrl: true Supabase hace el exchange automáticamente.
-    // Esperamos el evento SIGNED_IN en lugar de hacer el exchange manualmente
-    // para evitar la condición de carrera entre el exchange automático y el manual.
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (handled || event !== 'SIGNED_IN' || !session) return;
+    const processSession = async (session: { access_token: string }) => {
+      if (!mounted || handled) return;
       handled = true;
 
       try {
         const user = await authService.getMe(session.access_token);
+        if (!mounted) return;
         if (!user || !user.name) {
           await supabase.auth.signOut();
-          setError('No encontramos una cuenta registrada con ese correo. Registrate primero desde el formulario.');
+          if (mounted) setError('No encontramos una cuenta registrada con ese correo. Registrate primero desde el formulario.');
           return;
         }
 
         saveToken(session.access_token, user.role);
         window.location.href = '/';
       } catch {
-        setError('No se pudo conectar con el servidor. Verifica que el backend esté corriendo en el puerto 3000.');
+        if (mounted) setError('No se pudo conectar con el servidor. Verifica que el backend esté corriendo en el puerto 3000.');
       }
+    };
+
+    // Caso 1: Supabase ya procesó el code antes de que el listener se suscriba
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session) processSession(session);
+    });
+
+    // Caso 2: el exchange ocurre después de montar el componente
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'SIGNED_IN' && session) processSession(session);
     });
 
     const timeout = setTimeout(() => {
-      if (!handled) setError('No se pudo completar el inicio de sesión. Intentá de nuevo.');
+      if (mounted && !handled) setError('No se pudo completar el inicio de sesión. Intentá de nuevo.');
     }, 10000);
 
     return () => {
+      mounted = false;
       subscription.unsubscribe();
       clearTimeout(timeout);
     };

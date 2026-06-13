@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
 // Rutas que requieren cualquier usuario autenticado
-const AUTH_ROUTES = ["/mis-tickets", "/mis-compras", "/checkout", "/perfil"];
+const AUTH_ROUTES = ["/mis-tickets", "/mis-compras", "/checkout", "/perfil", "/mis-favoritos"];
 
 // Rutas restringidas por rol
 const ADMIN_ROUTES = ["/admin", "/dashboard-admin"];
