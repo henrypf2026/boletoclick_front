@@ -21,8 +21,6 @@ export default function EventoPage() {
   const [loadingEvent, setLoadingEvent] = useState(true);
   const [quantity, setQuantity] = useState(1);
   const [zoneId, setZoneId] = useState('');
-  const [promoCode, setPromoCode] = useState('');
-  const [promoApplied, setPromoApplied] = useState(false);
   const [message, setMessage] = useState('');
   const [headerSourceIndex, setHeaderSourceIndex] = useState(0);
   const [isFavorite, setIsFavorite] = useState(false);
@@ -69,9 +67,8 @@ export default function EventoPage() {
 
   const total = useMemo(() => {
     if (!selectedZone) return 0;
-    const subtotal = selectedZone.price * quantity;
-    return promoApplied ? Math.round(subtotal * 0.9) : subtotal;
-  }, [selectedZone, quantity, promoApplied]);
+    return selectedZone.price * quantity;
+  }, [selectedZone, quantity]);
 
   if (loadingEvent) {
     return (
@@ -92,16 +89,6 @@ export default function EventoPage() {
     router.replace('/eventos');
     return null;
   }
-
-  const handleApplyPromo = () => {
-    if (promoCode.trim().toUpperCase() === 'BOLETO10') {
-      setPromoApplied(true);
-      setMessage('Código aplicado: 10% de descuento.');
-      return;
-    }
-    setPromoApplied(false);
-    setMessage('Código no válido. Probá con BOLETO10.');
-  };
 
   const handlePurchase = () => {
     if (!authenticated || !user) {
@@ -268,19 +255,10 @@ export default function EventoPage() {
             </div>
 
             <div className="mb-4 flex gap-2">
-              <input
-                type="text"
-                value={promoCode}
-                onChange={(e) => setPromoCode(e.target.value)}
-                placeholder="Código de promoción"
-                className="min-w-0 flex-1 border-2 border-border bg-background px-3 py-2.5 text-sm text-text placeholder:text-text-soft focus:outline-none focus:border-primary transition-colors"
-              />
-              <button
-                onClick={handleApplyPromo}
-                className="shrink-0 border-2 border-border bg-surface-2 px-4 py-2.5 text-sm font-black uppercase tracking-wide text-text hover:bg-surface transition-colors"
-              >
-                Aplicar
-              </button>
+              <p className="mb-4 text-xs font-bold uppercase tracking-wide text-text-soft border-2 border-border bg-surface-2 px-3 py-2.5">
+              🎟️ ¿Tenés un cupón de descuento? Podés aplicarlo en el siguiente paso
+            </p>
+            
             </div>
 
             <div className="mb-5 flex items-center justify-between border-t-2 border-border pt-4">
@@ -288,8 +266,8 @@ export default function EventoPage() {
               <strong className="text-2xl font-black text-success">{formatPrice(total)}</strong>
             </div>
 
-            {message && (
-              <Alert color={promoApplied ? 'success' : 'failure'} className="mb-4 text-sm">
+           {message && (
+              <Alert color="failure" className="mb-4 text-sm">
                 {message}
               </Alert>
             )}
