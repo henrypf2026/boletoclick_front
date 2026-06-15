@@ -29,6 +29,8 @@ export interface AuthUser {
   email: string;
   name?: string;
   role?: UserRole;
+  profileImageUrl?: string | null;
+  allowNewsletter?: boolean;
 }
 
 function fromSupabaseUser(supabaseUser: SupabaseUser): AuthUser {
@@ -40,7 +42,7 @@ function fromSupabaseUser(supabaseUser: SupabaseUser): AuthUser {
 }
 
 function fromUserProfile(profile: UserProfile): AuthUser {
-  return { id: profile.id, email: profile.email, name: profile.name, role: profile.role };
+  return { id: profile.id, email: profile.email, name: profile.name, role: profile.role, profileImageUrl: profile.profileImageUrl, allowNewsletter: profile.allowNewsletter};
 }
 
 async function fetchProfile(userId: string): Promise<AuthUser | null> {

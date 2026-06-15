@@ -235,7 +235,7 @@ export default function MisComprasPage() {
     );
   }
 
-  
+
   return (
     <div className="p-4 md:p-8 max-w-2xl mx-auto min-h-screen bg-background text-text transition-colors">
 
@@ -326,7 +326,7 @@ export default function MisComprasPage() {
                     </span>
                   </div>
                 </div>
-                
+
                 {/* Total + botón PDF */}
                 <div className="flex items-center justify-between border-t-2 border-dashed border-text/30 pt-4 gap-4">
                   <div>

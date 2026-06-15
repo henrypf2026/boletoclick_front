@@ -62,39 +62,64 @@ function CheckoutContent() {
     }
   }, [ticketTypeId, eventId, router]);
 
+
   useEffect(() => {
-    if (timerExpired) return;
+  if (!ticketTypeId) return;
 
-    const interval = setInterval(() => {
-      setTimerSeconds((prev) => {
-        if (prev <= 1) {
-          clearInterval(interval);
-          setTimerExpired(true);
-          Swal.fire({
-            title: "TIEMPO AGOTADO",
-            text: "Tu reserva expiró. Volvé a seleccionar las entradas.",
-            icon: "warning",
-            confirmButtonText: "VOLVER A EVENTOS",
-            confirmButtonColor: "#6750e0",
-            background: "#f5f4f0",
-            color: "#171717",
-            allowOutsideClick: false,
-            customClass: {
-              popup:
-                "border-4 border-[#171717] rounded-none shadow-[6px_6px_0px_0px_#171717] font-mono",
-              title: "uppercase font-black tracking-tighter",
-              confirmButton:
-                "font-mono font-black uppercase tracking-wider border-2 border-[#171717] rounded-none",
-            },
-          }).then(() => router.push("/eventos"));
-          return 0;
-        }
-        return prev - 1;
+  const storageKey = `checkout_start_${ticketTypeId}`;
+  const storedStart = sessionStorage.getItem(storageKey);
+
+  if (!storedStart) {
+    sessionStorage.setItem(storageKey, String(Date.now()));
+  }
+}, [ticketTypeId]);
+
+useEffect(() => {
+  if (!ticketTypeId || timerExpired) return;
+
+  const storageKey = `checkout_start_${ticketTypeId}`;
+
+  const interval = setInterval(() => {
+    const storedStart = sessionStorage.getItem(storageKey);
+    if (!storedStart) return;
+
+    const startTime = Number(storedStart);
+    const elapsed = Math.floor((Date.now() - startTime) / 1000);
+    const remaining = Math.max(0, TIMER_SECONDS - elapsed);
+
+    setTimerSeconds(remaining);
+
+    if (remaining === 0) {
+      setTimerExpired(true);
+      sessionStorage.removeItem(storageKey);
+      clearInterval(interval);
+
+      Swal.fire({
+        title: "TIEMPO AGOTADO",
+        text: "Tu reserva expiró. Volvé a seleccionar las entradas.",
+        icon: "warning",
+        confirmButtonText: "VOLVER A EVENTOS",
+        confirmButtonColor: "#6750e0",
+        background: "#f5f4f0",
+        color: "#171717",
+        allowOutsideClick: false,
+        customClass: {
+          popup:
+            "border-4 border-[#171717] rounded-none shadow-[6px_6px_0px_0px_#171717] font-mono",
+          title: "uppercase font-black tracking-tighter",
+          confirmButton:
+            "font-mono font-black uppercase tracking-wider border-2 border-[#171717] rounded-none",
+        },
+      }).then(() => {
+        router.push("/eventos");
       });
-    }, 1000);
+    }
+  }, 1000);
 
-    return () => clearInterval(interval);
-  }, [timerExpired, router]);
+  return () => clearInterval(interval);
+}, [ticketTypeId, timerExpired, router]);
+
+
 
   const subtotal = ticketPrice * quantity;
   const totalFinal = Math.max(0, subtotal - discount);
@@ -103,15 +128,15 @@ function CheckoutContent() {
     if (!couponCode.trim()) return;
 
     try {
-      const token = getToken();
-      const res = await fetch(
-        `/api/backend/coupons/validate/${couponCode.trim()}`,
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        },
-      );
+      const res = await
+      fetch(`${process.env.NEXT_PUBLIC_API_URL}/coupons/validate/${couponCode.trim()}`)
 
+       console.log("status:", res.status);
+
+
+    
       if (!res.ok) throw new Error("Cupón inválido, vencido o apagado.");
+       
 
       const coupon = await res.json();
 
@@ -146,7 +171,8 @@ function CheckoutContent() {
             "font-mono font-black uppercase tracking-wider border-2 border-[#171717] rounded-none",
         },
       });
-    } catch {
+    } catch (err) {
+      console.error("Error real al validar cupón:", err);
       Swal.fire({
         title: "CUPÓN INVÁLIDO",
         text: "El código ingresado no es válido, está vencido o ya fue usado.",
