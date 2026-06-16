@@ -33,7 +33,7 @@ async function request<T>(
   if (token) headers['Authorization'] = `Bearer ${token}`;
 
   const res = await fetch(`${BASE_URL}${path}`, { method, headers, body });
-  const data = await parseJsonResponse<{ message?: string }>(res);
+  const data = await parseJsonResponse<{ message?: string | string[] }>(res);
 
   if (!res.ok) {
     const message = data.message;
