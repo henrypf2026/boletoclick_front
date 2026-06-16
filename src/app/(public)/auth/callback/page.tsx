@@ -14,13 +14,6 @@ export default function AuthCallbackPage() {
 
   useEffect(() => {
     let mounted = true;
-
-    const code = new URLSearchParams(window.location.search).get('code');
-    if (!code) {
-      setError('El enlace no es válido o ya fue utilizado.');
-      return;
-    }
-
     let handled = false;
 
     const processSession = async (session: { access_token: string }) => {
@@ -30,7 +23,7 @@ export default function AuthCallbackPage() {
       try {
         const user = await authService.getMe(session.access_token);
         if (!mounted) return;
-        if (!user || !user.name) {
+        if (!user || !user.role) {
           await supabase.auth.signOut();
           if (mounted) setError('No encontramos una cuenta registrada con ese correo. Registrate primero desde el formulario.');
           return;
