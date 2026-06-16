@@ -43,7 +43,7 @@ function orderStatusColor(status: ApiTicket["order"]["status"]) {
 
 export default function UserDashboard() {
 
-  const { user } = useAuth();
+  const { user, authenticated, loading } = useAuth();
   const router = useRouter();
   const [seccionActiva, setSeccionActiva] = useState<"entradas" | "historial">("entradas");
   const [ticketExpandido, setTicketExpandido] = useState<ApiTicket | null>(null);
@@ -93,9 +93,26 @@ export default function UserDashboard() {
       o.status.toLowerCase().includes(filtroHistorial.toLowerCase()),
   );
 
-  const firstName = user
+   const firstName = user
     ? (user.name ?? user.email.split("@")[0]).split(" ")[0]
     : "";
+
+    
+  if (loading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <p className="font-mono text-xs uppercase text-text-soft animate-pulse">
+          Verificando sesión...
+        </p>
+      </div>
+    );
+  }
+
+  if (!authenticated) {
+    router.push("/login?from=/dashboard-user");
+    return null;
+  }
+
 
   return (
     <div className="p-4 md:p-8 max-w-4xl mx-auto min-h-screen bg-background text-text transition-colors">
