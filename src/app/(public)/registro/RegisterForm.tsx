@@ -124,7 +124,7 @@ export function RegisterForm() {
               <FormTextInput label="Nombre de la empresa" name="businessName" type="text" placeholder="Eventos S.A." />
             )}
 
-            <FormTextInput label="Contraseña" name="password" type="password" placeholder="Mínimo 8 caracteres, mayúscula, número y símbolo" autoComplete="new-password" />
+            <FormTextInput label="Contraseña" name="password" type="password" placeholder="Creá tu contraseña" autoComplete="new-password" showStrength />
             <FormTextInput label="Confirmar contraseña" name="confirmPassword" type="password" placeholder="Repite tu contraseña" autoComplete="new-password" />
             <FormCheckbox name="allowNewsletter" label="Quiero recibir novedades y promociones de BoletoClick" />
             <FormCheckbox name="acceptTerms" label="Acepto los términos y condiciones de BoletoClick" />

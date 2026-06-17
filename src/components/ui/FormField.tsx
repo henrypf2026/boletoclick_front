@@ -9,6 +9,12 @@ interface FormTextInputProps {
   type?: string;
   placeholder?: string;
   autoComplete?: string;
+  showStrength?: boolean;
+}
+
+interface FormCheckboxProps {
+  label: string;
+  name: string;
 }
 
 function EyeIcon({ open }: { open: boolean }) {
@@ -27,12 +33,71 @@ function EyeIcon({ open }: { open: boolean }) {
   );
 }
 
-export function FormTextInput({ label, name, type, ...props }: FormTextInputProps) {
+function AlertIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="shrink-0">
+      <circle cx="12" cy="12" r="10" />
+      <line x1="12" y1="8" x2="12" y2="12" />
+      <line x1="12" y1="16" x2="12.01" y2="16" />
+    </svg>
+  );
+}
+
+function FieldError({ message }: { message: string }) {
+  return (
+    <p className="flex items-center gap-1.5 text-sm font-medium text-red-700 dark:text-red-400">
+      <AlertIcon />
+      {message}
+    </p>
+  );
+}
+
+const PASSWORD_REQUIREMENTS = [
+  { label: 'Mínimo 8 caracteres', test: (v: string) => v.length >= 8 },
+  { label: 'Una mayúscula (A–Z)', test: (v: string) => /[A-Z]/.test(v) },
+  { label: 'Una minúscula (a–z)', test: (v: string) => /[a-z]/.test(v) },
+  { label: 'Un número (0–9)', test: (v: string) => /\d/.test(v) },
+  { label: 'Un carácter especial (!@#$...)', test: (v: string) => /[!@#$%^&*(),.?":{}|<>_\-]/.test(v) },
+];
+
+function PasswordStrength({ value }: { value: string }) {
+  return (
+    <ul className="mt-0.5 flex flex-col gap-1">
+      {PASSWORD_REQUIREMENTS.map(({ label, test }) => {
+        const met = value.length > 0 && test(value);
+        return (
+          <li
+            key={label}
+            className={`flex items-center gap-1.5 text-xs font-medium transition-colors ${
+              !value
+                ? 'text-text-soft'
+                : met
+                  ? 'text-green-600 dark:text-green-400'
+                  : 'text-red-600 dark:text-red-400'
+            }`}
+          >
+            <span className="w-3 shrink-0 text-center leading-none">
+              {!value ? '·' : met ? '✓' : '✗'}
+            </span>
+            {label}
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
+export function FormTextInput({ label, name, type, showStrength, ...props }: FormTextInputProps) {
   const [field, meta] = useField(name);
   const [showPassword, setShowPassword] = useState(false);
-  const hasError = meta.touched && Boolean(meta.error);
   const isPassword = type === 'password';
   const inputType = isPassword ? (showPassword ? 'text' : 'password') : type;
+
+  // Show error as soon as the user types something (not only after blur)
+  const hasError = Boolean(meta.error) && (meta.touched || (field.value?.length ?? 0) > 0);
+
+  // Show strength checklist once the user starts typing or touches the field
+  const showStrengthChecklist = showStrength && isPassword && (field.value?.length > 0 || meta.touched);
 
   return (
     <div className="flex flex-col gap-1.5">
@@ -64,14 +129,13 @@ export function FormTextInput({ label, name, type, ...props }: FormTextInputProp
           </button>
         )}
       </div>
-      {hasError && <p className="text-sm text-red-500">{meta.error}</p>}
+      {showStrengthChecklist ? (
+        <PasswordStrength value={field.value ?? ''} />
+      ) : (
+        hasError && <FieldError message={meta.error!} />
+      )}
     </div>
   );
-}
-
-interface FormCheckboxProps {
-  label: string;
-  name: string;
 }
 
 export function FormCheckbox({ label, name }: FormCheckboxProps) {
@@ -93,7 +157,7 @@ export function FormCheckbox({ label, name }: FormCheckboxProps) {
         />
         <span className="text-sm text-text-soft">{label}</span>
       </label>
-      {hasError && <p className="text-sm text-red-500">{meta.error}</p>}
+      {hasError && <FieldError message={meta.error!} />}
     </div>
   );
 }
