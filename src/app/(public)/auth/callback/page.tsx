@@ -13,29 +13,22 @@ export default function AuthCallbackPage() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const handleCallback = async () => {
-      // Supabase puede haber procesado el redirect automáticamente — intentamos getSession primero
-      let session = (await supabase.auth.getSession()).data.session;
+    const code = new URLSearchParams(window.location.search).get('code');
+    if (!code) {
+      setError('El enlace no es válido o ya fue utilizado.');
+      return;
+    }
 
-      // Si no hay sesión todavía, intentamos el intercambio manual con el code de la URL
-      if (!session) {
-        const code = new URLSearchParams(window.location.search).get('code');
-        if (!code) {
-          setError('El enlace no es válido o ya fue utilizado.');
-          return;
-        }
-        const { data, error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
-        if (exchangeError || !data.session) {
-          setError('No se pudo completar el inicio de sesión. Intentá de nuevo.');
-          return;
-        }
-        session = data.session;
-      }
+    let handled = false;
+
+    // Con detectSessionInUrl: true Supabase hace el exchange automáticamente.
+    // Esperamos el evento SIGNED_IN en lugar de hacer el exchange manualmente
+    // para evitar la condición de carrera entre el exchange automático y el manual.
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (handled || event !== 'SIGNED_IN' || !session) return;
+      handled = true;
 
       const user = await authService.getMe(session.access_token);
-
-      // Si el usuario no tiene perfil en el back (no se registró por el formulario),
-      // getMe devuelve solo email sin name ni role — bloqueamos el acceso.
       if (!user || !user.name) {
         await supabase.auth.signOut();
         setError('No encontramos una cuenta registrada con ese correo. Registrate primero desde el formulario.');
@@ -43,11 +36,17 @@ export default function AuthCallbackPage() {
       }
 
       saveToken(session.access_token, user.role);
-      // Recarga completa para que AuthContext lea el token nuevo desde cero
       window.location.href = '/';
-    };
+    });
 
-    handleCallback();
+    const timeout = setTimeout(() => {
+      if (!handled) setError('No se pudo completar el inicio de sesión. Intentá de nuevo.');
+    }, 10000);
+
+    return () => {
+      subscription.unsubscribe();
+      clearTimeout(timeout);
+    };
   }, [router]);
 
   if (error) {
