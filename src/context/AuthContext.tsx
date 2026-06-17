@@ -3,6 +3,7 @@
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import { clearToken, getUserFromToken, saveToken, type User } from "@/lib/auth";
 import { authService, type RegisterDto } from "@/services/authService";
+import { supabase } from "@/lib/supabaseClient";
 
 interface AuthContextValue {
   user: User | null;
@@ -10,7 +11,7 @@ interface AuthContextValue {
   authenticated: boolean;
   login: (credentials: { email: string; password: string }) => Promise<User>;
   register: (data: RegisterDto) => Promise<User>;
-  logout: () => void;
+  logout: () => Promise<void>;
   setUser: React.Dispatch<React.SetStateAction<User | null>>;
 }
 
@@ -49,7 +50,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return account;
   };
 
-  const logout = () => {
+  const logout = async () => {
+    await supabase.auth.signOut();
     clearToken();
     setUser(null);
   };
