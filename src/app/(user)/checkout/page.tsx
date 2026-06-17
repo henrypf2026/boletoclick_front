@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import { getToken } from "@/lib/auth";
 import { savePendingPurchase } from "@/lib/pendingPurchase";
+import { checkoutService } from "@/services/checkoutService";
 import type { Event, Zone } from "@/mocks/events";
 import Swal from "sweetalert2";
 import Link from "next/link";
@@ -125,72 +126,61 @@ useEffect(() => {
   const totalFinal = Math.max(0, subtotal - discount);
 
   const handleApplyCoupon = async () => {
-    if (!couponCode.trim()) return;
+  if (!couponCode.trim()) return;
 
-    try {
-      const res = await
-      fetch(`${process.env.NEXT_PUBLIC_API_URL}/coupons/validate/${couponCode.trim()}`)
+  try {
+    const coupon = await checkoutService.validateCoupon(couponCode.trim());
 
-       console.log("status:", res.status);
-
-
-    
-      if (!res.ok) throw new Error("Cupón inválido, vencido o apagado.");
-       
-
-      const coupon = await res.json();
-
-      // Calcular descuento según el tipo
-      let descuento = 0;
-      if (coupon.discountType === "PERCENTAGE") {
-        descuento = Math.round(subtotal * (coupon.discountValue / 100));
-      } else {
-        descuento = coupon.discountValue;
-      }
-
-      setDiscount(descuento);
-      setCouponApplied(true);
-      setCouponId(coupon.id); // para mandarlo en el POST /orders
-
-      Swal.fire({
-        title: "CUPÓN APLICADO",
-        text:
-          coupon.discountType === "PERCENTAGE"
-            ? `Descuento del ${coupon.discountValue}%: -$${descuento.toLocaleString("es-MX")}`
-            : `Descuento fijo: -$${descuento.toLocaleString("es-MX")}`,
-        icon: "success",
-        confirmButtonText: "OK",
-        confirmButtonColor: "#6750e0",
-        background: "#f5f4f0",
-        color: "#171717",
-        customClass: {
-          popup:
-            "border-4 border-[#171717] rounded-none shadow-[6px_6px_0px_0px_#171717] font-mono",
-          title: "uppercase font-black tracking-tighter",
-          confirmButton:
-            "font-mono font-black uppercase tracking-wider border-2 border-[#171717] rounded-none",
-        },
-      });
-    } catch (err) {
-      console.error("Error real al validar cupón:", err);
-      Swal.fire({
-        title: "CUPÓN INVÁLIDO",
-        text: "El código ingresado no es válido, está vencido o ya fue usado.",
-        icon: "error",
-        confirmButtonText: "REINTENTAR",
-        confirmButtonColor: "#6750e0",
-        background: "#f5f4f0",
-        color: "#171717",
-        customClass: {
-          popup:
-            "border-4 border-[#171717] rounded-none shadow-[6px_6px_0px_0px_#171717] font-mono",
-          title: "uppercase font-black tracking-tighter",
-          confirmButton:
-            "font-mono font-black uppercase tracking-wider border-2 border-[#171717] rounded-none",
-        },
-      });
+    // Calcular descuento según el tipo
+    let descuento = 0;
+    if (coupon.discountType === "PERCENTAGE") {
+      descuento = Math.round(subtotal * (coupon.discountValue / 100));
+    } else {
+      descuento = coupon.discountValue;
     }
-  };
+
+    setDiscount(descuento);
+    setCouponApplied(true);
+    setCouponId(coupon.id);
+
+    Swal.fire({
+      title: "CUPÓN APLICADO",
+      text:
+        coupon.discountType === "PERCENTAGE"
+          ? `Descuento del ${coupon.discountValue}%: -$${descuento.toLocaleString("es-MX")}`
+          : `Descuento fijo: -$${descuento.toLocaleString("es-MX")}`,
+      icon: "success",
+      confirmButtonText: "OK",
+      confirmButtonColor: "#6750e0",
+      background: "#f5f4f0",
+      color: "#171717",
+      customClass: {
+        popup:
+          "border-4 border-[#171717] rounded-none shadow-[6px_6px_0px_0px_#171717] font-mono",
+        title: "uppercase font-black tracking-tighter",
+        confirmButton:
+          "font-mono font-black uppercase tracking-wider border-2 border-[#171717] rounded-none",
+      },
+    });
+  } catch {
+    Swal.fire({
+      title: "CUPÓN INVÁLIDO",
+      text: "El código ingresado no es válido, está vencido o ya fue usado.",
+      icon: "error",
+      confirmButtonText: "REINTENTAR",
+      confirmButtonColor: "#6750e0",
+      background: "#f5f4f0",
+      color: "#171717",
+      customClass: {
+        popup:
+          "border-4 border-[#171717] rounded-none shadow-[6px_6px_0px_0px_#171717] font-mono",
+        title: "uppercase font-black tracking-tighter",
+        confirmButton:
+          "font-mono font-black uppercase tracking-wider border-2 border-[#171717] rounded-none",
+      },
+    });
+  }
+};
 
   const handlePurchase = useCallback(async () => {
     if (!user || timerExpired) return;

@@ -45,8 +45,8 @@ export default function PerfilPage() {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (file.size > 400000) {
-      setErrorMsg("La imagen supera el tamaño máximo de 400KB.");
+    if (file.size > 2 * 1024 * 1024) {
+      setErrorMsg("La imagen supera el tamaño máximo de 2MB.");
       setSubmitStatus("error");
       return;
     }
@@ -232,7 +232,7 @@ export default function PerfilPage() {
                 Subir nueva foto
               </label>
               <p className="text-[11px] text-text-soft font-mono uppercase">
-                JPG, PNG, WEBP, GIF — Máx: <span className="font-black text-text">400KB</span>
+                JPG, PNG, WEBP, GIF — Máx: <span className="font-black text-text">2MB</span>
               </p>
               <label
                 htmlFor="profileImage"
