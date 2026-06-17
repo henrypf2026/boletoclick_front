@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import { getToken } from "@/lib/auth";
 import { savePendingPurchase } from "@/lib/pendingPurchase";
+import { checkoutService } from "@/services/checkoutService";
 import type { Event, Zone } from "@/mocks/events";
 import Swal from "sweetalert2";
 import Link from "next/link";
@@ -62,109 +63,124 @@ function CheckoutContent() {
     }
   }, [ticketTypeId, eventId, router]);
 
+
   useEffect(() => {
-    if (timerExpired) return;
+  if (!ticketTypeId) return;
 
-    const interval = setInterval(() => {
-      setTimerSeconds((prev) => {
-        if (prev <= 1) {
-          clearInterval(interval);
-          setTimerExpired(true);
-          Swal.fire({
-            title: "TIEMPO AGOTADO",
-            text: "Tu reserva expiró. Volvé a seleccionar las entradas.",
-            icon: "warning",
-            confirmButtonText: "VOLVER A EVENTOS",
-            confirmButtonColor: "#6750e0",
-            background: "#f5f4f0",
-            color: "#171717",
-            allowOutsideClick: false,
-            customClass: {
-              popup:
-                "border-4 border-[#171717] rounded-none shadow-[6px_6px_0px_0px_#171717] font-mono",
-              title: "uppercase font-black tracking-tighter",
-              confirmButton:
-                "font-mono font-black uppercase tracking-wider border-2 border-[#171717] rounded-none",
-            },
-          }).then(() => router.push("/eventos"));
-          return 0;
-        }
-        return prev - 1;
+  const storageKey = `checkout_start_${ticketTypeId}`;
+  const storedStart = sessionStorage.getItem(storageKey);
+
+  if (!storedStart) {
+    sessionStorage.setItem(storageKey, String(Date.now()));
+  }
+}, [ticketTypeId]);
+
+useEffect(() => {
+  if (!ticketTypeId || timerExpired) return;
+
+  const storageKey = `checkout_start_${ticketTypeId}`;
+
+  const interval = setInterval(() => {
+    const storedStart = sessionStorage.getItem(storageKey);
+    if (!storedStart) return;
+
+    const startTime = Number(storedStart);
+    const elapsed = Math.floor((Date.now() - startTime) / 1000);
+    const remaining = Math.max(0, TIMER_SECONDS - elapsed);
+
+    setTimerSeconds(remaining);
+
+    if (remaining === 0) {
+      setTimerExpired(true);
+      sessionStorage.removeItem(storageKey);
+      clearInterval(interval);
+
+      Swal.fire({
+        title: "TIEMPO AGOTADO",
+        text: "Tu reserva expiró. Volvé a seleccionar las entradas.",
+        icon: "warning",
+        confirmButtonText: "VOLVER A EVENTOS",
+        confirmButtonColor: "#6750e0",
+        background: "#f5f4f0",
+        color: "#171717",
+        allowOutsideClick: false,
+        customClass: {
+          popup:
+            "border-4 border-[#171717] rounded-none shadow-[6px_6px_0px_0px_#171717] font-mono",
+          title: "uppercase font-black tracking-tighter",
+          confirmButton:
+            "font-mono font-black uppercase tracking-wider border-2 border-[#171717] rounded-none",
+        },
+      }).then(() => {
+        router.push("/eventos");
       });
-    }, 1000);
+    }
+  }, 1000);
 
-    return () => clearInterval(interval);
-  }, [timerExpired, router]);
+  return () => clearInterval(interval);
+}, [ticketTypeId, timerExpired, router]);
+
+
 
   const subtotal = ticketPrice * quantity;
   const totalFinal = Math.max(0, subtotal - discount);
 
   const handleApplyCoupon = async () => {
-    if (!couponCode.trim()) return;
+  if (!couponCode.trim()) return;
 
-    try {
-      const token = getToken();
-      const res = await fetch(
-        `/api/backend/coupons/validate/${couponCode.trim()}`,
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        },
-      );
+  try {
+    const coupon = await checkoutService.validateCoupon(couponCode.trim());
 
-      if (!res.ok) throw new Error("Cupón inválido, vencido o apagado.");
-
-      const coupon = await res.json();
-
-      // Calcular descuento según el tipo
-      let descuento = 0;
-      if (coupon.discountType === "PERCENTAGE") {
-        descuento = Math.round(subtotal * (coupon.discountValue / 100));
-      } else {
-        descuento = coupon.discountValue;
-      }
-
-      setDiscount(descuento);
-      setCouponApplied(true);
-      setCouponId(coupon.id); // para mandarlo en el POST /orders
-
-      Swal.fire({
-        title: "CUPÓN APLICADO",
-        text:
-          coupon.discountType === "PERCENTAGE"
-            ? `Descuento del ${coupon.discountValue}%: -$${descuento.toLocaleString("es-MX")}`
-            : `Descuento fijo: -$${descuento.toLocaleString("es-MX")}`,
-        icon: "success",
-        confirmButtonText: "OK",
-        confirmButtonColor: "#6750e0",
-        background: "#f5f4f0",
-        color: "#171717",
-        customClass: {
-          popup:
-            "border-4 border-[#171717] rounded-none shadow-[6px_6px_0px_0px_#171717] font-mono",
-          title: "uppercase font-black tracking-tighter",
-          confirmButton:
-            "font-mono font-black uppercase tracking-wider border-2 border-[#171717] rounded-none",
-        },
-      });
-    } catch {
-      Swal.fire({
-        title: "CUPÓN INVÁLIDO",
-        text: "El código ingresado no es válido, está vencido o ya fue usado.",
-        icon: "error",
-        confirmButtonText: "REINTENTAR",
-        confirmButtonColor: "#6750e0",
-        background: "#f5f4f0",
-        color: "#171717",
-        customClass: {
-          popup:
-            "border-4 border-[#171717] rounded-none shadow-[6px_6px_0px_0px_#171717] font-mono",
-          title: "uppercase font-black tracking-tighter",
-          confirmButton:
-            "font-mono font-black uppercase tracking-wider border-2 border-[#171717] rounded-none",
-        },
-      });
+    // Calcular descuento según el tipo
+    let descuento = 0;
+    if (coupon.discountType === "PERCENTAGE") {
+      descuento = Math.round(subtotal * (coupon.discountValue / 100));
+    } else {
+      descuento = coupon.discountValue;
     }
-  };
+
+    setDiscount(descuento);
+    setCouponApplied(true);
+    setCouponId(coupon.id);
+
+    Swal.fire({
+      title: "CUPÓN APLICADO",
+      text:
+        coupon.discountType === "PERCENTAGE"
+          ? `Descuento del ${coupon.discountValue}%: -$${descuento.toLocaleString("es-MX")}`
+          : `Descuento fijo: -$${descuento.toLocaleString("es-MX")}`,
+      icon: "success",
+      confirmButtonText: "OK",
+      confirmButtonColor: "#6750e0",
+      background: "#f5f4f0",
+      color: "#171717",
+      customClass: {
+        popup:
+          "border-4 border-[#171717] rounded-none shadow-[6px_6px_0px_0px_#171717] font-mono",
+        title: "uppercase font-black tracking-tighter",
+        confirmButton:
+          "font-mono font-black uppercase tracking-wider border-2 border-[#171717] rounded-none",
+      },
+    });
+  } catch {
+    Swal.fire({
+      title: "CUPÓN INVÁLIDO",
+      text: "El código ingresado no es válido, está vencido o ya fue usado.",
+      icon: "error",
+      confirmButtonText: "REINTENTAR",
+      confirmButtonColor: "#6750e0",
+      background: "#f5f4f0",
+      color: "#171717",
+      customClass: {
+        popup:
+          "border-4 border-[#171717] rounded-none shadow-[6px_6px_0px_0px_#171717] font-mono",
+        title: "uppercase font-black tracking-tighter",
+        confirmButton:
+          "font-mono font-black uppercase tracking-wider border-2 border-[#171717] rounded-none",
+      },
+    });
+  }
+};
 
   const handlePurchase = useCallback(async () => {
     if (!user || timerExpired) return;

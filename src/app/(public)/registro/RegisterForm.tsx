@@ -4,8 +4,8 @@ import { useState } from 'react';
 import { Formik, Form, type FormikHelpers } from 'formik';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Alert, Button } from 'flowbite-react';
-import { FormCheckbox, FormTextInput } from '@/components/ui/FormField';
+import { Button } from 'flowbite-react';
+import { FormAlert, FormCheckbox, FormTextInput } from '@/components/ui/FormField';
 import { useAuth } from '@/context/AuthContext';
 import { userRegisterSchema, producerRegisterSchema } from '@/validators/authSchemas';
 
@@ -124,12 +124,12 @@ export function RegisterForm() {
               <FormTextInput label="Nombre de la empresa" name="businessName" type="text" placeholder="Eventos S.A." />
             )}
 
-            <FormTextInput label="Contraseña" name="password" type="password" placeholder="Mínimo 6 caracteres" autoComplete="new-password" />
+            <FormTextInput label="Contraseña" name="password" type="password" placeholder="Creá tu contraseña" autoComplete="new-password" showStrength />
             <FormTextInput label="Confirmar contraseña" name="confirmPassword" type="password" placeholder="Repite tu contraseña" autoComplete="new-password" />
             <FormCheckbox name="allowNewsletter" label="Quiero recibir novedades y promociones de BoletoClick" />
             <FormCheckbox name="acceptTerms" label="Acepto los términos y condiciones de BoletoClick" />
 
-            {status && <Alert color="failure">{status}</Alert>}
+            {status && <FormAlert message={status} />}
 
             <Button
               type="submit"

@@ -31,10 +31,12 @@ async function uploadImage(file: File, userId: string): Promise<string> {
 export default function PerfilPage() {
   const { user, setUser } = useAuth();
 
-  const [imagePreview, setImagePreview] = useState<string | null>(
-    user?.profileImageUrl ?? null
-  );
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [imageFile, setImageFile] = useState<File | null>(null);
+  if (user?.profileImageUrl && imagePreview === null && !imageFile) {
+  setImagePreview(user.profileImageUrl);
+}
+  
   const [uploadingImage, setUploadingImage] = useState(false);
   const [submitStatus, setSubmitStatus] = useState<"success" | "error" | null>(null);
   const [errorMsg, setErrorMsg] = useState<string>("");
@@ -43,8 +45,8 @@ export default function PerfilPage() {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (file.size > 400000) {
-      setErrorMsg("La imagen supera el tamaño máximo de 400KB.");
+    if (file.size > 2 * 1024 * 1024) {
+      setErrorMsg("La imagen supera el tamaño máximo de 2MB.");
       setSubmitStatus("error");
       return;
     }
@@ -230,7 +232,7 @@ export default function PerfilPage() {
                 Subir nueva foto
               </label>
               <p className="text-[11px] text-text-soft font-mono uppercase">
-                JPG, PNG, WEBP, GIF — Máx: <span className="font-black text-text">400KB</span>
+                JPG, PNG, WEBP, GIF — Máx: <span className="font-black text-text">2MB</span>
               </p>
               <label
                 htmlFor="profileImage"
@@ -253,6 +255,16 @@ export default function PerfilPage() {
             </div>
           </div>
         </div>
+         {submitStatus === "success" && (
+          <div className="border-2 border-success bg-success/10 p-4 font-mono text-xs font-bold uppercase text-success">
+            ✅ Perfil actualizado correctamente
+          </div>
+        )}
+        {submitStatus === "error" && (
+          <div className="border-2 border-red-500 bg-red-500/10 p-4 font-mono text-xs font-bold uppercase text-red-500">
+            ❌ {errorMsg || "Hubo un error al guardar. Intentá de nuevo."}
+          </div>
+        )}
 
         <div className="bg-surface border-2 border-text p-6 shadow-[4px_4px_0px_0px_var(--color-text)]">
           <h2 className="text-base font-black uppercase tracking-tight border-b-2 border-text pb-2 mb-5">
@@ -291,18 +303,6 @@ export default function PerfilPage() {
             </div>
           </label>
         </div>
-
-        {submitStatus === "success" && (
-          <div className="border-2 border-success bg-success/10 p-4 font-mono text-xs font-bold uppercase text-success">
-            ✅ Perfil actualizado correctamente
-          </div>
-        )}
-        {submitStatus === "error" && (
-          <div className="border-2 border-red-500 bg-red-500/10 p-4 font-mono text-xs font-bold uppercase text-red-500">
-            ❌ {errorMsg || "Hubo un error al guardar. Intentá de nuevo."}
-          </div>
-        )}
-
         <button
           type="submit"
           disabled={isLoading}
