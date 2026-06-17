@@ -45,7 +45,7 @@ function AlertIcon() {
 
 function FieldError({ message }: { message: string }) {
   return (
-    <p className="flex items-center gap-1.5 text-sm font-medium text-red-700 dark:text-red-400">
+    <p className="flex items-center gap-1.5 rounded bg-red-50 px-2 py-1 text-sm font-semibold text-red-700 dark:bg-red-950/50 dark:text-red-300">
       <AlertIcon />
       {message}
     </p>
@@ -62,7 +62,7 @@ const PASSWORD_REQUIREMENTS = [
 
 function PasswordStrength({ value }: { value: string }) {
   return (
-    <ul className="mt-0.5 flex flex-col gap-1">
+    <ul className="mt-0.5 grid grid-cols-2 gap-x-4 gap-y-1">
       {PASSWORD_REQUIREMENTS.map(({ label, test }) => {
         const met = value.length > 0 && test(value);
         return (
