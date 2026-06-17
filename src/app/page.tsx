@@ -313,7 +313,7 @@ export default function HomePage() {
         >
           <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
             <div>
-              <p className="mb-2 text-[11px] font-black uppercase tracking-widest text-primary">
+              <p className="mb-2 text-[11px] font-black uppercase tracking-widest text-primary dark:text-background">
                 ↗ No te quedés afuera
               </p>
               <h2 className="text-2xl font-black uppercase leading-tight tracking-tighter text-background md:text-4xl">
