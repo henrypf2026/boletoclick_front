@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 
 interface TicketType {
@@ -19,8 +19,8 @@ interface Evento {
   ticketTypes: TicketType[];
   poster?: string;
   location?: string;
-  category?: any;
-  venue?: any;
+  category?: string | { name: string };
+  venue?: string | { name?: string; address?: string };
 }
 
 interface Acceso {
@@ -70,7 +70,8 @@ export default function DashboardProducer() {
 
         const cleanToken = rawToken.replace(/['"]+/g, "");
 
-        const response = await fetch("/api/backend/events", {
+        // 🎯 Se corrigió la URL agregando '/producer' para consultar el endpoint filtrado del backend
+        const response = await fetch("/api/backend/events/producer", {
           method: "GET",
           headers: {
             "Content-Type": "application/json",
@@ -106,16 +107,19 @@ export default function DashboardProducer() {
     if (ev.venue && typeof ev.venue === "object") {
       setFormLocation(ev.venue.name || ev.venue.address || "");
     } else {
-      setFormLocation(ev.location || ev.venue || "");
+      setFormLocation(ev.location || (ev.venue as string) || "");
     }
 
     if (ev.category && typeof ev.category === "object") {
       setFormCategory(ev.category.name || "");
     } else {
-      setFormCategory(ev.category || "");
+      setFormCategory((ev.category as string) || "");
     }
 
-    setFormTicketTypes(ev.ticketTypes ? [...ev.ticketTypes] : []);
+    // Copia profunda mapeando los objetos para romper la referencia de memoria
+    setFormTicketTypes(
+      ev.ticketTypes ? ev.ticketTypes.map((t) => ({ ...t })) : [],
+    );
     setStatusScanner("idle");
 
     if (ev.status === "CONCLUIDO") {
@@ -128,12 +132,11 @@ export default function DashboardProducer() {
     field: keyof TicketType,
     value: any,
   ) => {
-    const updated = [...formTicketTypes];
-    updated[index] = {
-      ...updated[index],
-      [field]: value,
-    };
-    setFormTicketTypes(updated);
+    setFormTicketTypes((prev) =>
+      prev.map((ticket, idx) =>
+        idx === index ? { ...ticket, [field]: value } : ticket,
+      ),
+    );
   };
 
   const guardarCambios = async () => {
@@ -147,7 +150,7 @@ export default function DashboardProducer() {
       if (vendidos > 0) {
         if (original && original.price !== Number(modificado.price)) {
           alert(
-            `Error de Seguridad: No podés cambiar el precio de "${modificado.name}" porque ya tiene ${vendidos} entradas vendidas.`,
+            `Error de Seguridad: No podés cambiar el precio de "${modificado.name}" because ya tiene ${vendidos} entradas vendidas.`,
           );
           return;
         }
@@ -276,17 +279,20 @@ export default function DashboardProducer() {
 
   const esConcluido = eventoSeleccionado?.status === "CONCLUIDO";
 
-  const capacidadTotalPantalla = formTicketTypes.reduce(
-    (acc, curr) => acc + (Number(curr.stock) || 0),
-    0,
-  );
+  // Optimización con useMemo para evitar recálculos innecesarios al tipear
+  const capacidadTotalPantalla = useMemo(() => {
+    return formTicketTypes.reduce(
+      (acc, curr) => acc + (Number(curr.stock) || 0),
+      0,
+    );
+  }, [formTicketTypes]);
 
   return (
     <div className="p-4 md:p-8 max-w-7xl mx-auto min-h-screen bg-background text-text selection:bg-primary selection:text-background">
       <div className="mb-6 flex flex-wrap gap-3 p-4 bg-surface border-4 border-text shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
         <button
           onClick={() => router.push("/producer/eventos/crear")}
-          className="px-4 py-2 bg-success text-black border-2 border-text font-mono text-xs font-black uppercase tracking-wider hover:translate-x-0.5 hover:translate-y-0.5 transition-all shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] hover:shadow-none"
+          className="px-4 py-2 bg-accent text-black border-2 border-text font-mono text-xs font-black uppercase tracking-wider hover:translate-x-0.5 hover:translate-y-0.5 transition-all shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] hover:shadow-none"
         >
           ➕ Crear Nuevo Evento
         </button>
@@ -406,7 +412,7 @@ export default function DashboardProducer() {
 
           {!eventoSeleccionado ? (
             <div className="border-2 border-dashed border-text p-12 text-center bg-surface/30 font-mono text-xs uppercase text-text-soft font-bold">
-              [ Seleccioná un show de la lista para auditar o editár ]
+              [ Seleccioná un show de la lista para auditar o editar ]
             </div>
           ) : (
             <div>

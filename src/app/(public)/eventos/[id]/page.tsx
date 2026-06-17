@@ -7,9 +7,9 @@ import { Alert } from 'flowbite-react';
 import { useAuth } from '@/context/AuthContext';
 import { formatEventDate, formatPrice, type Event } from '@/mocks/events';
 import { eventService } from '@/services/eventService';
-import { saveTicket } from '@/lib/auth';
+import { getToken } from '@/lib/auth';
 import EventMap from '@/components/ui/EventMap';
-import { paymentService } from '@/services/paymentService';
+import { favoritesService } from '@/services/favoritesService';
 
 export default function EventoPage() {
   const params = useParams();
@@ -21,10 +21,10 @@ export default function EventoPage() {
   const [loadingEvent, setLoadingEvent] = useState(true);
   const [quantity, setQuantity] = useState(1);
   const [zoneId, setZoneId] = useState('');
-  const [promoCode, setPromoCode] = useState('');
-  const [promoApplied, setPromoApplied] = useState(false);
   const [message, setMessage] = useState('');
   const [headerSourceIndex, setHeaderSourceIndex] = useState(0);
+  const [isFavorite, setIsFavorite] = useState(false);
+  const [loadingFav, setLoadingFav] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -38,14 +38,37 @@ export default function EventoPage() {
     return () => { active = false; };
   }, [id]);
 
+  useEffect(() => {
+    if (!authenticated) return;
+    const token = getToken();
+    if (!token) return;
+    favoritesService.getAll(token).then((favs) => {
+      setIsFavorite(favs.some((f) => f.eventId === id));
+    }).catch(() => {});
+  }, [authenticated, id]);
+
+  const handleToggleFavorite = async () => {
+    if (!authenticated) { router.push(`/login?from=/eventos/${id}`); return; }
+    const token = getToken();
+    if (!token) return;
+    setLoadingFav(true);
+    try {
+      const { added } = await favoritesService.toggle(id, token);
+      setIsFavorite(added);
+    } catch {
+      setMessage('No se pudo actualizar favoritos. Intentá de nuevo.');
+    } finally {
+      setLoadingFav(false);
+    }
+  };
+
   const selectedZone = event?.zones.find((zone) => zone.id === zoneId);
   const date = event ? formatEventDate(event.date, event.time) : null;
 
   const total = useMemo(() => {
     if (!selectedZone) return 0;
-    const subtotal = selectedZone.price * quantity;
-    return promoApplied ? Math.round(subtotal * 0.9) : subtotal;
-  }, [selectedZone, quantity, promoApplied]);
+    return selectedZone.price * quantity;
+  }, [selectedZone, quantity]);
 
   if (loadingEvent) {
     return (
@@ -67,56 +90,39 @@ export default function EventoPage() {
     return null;
   }
 
-  const handleApplyPromo = () => {
-    if (promoCode.trim().toUpperCase() === 'BOLETO10') {
-      setPromoApplied(true);
-      setMessage('Código aplicado: 10% de descuento.');
+  const handlePurchase = () => {
+    if (!authenticated || !user) {
+      router.push(`/login?from=/eventos/${event.id}`);
       return;
     }
-    setPromoApplied(false);
-    setMessage('Código no válido. Probá con BOLETO10.');
-  };
 
-  const handlePurchase = async () => {
-
-  if (!authenticated) {
-    router.push(`/login?from=/eventos/${event.id}`);
-    return;
-  }
-
-  if (!selectedZone || quantity > selectedZone.available) {
-    setMessage("Cantidad no disponible en esa zona.");
-    return;
-  }
-
-  try {
-
-    const response = await fetch(
-      `${process.env.NEXT_PUBLIC_API_URL}/ticket-types/by-zone/${selectedZone.id}`
-    );
-
-    if (!response.ok) {
-      throw new Error();
+    if (!selectedZone || quantity > selectedZone.available) {
+      setMessage('Cantidad no disponible en esa zona.');
+      return;
     }
 
-    const ticketType = await response.json();
-
     const params = new URLSearchParams({
-      ticketTypeId: ticketType.id,
+      ticketTypeId: selectedZone.ticketTypeId,
+      eventId: event.id,
       nombre: event.title,
-      zona: selectedZone.name,
+      venue: event.venue,
+      city: event.city,
+      date: event.date,
+      time: event.time,
+      tribuna: selectedZone.zone,
+      tipo: selectedZone.name,
       precio: String(selectedZone.price),
-      cantidad: String(quantity)
+      cantidad: String(quantity),
+      lat: String(event.coordinates.lat),
+      lng: String(event.coordinates.lng),
     });
 
+    if (event.address) {
+      params.set('address', event.address);
+    }
+
     router.push(`/checkout?${params.toString()}`);
-
-  } catch {
-
-    setMessage("No se pudo obtener el tipo de ticket");
-
-  }
-};
+  };
 
   const headerSources = [event.posterUrl, event.fallbackImageUrl].filter(Boolean) as string[];
   const headerImage = headerSources[headerSourceIndex];
@@ -233,30 +239,26 @@ export default function EventoPage() {
                 id="zone"
                 value={zoneId}
                 onChange={(e) => setZoneId(e.target.value)}
-                className="w-full border-2 border-border bg-background px-3 py-2.5 text-sm font-bold text-text focus:outline-none focus:border-primary transition-colors"
+                disabled={event.zones.length === 0}
+                className="w-full border-2 border-border bg-background px-3 py-2.5 text-sm font-bold text-text focus:outline-none focus:border-primary transition-colors disabled:opacity-50"
               >
-                {event.zones.map((zone) => (
-                  <option key={zone.id} value={zone.id}>
-                    {zone.name} · {formatPrice(zone.price)} ({zone.available} disp.)
-                  </option>
-                ))}
+                {event.zones.length === 0 ? (
+                  <option value="">Sin zonas disponibles</option>
+                ) : (
+                  event.zones.map((zone) => (
+                    <option key={zone.id} value={zone.id}>
+                      {zone.zone} · {zone.name} · {formatPrice(zone.price)} ({zone.available} disp.)
+                    </option>
+                  ))
+                )}
               </select>
             </div>
 
             <div className="mb-4 flex gap-2">
-              <input
-                type="text"
-                value={promoCode}
-                onChange={(e) => setPromoCode(e.target.value)}
-                placeholder="Código de promoción"
-                className="min-w-0 flex-1 border-2 border-border bg-background px-3 py-2.5 text-sm text-text placeholder:text-text-soft focus:outline-none focus:border-primary transition-colors"
-              />
-              <button
-                onClick={handleApplyPromo}
-                className="shrink-0 border-2 border-border bg-surface-2 px-4 py-2.5 text-sm font-black uppercase tracking-wide text-text hover:bg-surface transition-colors"
-              >
-                Aplicar
-              </button>
+              <p className="mb-4 text-xs font-bold uppercase tracking-wide text-text-soft border-2 border-border bg-surface-2 px-3 py-2.5">
+              🎟️ ¿Tenés un cupón de descuento? Podés aplicarlo en el siguiente paso
+            </p>
+            
             </div>
 
             <div className="mb-5 flex items-center justify-between border-t-2 border-border pt-4">
@@ -264,17 +266,30 @@ export default function EventoPage() {
               <strong className="text-2xl font-black text-success">{formatPrice(total)}</strong>
             </div>
 
-            {message && (
-              <Alert color={promoApplied ? 'success' : 'failure'} className="mb-4 text-sm">
+           {message && (
+              <Alert color="failure" className="mb-4 text-sm">
                 {message}
               </Alert>
             )}
 
             <button
               onClick={handlePurchase}
-              className="w-full border-4 border-border bg-primary py-3 text-sm font-black uppercase tracking-wider text-background shadow-[4px_4px_0px_0px_rgba(23,23,23,1)] transition-all hover:-translate-y-0.5 hover:shadow-[6px_6px_0px_0px_rgba(23,23,23,1)] active:translate-y-0.5 active:shadow-none dark:shadow-[4px_4px_0px_0px_rgba(255,255,255,1)]"
+              disabled={!selectedZone || event.zones.length === 0}
+              className="w-full border-4 border-border bg-primary py-3 text-sm font-black uppercase tracking-wider text-background shadow-[4px_4px_0px_0px_rgba(23,23,23,1)] transition-all hover:-translate-y-0.5 hover:shadow-[6px_6px_0px_0px_rgba(23,23,23,1)] active:translate-y-0.5 active:shadow-none disabled:opacity-50 disabled:pointer-events-none dark:shadow-[4px_4px_0px_0px_rgba(255,255,255,1)]"
             >
               {authenticated ? 'Confirmar compra' : 'Iniciá sesión para comprar'}
+            </button>
+
+            <button
+              onClick={handleToggleFavorite}
+              disabled={loadingFav}
+              className={`mt-2 w-full border-2 border-border py-2.5 text-sm font-black uppercase tracking-wider transition-all hover:-translate-y-0.5 disabled:opacity-50 ${
+                isFavorite
+                  ? "bg-red-500 text-white border-red-500"
+                  : "bg-surface text-text hover:bg-surface-2"
+              }`}
+            >
+              {isFavorite ? "♥ Guardado en favoritos" : "♡ Guardar en favoritos"}
             </button>
           </div>
 

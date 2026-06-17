@@ -3,34 +3,12 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
-import { ticketService } from "@/services/ticketService";
+import { ticketService, type ApiTicket } from "@/services/ticketService";
 import { orderService } from "@/services/orderService";
+import TicketQrCode from "@/components/ui/TicketQrCode";
+import AddToWalletButton from "@/components/ui/AddToWalletButton";
 
 
-
-interface TicketType {
-  id: string;
-  name: string;
-  price: number;
-  zone: string | null;
-}
-
-interface Order {
-  id: string;
-  total: number;
-  status: "PENDING" | "PAID" | "FAILED" | "REFUNDED";
-  createdAt: string;
-}
-
-interface Ticket {
-  id: string;
-  qrCode: string;
-  allowEntrance: boolean;
-  usedAt: string | null;
-  createdAt: string;
-  ticketType: TicketType;
-  order: Order;
-}
 
 interface OrderItem {
   id: string;
@@ -44,7 +22,7 @@ interface OrderItem {
 }
 
 
-function orderStatusLabel(status: Order["status"]) {
+function orderStatusLabel(status: ApiTicket["order"]["status"]) {
   switch (status) {
     case "PAID": return "PAGADO";
     case "PENDING": return "PENDIENTE";
@@ -53,7 +31,7 @@ function orderStatusLabel(status: Order["status"]) {
   }
 }
 
-function orderStatusColor(status: Order["status"]) {
+function orderStatusColor(status: ApiTicket["order"]["status"]) {
   switch (status) {
     case "PAID": return "text-success bg-success/10 border-success";
     case "PENDING": return "text-yellow-600 bg-yellow-400/10 border-yellow-500";
@@ -65,12 +43,12 @@ function orderStatusColor(status: Order["status"]) {
 
 export default function UserDashboard() {
 
-  const { user } = useAuth();
+  const { user, authenticated, loading } = useAuth();
   const router = useRouter();
   const [seccionActiva, setSeccionActiva] = useState<"entradas" | "historial">("entradas");
-  const [ticketExpandido, setTicketExpandido] = useState<Ticket | null>(null);
+  const [ticketExpandido, setTicketExpandido] = useState<ApiTicket | null>(null);
   const [filtroHistorial, setFiltroHistorial] = useState("");
-  const [tickets, setTickets] = useState<Ticket[]>([]);
+  const [tickets, setTickets] = useState<ApiTicket[]>([]);
   const [orders, setOrders] = useState<OrderItem[]>([]);
   const [loadingTickets, setLoadingTickets] = useState(true);
   const [loadingOrders, setLoadingOrders] = useState(true);
@@ -82,7 +60,7 @@ export default function UserDashboard() {
   if (!user) return;
   const fetchTickets = async () => {
     try {
-      const data = await ticketService.getMyTickets();
+      const data = await ticketService.getMyTickets(user.id);
       setTickets(data);
     } catch {
       setErrorTickets(true);
@@ -115,9 +93,26 @@ export default function UserDashboard() {
       o.status.toLowerCase().includes(filtroHistorial.toLowerCase()),
   );
 
-  const firstName = user
+   const firstName = user
     ? (user.name ?? user.email.split("@")[0]).split(" ")[0]
     : "";
+
+    
+  if (loading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <p className="font-mono text-xs uppercase text-text-soft animate-pulse">
+          Verificando sesión...
+        </p>
+      </div>
+    );
+  }
+
+  if (!authenticated) {
+    router.push("/login?from=/dashboard-user");
+    return null;
+  }
+
 
   return (
     <div className="p-4 md:p-8 max-w-4xl mx-auto min-h-screen bg-background text-text transition-colors">
@@ -194,7 +189,7 @@ export default function UserDashboard() {
                   <div className="border-b-2 border-dashed border-text/40 pb-4 mb-4">
                     <div className="flex justify-between items-start gap-2">
                       <h3 className="text-text font-black text-lg uppercase tracking-tight group-hover:text-primary transition-colors">
-                        {ticket.ticketType.name}
+                        {ticket.eventTitle ?? ticket.ticketType.name}
                       </h3>
                       <span className={`text-[9px] font-mono px-1.5 py-0.5 font-bold whitespace-nowrap border ${orderStatusColor(ticket.order.status)}`}>
                         {orderStatusLabel(ticket.order.status)}
@@ -213,9 +208,7 @@ export default function UserDashboard() {
                     </p>
                   </div>
                   <div className="bg-surface-2 p-3 border-2 border-text flex flex-col items-center justify-center max-w-40 mx-auto w-full transition-transform group-hover:scale-105">
-                    <div className="w-full py-3 bg-black text-white flex items-center justify-center font-mono text-[10px] uppercase font-black tracking-widest">
-                      [ SCAN CODE ]
-                    </div>
+                    <TicketQrCode value={ticket.qrCode} size={112} className="w-full h-auto" />
                   </div>
                 </div>
               ))}
@@ -320,7 +313,7 @@ export default function UserDashboard() {
                 PASES DIGITALES BOLETOCLICK
               </span>
               <h2 className="text-black font-black text-2xl uppercase tracking-tighter mt-4 leading-tight">
-                {ticketExpandido.ticketType.name}
+                {ticketExpandido.eventTitle ?? ticketExpandido.ticketType.name}
               </h2>
               {ticketExpandido.ticketType.zone && (
                 <div className="mt-3">
@@ -343,15 +336,7 @@ export default function UserDashboard() {
 
             {/* QR */}
             <div className="my-6 bg-white p-4 border-4 border-black flex flex-col items-center justify-center aspect-square w-full max-w-60 mx-auto shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
-              <div className="w-full h-full bg-black text-white flex flex-col items-center justify-center p-4 text-center font-mono text-xs uppercase font-black tracking-widest select-none">
-                <span className="text-4xl mb-3">🏁</span>
-                <span className="bg-white text-black px-2 py-0.5 font-mono text-[11px] font-black tracking-normal mb-1 break-all">
-                  {ticketExpandido.qrCode.slice(0, 16)}...
-                </span>
-                <span className="text-[9px] text-neutral-400 mt-2 tracking-tighter">
-                  DIGITAL TICKET ID
-                </span>
-              </div>
+              <TicketQrCode value={ticketExpandido.qrCode} size={200} className="w-full h-full" />
             </div>
 
             <div className="space-y-3">
@@ -359,12 +344,15 @@ export default function UserDashboard() {
                 📱 Presentá esta pantalla en los lectores de puerta
               </p>
               <div className="grid grid-cols-1 gap-2">
-                <button
-                  onClick={() => alert("Simulación: Agregando pase a Wallet...")}
-                  className="w-full bg-neutral-100 hover:bg-neutral-200 text-black font-mono font-black py-2.5 text-[11px] uppercase tracking-wider border-2 border-black transition-colors cursor-pointer shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]"
-                >
-                  💼 AGREGAR A WALLET
-                </button>
+                <AddToWalletButton
+                  ticket={{
+                    id: ticketExpandido.id,
+                    qrCode: ticketExpandido.qrCode,
+                    eventTitle: ticketExpandido.eventTitle,
+                    ticketTypeName: ticketExpandido.ticketType.name,
+                    zone: ticketExpandido.ticketType.zone,
+                  }}
+                />
                 <button
                   onClick={() => setTicketExpandido(null)}
                   className="w-full bg-black hover:bg-neutral-900 text-white font-mono font-black py-2.5 text-[11px] uppercase tracking-wider border-2 border-black transition-colors cursor-pointer"

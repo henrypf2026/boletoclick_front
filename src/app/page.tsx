@@ -5,6 +5,7 @@ import Link from 'next/link';
 import EventCard from '@/components/ui/EventCard';
 import { type Event } from '@/mocks/events';
 import { eventService } from '@/services/eventService';
+import { useAuth } from '@/context/AuthContext';
 
 function useReveal(threshold = 0.12) {
   const ref = useRef<HTMLElement>(null);
@@ -47,6 +48,7 @@ function TicketDecoration() {
 }
 
 export default function HomePage() {
+  const { authenticated } = useAuth();
   const [featured, setFeatured] = useState<Event[]>([]);
   const [loadingEvents, setLoadingEvents] = useState(true);
   const [heroReady, setHeroReady] = useState(false);
@@ -131,12 +133,14 @@ export default function HomePage() {
             >
               Ver cartelera
             </Link>
-            <Link
-              href="/registro"
-              className="inline-flex h-12 items-center border-4 border-border bg-surface px-7 text-sm font-black uppercase tracking-wider text-text shadow-[4px_4px_0px_0px_rgba(23,23,23,1)] transition-all duration-100 hover:-translate-y-0.5 hover:shadow-[6px_6px_0px_0px_rgba(23,23,23,1)] active:translate-y-0.5 active:shadow-none dark:shadow-[4px_4px_0px_0px_rgba(255,255,255,1)]"
-            >
-              Crear cuenta gratis
-            </Link>
+            {!authenticated && (
+              <Link
+                href="/registro"
+                className="inline-flex h-12 items-center border-4 border-border bg-surface px-7 text-sm font-black uppercase tracking-wider text-text shadow-[4px_4px_0px_0px_rgba(23,23,23,1)] transition-all duration-100 hover:-translate-y-0.5 hover:shadow-[6px_6px_0px_0px_rgba(23,23,23,1)] active:translate-y-0.5 active:shadow-none dark:shadow-[4px_4px_0px_0px_rgba(255,255,255,1)]"
+              >
+                Crear cuenta gratis
+              </Link>
+            )}
           </div>
 
           <div
@@ -309,7 +313,7 @@ export default function HomePage() {
         >
           <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
             <div>
-              <p className="mb-2 text-[11px] font-black uppercase tracking-widest text-primary">
+              <p className="mb-2 text-[11px] font-black uppercase tracking-widest text-primary dark:text-background">
                 ↗ No te quedés afuera
               </p>
               <h2 className="text-2xl font-black uppercase leading-tight tracking-tighter text-background md:text-4xl">

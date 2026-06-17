@@ -1,7 +1,7 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
-import { Alert } from 'flowbite-react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Alert, Button } from 'flowbite-react';
 import CategoryFilter from '@/components/ui/CategoryFilter';
 import EventCard from '@/components/ui/EventCard';
 import EventGrid from '@/components/ui/EventGrid';
@@ -17,29 +17,46 @@ export default function EventosPage() {
   const [categories, setCategories] = useState<CategoryOption[]>([ALL_CATEGORY]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [reloadKey, setReloadKey] = useState(0);
+
+  const loadEvents = useCallback(async (signal?: { cancelled: boolean }) => {
+    setLoading(true);
+    setError(null);
+
+    const [eventsResult, categoriesResult] = await Promise.allSettled([
+      eventService.getEvents(),
+      eventService.getCategories(),
+    ]);
+
+    if (signal?.cancelled) return;
+
+    if (eventsResult.status === 'fulfilled') {
+      setEvents(eventsResult.value);
+      setError(null);
+    } else {
+      setEvents([]);
+      const reason = eventsResult.reason;
+      setError(
+        reason instanceof Error
+          ? reason.message
+          : 'No se pudieron cargar los eventos.',
+      );
+    }
+
+    if (categoriesResult.status === 'fulfilled') {
+      setCategories([ALL_CATEGORY, ...categoriesResult.value]);
+    }
+
+    setLoading(false);
+  }, []);
 
   useEffect(() => {
-    let active = true;
-    setLoading(true);
-
-    Promise.all([eventService.getEvents(), eventService.getCategories()])
-      .then(([eventsData, categoriesData]) => {
-        if (!active) return;
-        setEvents(eventsData);
-        setCategories([ALL_CATEGORY, ...categoriesData]);
-        setError(null);
-      })
-      .catch((err: unknown) => {
-        if (!active) return;
-        setEvents([]);
-        setError(err instanceof Error ? err.message : 'No se pudieron cargar los eventos.');
-      })
-      .finally(() => {
-        if (active) setLoading(false);
-      });
-
-    return () => { active = false; };
-  }, []);
+    const signal = { cancelled: false };
+    void loadEvents(signal);
+    return () => {
+      signal.cancelled = true;
+    };
+  }, [loadEvents, reloadKey]);
 
   const filteredEvents = useMemo(() => {
     const query = search.trim().toLowerCase();
@@ -87,6 +104,14 @@ export default function EventosPage() {
           <Alert color="failure" className="mb-6">
             <span className="block font-medium">No se pudieron cargar los eventos.</span>
             <span className="mt-1 block text-sm">{error}</span>
+            <Button
+              color="failure"
+              size="sm"
+              className="mt-3"
+              onClick={() => setReloadKey((key) => key + 1)}
+            >
+              Reintentar
+            </Button>
           </Alert>
         )}
 

@@ -3,7 +3,7 @@
 import { useEffect, useRef } from 'react';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
-import { getDirectionsUrl, getMapboxToken, type GeoCoordinates } from '@/lib/geo/mapbox';
+import { getDirectionsUrl, getMapboxToken, normalizeCoordinates, type GeoCoordinates } from '@/lib/geo/mapbox';
 
 interface EventMapProps {
   coordinates: GeoCoordinates;
@@ -15,10 +15,11 @@ interface EventMapProps {
 export default function EventMap({ coordinates, venue, city, address }: EventMapProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const token = getMapboxToken();
-  const directionsUrl = getDirectionsUrl(coordinates, `${venue}, ${city}`);
+  const coords = normalizeCoordinates(coordinates);
+  const directionsUrl = getDirectionsUrl(coords, `${venue}, ${city}`);
 
   useEffect(() => {
-    if (!token || !containerRef.current) {
+    if (!token || !containerRef.current || !coords) {
       return undefined;
     }
 
@@ -27,7 +28,7 @@ export default function EventMap({ coordinates, venue, city, address }: EventMap
     const map = new mapboxgl.Map({
       container: containerRef.current,
       style: 'mapbox://styles/mapbox/dark-v11',
-      center: [coordinates.lng, coordinates.lat],
+      center: [coords.lng, coords.lat],
       zoom: 14,
       attributionControl: false,
     });
@@ -35,7 +36,7 @@ export default function EventMap({ coordinates, venue, city, address }: EventMap
     map.addControl(new mapboxgl.NavigationControl({ showCompass: false }), 'top-right');
 
     const marker = new mapboxgl.Marker({ color: '#22c55e' })
-      .setLngLat([coordinates.lng, coordinates.lat])
+      .setLngLat([coords.lng, coords.lat])
       .setPopup(
         new mapboxgl.Popup({ offset: 24 }).setHTML(
           `<strong>${venue}</strong><br/>${address ? `${address}<br/>` : ''}${city}`,
@@ -45,10 +46,28 @@ export default function EventMap({ coordinates, venue, city, address }: EventMap
 
     marker.togglePopup();
 
+    map.resize();
+
     return () => {
       map.remove();
     };
-  }, [coordinates, venue, city, address, token]);
+  }, [coords?.lat, coords?.lng, venue, city, address, token]);
+
+  if (!coords) {
+    return (
+      <div className="space-y-3">
+        <p className="text-sm text-text-soft">{address ? `${address}, ${city}` : city}</p>
+        <a
+          href={getDirectionsUrl(null, `${venue}, ${city}`)}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center gap-1 text-sm font-black uppercase tracking-wide text-primary hover:underline"
+        >
+          Cómo llegar al recinto →
+        </a>
+      </div>
+    );
+  }
 
   if (!token) {
     return (
@@ -63,14 +82,14 @@ export default function EventMap({ coordinates, venue, city, address }: EventMap
     <div className="space-y-3">
       <div
         ref={containerRef}
-        className="h-64 w-full overflow-hidden rounded-xl border border-gray-800 md:h-80"
+        className="h-64 w-full min-h-[16rem] overflow-hidden rounded-xl border border-border md:h-80"
         aria-label={`Mapa de ${venue}, ${city}`}
       />
       <a
         href={directionsUrl}
         target="_blank"
         rel="noopener noreferrer"
-        className="inline-flex items-center gap-1 text-sm font-medium text-primary hover:underline"
+        className="inline-flex items-center gap-1 text-sm font-black uppercase tracking-wide text-primary hover:underline"
       >
         Cómo llegar al recinto →
       </a>

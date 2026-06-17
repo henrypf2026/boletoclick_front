@@ -4,8 +4,8 @@ import { Suspense } from 'react';
 import { Formik, Form, type FormikHelpers } from 'formik';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Alert, Button, Card } from 'flowbite-react';
-import { FormTextInput } from '@/components/ui/FormField';
+import { Button, Card } from 'flowbite-react';
+import { FormAlert, FormTextInput } from '@/components/ui/FormField';
 import { useAuth } from '@/context/AuthContext';
 import { loginSchema } from '@/validators/authSchemas';
 import { supabase } from '@/lib/supabaseClient';
@@ -19,6 +19,7 @@ function LoginForm() {
   const redirectTo = searchParams.get('from') || '/';
 
   const handleGoogleLogin = async () => {
+    await supabase.auth.signOut();
     await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
@@ -36,8 +37,8 @@ function LoginForm() {
     try {
       await login(values);
       router.push(redirectTo);
-    } catch (error) {
-      setStatus((error as Error).message);
+    } catch {
+      setStatus('El correo o la contraseña son incorrectos.');
     } finally {
       setSubmitting(false);
     }
@@ -59,7 +60,7 @@ function LoginForm() {
             <FormTextInput label="Correo electrónico" name="email" type="email" placeholder="tu@correo.com" autoComplete="email" />
             <FormTextInput label="Contraseña" name="password" type="password" placeholder="••••••••" autoComplete="current-password" />
 
-            {status && <Alert color="failure">{status}</Alert>}
+            {status && <FormAlert message={status} />}
 
             <Button type="submit" disabled={isSubmitting} className="bg-primary text-background hover:bg-primary-deep">
               {isSubmitting ? 'Ingresando...' : 'Iniciar sesión'}

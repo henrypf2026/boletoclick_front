@@ -333,42 +333,54 @@ export default function EventForm() {
             key={index}
             className="flex flex-col md:flex-row gap-3 items-end bg-background border-2 border-border p-4 shadow-[3px_3px_0px_0px_rgba(23,23,23,1)]"
           >
-            <input
-              type="text"
-              placeholder="Nombre"
-              value={ticket.name}
-              onChange={(e) =>
-                handleLocalidadChange(index, "name", e.target.value)
-              }
-              className="flex-1 w-full p-2 border-2 border-border text-xs"
-            />
-            <input
-              type="number"
-              placeholder="Precio"
-              value={ticket.price}
-              onChange={(e) =>
-                handleLocalidadChange(index, "price", e.target.value)
-              }
-              className="w-full md:w-28 p-2 border-2 border-border text-xs"
-            />
-            <input
-              type="number"
-              placeholder="Stock"
-              value={ticket.stock}
-              onChange={(e) =>
-                handleLocalidadChange(index, "stock", e.target.value)
-              }
-              className="w-full md:w-28 p-2 border-2 border-border text-xs"
-            />
-            <input
-              type="text"
-              placeholder="Zona"
-              value={ticket.zone}
-              onChange={(e) =>
-                handleLocalidadChange(index, "zone", e.target.value)
-              }
-              className="w-full md:w-40 p-2 border-2 border-border text-xs"
-            />
+            <div className="flex flex-col gap-1 flex-1 w-full">
+              <label className="text-[10px] font-black uppercase tracking-wide text-text-soft">Nombre del tipo</label>
+              <input
+                type="text"
+                placeholder="Ej: VIP, General, Platea..."
+                value={ticket.name}
+                onChange={(e) =>
+                  handleLocalidadChange(index, "name", e.target.value)
+                }
+                className="w-full p-2 border-2 border-border text-xs"
+              />
+            </div>
+            <div className="flex flex-col gap-1 w-full md:w-28">
+              <label className="text-[10px] font-black uppercase tracking-wide text-text-soft">Precio por entrada ($)</label>
+              <input
+                type="number"
+                placeholder="Ej: 5000"
+                value={ticket.price}
+                onChange={(e) =>
+                  handleLocalidadChange(index, "price", e.target.value)
+                }
+                className="w-full p-2 border-2 border-border text-xs"
+              />
+            </div>
+            <div className="flex flex-col gap-1 w-full md:w-28">
+              <label className="text-[10px] font-black uppercase tracking-wide text-text-soft">Cantidad de asientos</label>
+              <input
+                type="number"
+                placeholder="Ej: 200"
+                value={ticket.stock}
+                onChange={(e) =>
+                  handleLocalidadChange(index, "stock", e.target.value)
+                }
+                className="w-full p-2 border-2 border-border text-xs"
+              />
+            </div>
+            <div className="flex flex-col gap-1 w-full md:w-40">
+              <label className="text-[10px] font-black uppercase tracking-wide text-text-soft">Zona / Sector</label>
+              <input
+                type="text"
+                placeholder="Ej: Platea Baja, Tribuna..."
+                value={ticket.zone}
+                onChange={(e) =>
+                  handleLocalidadChange(index, "zone", e.target.value)
+                }
+                className="w-full p-2 border-2 border-border text-xs"
+              />
+            </div>
             {ticketTypes.length > 1 && (
               <button
                 type="button"

@@ -1,27 +1,42 @@
 "use client";
 
 import React, { useState } from "react";
+import { getToken } from "@/lib/auth";
+import {
+  mapFormToApi,
+  type BankFormData,
+} from "./bankAccountMapper";
 
 interface BankFormProps {
-  initialData: {
-    banco?: string;
-    tipoCuenta?: string;
-    cbu?: string;
-    alias?: string;
-    titular?: string;
-    cuit?: string;
-  } | null;
+  initialData: BankFormData | null;
+}
+
+const EMPTY_FORM: BankFormData = {
+  banco: "",
+  tipoCuenta: "Caja de Ahorros",
+  cbu: "",
+  alias: "",
+  titular: "",
+  cuit: "",
+};
+
+function parseErrorMessage(payload: unknown): string {
+  if (!payload || typeof payload !== "object") {
+    return "Error al guardar los datos.";
+  }
+
+  const message = (payload as { message?: string | string[] }).message;
+
+  if (typeof message === "string") return message;
+  if (Array.isArray(message)) return message.join(". ");
+
+  return "Error al guardar los datos.";
 }
 
 export default function BankForm({ initialData }: BankFormProps) {
-  const [formData, setFormData] = useState({
-    banco: initialData?.banco || "",
-    tipoCuenta: initialData?.tipoCuenta || "Caja de Ahorros",
-    cbu: initialData?.cbu || "",
-    alias: initialData?.alias || "",
-    titular: initialData?.titular || "",
-    cuit: initialData?.cuit || "",
-  });
+  const [formData, setFormData] = useState<BankFormData>(
+    initialData ?? EMPTY_FORM,
+  );
 
   const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState<{
@@ -43,28 +58,43 @@ export default function BankForm({ initialData }: BankFormProps) {
     setLoading(true);
     setStatus(null);
 
-    try {
-      const method = initialData ? "PUT" : "POST";
-      const endpoint = `/api/backend/bank-accounts/me`;
+    const token = getToken();
+    if (!token) {
+      setStatus({
+        type: "error",
+        msg: "Tenés que iniciar sesión como productor para guardar los datos.",
+      });
+      setLoading(false);
+      return;
+    }
 
-      const res = await fetch(endpoint, {
-        method: method,
+    try {
+      const res = await fetch("/api/backend/bank-accounts", {
+        method: "PUT",
         headers: {
           "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify(formData),
+        body: JSON.stringify(mapFormToApi(formData)),
       });
 
-      if (!res.ok) throw new Error("Error al guardar los datos.");
+      const data = await res.json().catch(() => null);
+
+      if (!res.ok) {
+        throw new Error(parseErrorMessage(data));
+      }
 
       setStatus({
         type: "success",
         msg: "¡Datos bancarios guardados con éxito!",
       });
-    } catch (error: any) {
+    } catch (error) {
       setStatus({
         type: "error",
-        msg: error.message || "Hubo un problema con el servidor.",
+        msg:
+          error instanceof Error
+            ? error.message
+            : "Hubo un problema con el servidor.",
       });
     } finally {
       setLoading(false);
@@ -88,7 +118,6 @@ export default function BankForm({ initialData }: BankFormProps) {
         </div>
       )}
 
-      {/* Fila 1: Banco y Tipo */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div className="flex flex-col gap-1.5">
           <label className="text-xs font-black uppercase tracking-wide text-text">
@@ -121,7 +150,6 @@ export default function BankForm({ initialData }: BankFormProps) {
         </div>
       </div>
 
-      {/* Fila 2: CBU y Alias */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div className="flex flex-col gap-1.5">
           <label className="text-xs font-black uppercase tracking-wide text-text">
@@ -141,21 +169,19 @@ export default function BankForm({ initialData }: BankFormProps) {
 
         <div className="flex flex-col gap-1.5">
           <label className="text-xs font-black uppercase tracking-wide text-text">
-            Alias de cuenta
+            Alias de cuenta (opcional)
           </label>
           <input
             type="text"
             name="alias"
             value={formData.alias}
             onChange={handleChange}
-            required
             placeholder="Ej: boleto.click.mp"
             className="p-3 border-2 border-border bg-background text-text font-medium focus:outline-none focus:ring-2 focus:ring-primary shadow-[2px_2px_0px_0px_rgba(23,23,23,1)] placeholder:text-text-soft/50 text-sm"
           />
         </div>
       </div>
 
-      {/* Fila 3: Titular y CUIT */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div className="flex flex-col gap-1.5">
           <label className="text-xs font-black uppercase tracking-wide text-text">

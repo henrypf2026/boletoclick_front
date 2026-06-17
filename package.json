@@ -3,12 +3,13 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev -p 3002",
+    "dev": "next dev -p 3002 -H 0.0.0.0",
     "build": "next build",
     "start": "next start -p 3002",
     "lint": "eslint"
   },
   "dependencies": {
+    "@supabase/ssr": "^0.12.0",
     "@supabase/supabase-js": "^2.106.2",
     "flowbite": "^4.0.2",
     "flowbite-react": "^0.12.17",
@@ -17,6 +18,7 @@
     "jspdf": "^4.2.1",
     "mapbox-gl": "^3.24.0",
     "next": "16.2.6",
+    "qrcode": "^1.5.4",
     "react": "19.2.4",
     "react-dom": "19.2.4",
     "sweetalert2": "^11.26.25",
@@ -25,6 +27,7 @@
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
+    "@types/qrcode": "^1.5.6",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",

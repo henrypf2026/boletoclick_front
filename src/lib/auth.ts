@@ -14,7 +14,7 @@ export interface User {
   role?: UserRole;
 
 
-  profileImageUrl?: string;
+  profileImageUrl?: string | null;
   allowNewsletter?: boolean;
 }
 
