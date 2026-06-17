@@ -45,7 +45,7 @@ function AlertIcon() {
 
 function FieldError({ message }: { message: string }) {
   return (
-    <p className="flex items-center gap-1.5 rounded bg-red-50 px-2 py-1 text-sm font-semibold text-red-700 dark:bg-red-950/50 dark:text-red-300">
+    <p className="flex items-center gap-2 border-2 border-red-700 bg-red-600 px-2.5 py-1.5 text-sm font-bold text-white dark:border-red-500 dark:bg-red-600">
       <AlertIcon />
       {message}
     </p>
