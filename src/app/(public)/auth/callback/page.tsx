@@ -3,10 +3,10 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Alert } from 'flowbite-react';
 import { supabase } from '@/lib/supabaseClient';
 import { authService } from '@/services/authService';
 import { saveToken } from '@/lib/auth';
+import { FormAlert } from '@/components/ui/FormField';
 
 export default function AuthCallbackPage() {
   const router = useRouter();
@@ -19,7 +19,6 @@ export default function AuthCallbackPage() {
     const processSession = async (session: { access_token: string }) => {
       if (!mounted || handled) return;
       handled = true;
-
       try {
         const user = await authService.getMe(session.access_token);
         if (!mounted) return;
@@ -28,20 +27,39 @@ export default function AuthCallbackPage() {
           if (mounted) setError('No encontramos una cuenta registrada con ese correo. Registrate primero desde el formulario.');
           return;
         }
-
         saveToken(session.access_token, user.role);
         window.location.href = '/';
       } catch {
-        if (mounted) setError('No se pudo conectar con el servidor. Verifica que el backend esté corriendo en el puerto 3000.');
+        if (mounted) setError('No se pudo conectar con el servidor.');
       }
     };
 
-    // Caso 1: Supabase ya procesó el code antes de que el listener se suscriba
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session) processSession(session);
-    });
+    const run = async () => {
+      // Paso 1: si createBrowserClient ya intercambió el code, la sesión existe
+      const { data: { session: existing } } = await supabase.auth.getSession();
+      if (existing) {
+        processSession(existing);
+        return;
+      }
 
-    // Caso 2: el exchange ocurre después de montar el componente
+      // Paso 2: intercambio explícito del code (más confiable en producción)
+      const code = new URLSearchParams(window.location.search).get('code');
+      if (code) {
+        const { data, error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
+        if (exchangeError) {
+          if (mounted) setError('No se pudo completar el inicio de sesión. Intentá de nuevo.');
+          return;
+        }
+        if (data.session) {
+          processSession(data.session);
+          return;
+        }
+      }
+    };
+
+    run();
+
+    // Respaldo: captura el SIGNED_IN si el exchange ocurre de forma asíncrona
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === 'SIGNED_IN' && session) processSession(session);
     });
@@ -61,7 +79,7 @@ export default function AuthCallbackPage() {
     return (
       <div className="flex min-h-dvh items-center justify-center px-4 py-8 -mx-4 -my-8">
         <div className="flex w-full max-w-md flex-col gap-4 text-center">
-          <Alert color="failure">{error}</Alert>
+          <FormAlert message={error} />
           <Link href="/login" className="text-sm text-primary hover:underline">
             Volver al inicio de sesión
           </Link>
