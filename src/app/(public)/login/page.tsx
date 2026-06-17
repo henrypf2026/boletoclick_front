@@ -37,8 +37,8 @@ function LoginForm() {
     try {
       await login(values);
       router.push(redirectTo);
-    } catch (error) {
-      setStatus((error as Error).message);
+    } catch {
+      setStatus('El correo o la contraseña son incorrectos.');
     } finally {
       setSubmitting(false);
     }
