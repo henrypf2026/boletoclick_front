@@ -4,8 +4,8 @@ import { useState } from 'react';
 import { Formik, Form, type FormikHelpers } from 'formik';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Alert, Button } from 'flowbite-react';
-import { FormCheckbox, FormTextInput } from '@/components/ui/FormField';
+import { Button } from 'flowbite-react';
+import { FormAlert, FormCheckbox, FormTextInput } from '@/components/ui/FormField';
 import { useAuth } from '@/context/AuthContext';
 import { userRegisterSchema, producerRegisterSchema } from '@/validators/authSchemas';
 
@@ -129,7 +129,7 @@ export function RegisterForm() {
             <FormCheckbox name="allowNewsletter" label="Quiero recibir novedades y promociones de BoletoClick" />
             <FormCheckbox name="acceptTerms" label="Acepto los términos y condiciones de BoletoClick" />
 
-            {status && <Alert color="failure">{status}</Alert>}
+            {status && <FormAlert message={status} />}
 
             <Button
               type="submit"

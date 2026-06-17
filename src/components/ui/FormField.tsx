@@ -45,7 +45,7 @@ function AlertIcon() {
 
 function FieldError({ message }: { message: string }) {
   return (
-    <p className="flex items-center gap-2 border-2 border-red-700 bg-red-600 px-2.5 py-1.5 text-sm font-bold text-white dark:border-red-500 dark:bg-red-600">
+    <p className="flex items-center gap-1.5 text-sm font-medium text-red-700 dark:text-red-400">
       <AlertIcon />
       {message}
     </p>
@@ -134,6 +134,19 @@ export function FormTextInput({ label, name, type, showStrength, ...props }: For
       ) : (
         hasError && <FieldError message={meta.error!} />
       )}
+    </div>
+  );
+}
+
+export function FormAlert({ message }: { message: string }) {
+  return (
+    <div className="flex items-start gap-3 border-2 border-red-700 bg-red-600 px-3 py-2.5 shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] dark:border-red-500 dark:shadow-[3px_3px_0px_0px_rgba(255,255,255,0.25)]">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="mt-0.5 shrink-0 text-white" aria-hidden="true">
+        <circle cx="12" cy="12" r="10" />
+        <line x1="12" y1="8" x2="12" y2="12" />
+        <line x1="12" y1="16" x2="12.01" y2="16" />
+      </svg>
+      <p className="text-sm font-bold text-white">{message}</p>
     </div>
   );
 }
