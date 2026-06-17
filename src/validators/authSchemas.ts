@@ -1,5 +1,25 @@
 import * as Yup from 'yup';
 
+const PASSWORD_REGEX = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*(),.?":{}|<>_\-]).+$/;
+const PASSWORD_RULES = Yup.string()
+  .min(8, 'La contraseña debe tener al menos 8 caracteres')
+  .matches(
+    PASSWORD_REGEX,
+    'La contraseña debe contener al menos una mayúscula, una minúscula, un número y un carácter especial',
+  )
+  .required('La contraseña es obligatoria');
+
+function isAdult(value: string | undefined): boolean {
+  if (!value) return false;
+  const birth = new Date(value);
+  if (isNaN(birth.getTime())) return false;
+  const today = new Date();
+  let age = today.getFullYear() - birth.getFullYear();
+  const m = today.getMonth() - birth.getMonth();
+  if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) age--;
+  return age >= 18;
+}
+
 export const loginSchema = Yup.object({
   email: Yup.string()
     .trim()
@@ -16,9 +36,7 @@ export const forgotPasswordSchema = Yup.object({
 });
 
 export const updatePasswordSchema = Yup.object({
-  password: Yup.string()
-    .min(6, 'La contraseña debe tener al menos 6 caracteres')
-    .required('La contraseña es obligatoria'),
+  password: PASSWORD_RULES,
   confirmPassword: Yup.string()
     .oneOf([Yup.ref('password')], 'Las contraseñas no coinciden')
     .required('Confirmá tu contraseña'),
@@ -33,10 +51,10 @@ const baseRegisterSchema = Yup.object({
     .trim()
     .email('Ingresa un correo válido')
     .required('El correo es obligatorio'),
-  birthDate: Yup.string().required('La fecha de nacimiento es obligatoria'),
-  password: Yup.string()
-    .min(6, 'La contraseña debe tener al menos 6 caracteres')
-    .required('La contraseña es obligatoria'),
+  birthDate: Yup.string()
+    .required('La fecha de nacimiento es obligatoria')
+    .test('is-adult', 'Debes ser mayor de 18 años para registrarte', isAdult),
+  password: PASSWORD_RULES,
   confirmPassword: Yup.string()
     .oneOf([Yup.ref('password')], 'Las contraseñas no coinciden')
     .required('Confirma tu contraseña'),
