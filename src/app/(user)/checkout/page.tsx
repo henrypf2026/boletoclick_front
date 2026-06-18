@@ -233,10 +233,8 @@ useEffect(() => {
           Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
-          userId: user.id,
           ticketTypeId,
           quantity,
-          total: totalFinal,
           ...(couponId ? { couponId } : {}),
         }),
       });
