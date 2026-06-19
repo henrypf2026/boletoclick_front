@@ -62,6 +62,8 @@ export default function EventoPage() {
     }
   };
 
+  const isProducer = authenticated && user?.role === 'producer';
+
   const selectedZone = event?.zones.find((zone) => zone.id === zoneId);
   const date = event ? formatEventDate(event.date, event.time) : null;
 
@@ -209,88 +211,115 @@ export default function EventoPage() {
             </div>
           </div>
 
-          {/* Comprar entradas */}
+          {/* Comprar entradas / Vista productor */}
           <div className="border-4 border-border bg-surface p-6 shadow-[4px_4px_0px_0px_rgba(23,23,23,1)] dark:shadow-[4px_4px_0px_0px_rgba(255,255,255,1)] lg:col-span-2">
             <h2 className="mb-5 text-base font-black uppercase tracking-wide text-text">
-              Comprar entradas
+              {isProducer ? 'Entradas' : 'Comprar entradas'}
             </h2>
 
-            <div className="mb-4">
-              <label htmlFor="quantity" className="mb-1.5 block text-[11px] font-black uppercase tracking-widest text-text-soft">
-                Cantidad
-              </label>
-              <select
-                id="quantity"
-                value={quantity}
-                onChange={(e) => setQuantity(Number(e.target.value))}
-                className="w-full border-2 border-border bg-background px-3 py-2.5 text-sm font-bold text-text focus:outline-none focus:border-primary transition-colors"
-              >
-                {[1, 2, 3, 4, 5, 6].map((v) => (
-                  <option key={v} value={v}>{v}</option>
-                ))}
-              </select>
-            </div>
+            {isProducer ? (
+              <div className="flex flex-col gap-4">
+                <div className="border-2 border-border bg-surface-2 p-4">
+                  <p className="text-sm font-bold uppercase tracking-wide text-text">
+                    Zonas disponibles
+                  </p>
+                  {event.zones.length === 0 ? (
+                    <p className="mt-2 text-sm text-text-soft">Sin zonas disponibles</p>
+                  ) : (
+                    <ul className="mt-2 flex flex-col gap-2">
+                      {event.zones.map((zone) => (
+                        <li key={zone.id} className="flex items-center justify-between text-sm">
+                          <span className="text-text-soft">{zone.zone} · {zone.name}</span>
+                          <span className="font-black text-text">{formatPrice(zone.price)}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+                <div className="border-2 border-border bg-surface-2 p-4 text-sm text-text-soft">
+                  <p className="font-black uppercase tracking-wide text-text mb-1">Cuenta productora</p>
+                  Los productores solo pueden visualizar eventos. Para comprar entradas, creá una cuenta de usuario.
+                </div>
+              </div>
+            ) : (
+              <>
+                <div className="mb-4">
+                  <label htmlFor="quantity" className="mb-1.5 block text-[11px] font-black uppercase tracking-widest text-text-soft">
+                    Cantidad
+                  </label>
+                  <select
+                    id="quantity"
+                    value={quantity}
+                    onChange={(e) => setQuantity(Number(e.target.value))}
+                    className="w-full border-2 border-border bg-background px-3 py-2.5 text-sm font-bold text-text focus:outline-none focus:border-primary transition-colors"
+                  >
+                    {[1, 2, 3, 4, 5, 6].map((v) => (
+                      <option key={v} value={v}>{v}</option>
+                    ))}
+                  </select>
+                </div>
 
-            <div className="mb-4">
-              <label htmlFor="zone" className="mb-1.5 block text-[11px] font-black uppercase tracking-widest text-text-soft">
-                Zona / tribuna
-              </label>
-              <select
-                id="zone"
-                value={zoneId}
-                onChange={(e) => setZoneId(e.target.value)}
-                disabled={event.zones.length === 0}
-                className="w-full border-2 border-border bg-background px-3 py-2.5 text-sm font-bold text-text focus:outline-none focus:border-primary transition-colors disabled:opacity-50"
-              >
-                {event.zones.length === 0 ? (
-                  <option value="">Sin zonas disponibles</option>
-                ) : (
-                  event.zones.map((zone) => (
-                    <option key={zone.id} value={zone.id}>
-                      {zone.zone} · {zone.name} · {formatPrice(zone.price)} ({zone.available} disp.)
-                    </option>
-                  ))
+                <div className="mb-4">
+                  <label htmlFor="zone" className="mb-1.5 block text-[11px] font-black uppercase tracking-widest text-text-soft">
+                    Zona / tribuna
+                  </label>
+                  <select
+                    id="zone"
+                    value={zoneId}
+                    onChange={(e) => setZoneId(e.target.value)}
+                    disabled={event.zones.length === 0}
+                    className="w-full border-2 border-border bg-background px-3 py-2.5 text-sm font-bold text-text focus:outline-none focus:border-primary transition-colors disabled:opacity-50"
+                  >
+                    {event.zones.length === 0 ? (
+                      <option value="">Sin zonas disponibles</option>
+                    ) : (
+                      event.zones.map((zone) => (
+                        <option key={zone.id} value={zone.id}>
+                          {zone.zone} · {zone.name} · {formatPrice(zone.price)} ({zone.available} disp.)
+                        </option>
+                      ))
+                    )}
+                  </select>
+                </div>
+
+                <div className="mb-4 flex gap-2">
+                  <p className="mb-4 text-xs font-bold uppercase tracking-wide text-text-soft border-2 border-border bg-surface-2 px-3 py-2.5">
+                    🎟️ ¿Tenés un cupón de descuento? Podés aplicarlo en el siguiente paso
+                  </p>
+                </div>
+
+                <div className="mb-5 flex items-center justify-between border-t-2 border-border pt-4">
+                  <span className="text-sm font-bold uppercase tracking-wide text-text-soft">Total</span>
+                  <strong className="text-2xl font-black text-success">{formatPrice(total)}</strong>
+                </div>
+
+                {message && (
+                  <Alert color="failure" className="mb-4 text-sm">
+                    {message}
+                  </Alert>
                 )}
-              </select>
-            </div>
 
-            <div className="mb-4 flex gap-2">
-              <p className="mb-4 text-xs font-bold uppercase tracking-wide text-text-soft border-2 border-border bg-surface-2 px-3 py-2.5">
-              🎟️ ¿Tenés un cupón de descuento? Podés aplicarlo en el siguiente paso
-            </p>
-            
-            </div>
+                <button
+                  onClick={handlePurchase}
+                  disabled={!selectedZone || event.zones.length === 0}
+                  className="w-full border-4 border-border bg-primary py-3 text-sm font-black uppercase tracking-wider text-background shadow-[4px_4px_0px_0px_rgba(23,23,23,1)] transition-all hover:-translate-y-0.5 hover:shadow-[6px_6px_0px_0px_rgba(23,23,23,1)] active:translate-y-0.5 active:shadow-none disabled:opacity-50 disabled:pointer-events-none dark:shadow-[4px_4px_0px_0px_rgba(255,255,255,1)]"
+                >
+                  {authenticated ? 'Confirmar compra' : 'Iniciá sesión para comprar'}
+                </button>
 
-            <div className="mb-5 flex items-center justify-between border-t-2 border-border pt-4">
-              <span className="text-sm font-bold uppercase tracking-wide text-text-soft">Total</span>
-              <strong className="text-2xl font-black text-success">{formatPrice(total)}</strong>
-            </div>
-
-           {message && (
-              <Alert color="failure" className="mb-4 text-sm">
-                {message}
-              </Alert>
+                <button
+                  onClick={handleToggleFavorite}
+                  disabled={loadingFav}
+                  className={`mt-2 w-full border-2 border-border py-2.5 text-sm font-black uppercase tracking-wider transition-all hover:-translate-y-0.5 disabled:opacity-50 ${
+                    isFavorite
+                      ? "bg-red-500 text-white border-red-500"
+                      : "bg-surface text-text hover:bg-surface-2"
+                  }`}
+                >
+                  {isFavorite ? "♥ Guardado en favoritos" : "♡ Guardar en favoritos"}
+                </button>
+              </>
             )}
-
-            <button
-              onClick={handlePurchase}
-              disabled={!selectedZone || event.zones.length === 0}
-              className="w-full border-4 border-border bg-primary py-3 text-sm font-black uppercase tracking-wider text-background shadow-[4px_4px_0px_0px_rgba(23,23,23,1)] transition-all hover:-translate-y-0.5 hover:shadow-[6px_6px_0px_0px_rgba(23,23,23,1)] active:translate-y-0.5 active:shadow-none disabled:opacity-50 disabled:pointer-events-none dark:shadow-[4px_4px_0px_0px_rgba(255,255,255,1)]"
-            >
-              {authenticated ? 'Confirmar compra' : 'Iniciá sesión para comprar'}
-            </button>
-
-            <button
-              onClick={handleToggleFavorite}
-              disabled={loadingFav}
-              className={`mt-2 w-full border-2 border-border py-2.5 text-sm font-black uppercase tracking-wider transition-all hover:-translate-y-0.5 disabled:opacity-50 ${
-                isFavorite
-                  ? "bg-red-500 text-white border-red-500"
-                  : "bg-surface text-text hover:bg-surface-2"
-              }`}
-            >
-              {isFavorite ? "♥ Guardado en favoritos" : "♡ Guardar en favoritos"}
-            </button>
           </div>
 
         </div>

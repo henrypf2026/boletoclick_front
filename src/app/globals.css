@@ -20,14 +20,14 @@
   --primary: #ccff00;
   --primary-deep: #b3e600;
   --accent: #ffffff;
-  --background: #000000;
-  --bg: #000000;
-  --surface: #121212;
-  --surface-2: #1e1e1e;
+  --background: #1c1c1c;
+  --bg: #1c1c1c;
+  --surface: #3a3a3a;
+  --surface-2: #484848;
   --border: #ffffff;
   --success: #00ff66;
   --text: #ffffff;
-  --text-soft: #a3a3a3;
+  --text-soft: #bebebe;
 }
 
 @theme inline {
