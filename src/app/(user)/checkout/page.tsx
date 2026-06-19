@@ -28,7 +28,8 @@ function CheckoutContent() {
   const ticketTypeId = searchParams.get("ticketTypeId") ?? "";
   const eventId = searchParams.get("eventId") ?? "";
   const ticketTypeName = searchParams.get("nombre") ?? "Entrada";
-  const ticketTypeZone = searchParams.get("tribuna") ?? searchParams.get("zona") ?? "";
+  const ticketTypeZone =
+    searchParams.get("tribuna") ?? searchParams.get("zona") ?? "";
   const ticketTypeLabel = searchParams.get("tipo") ?? ticketTypeName;
   const ticketPrice = Number(searchParams.get("precio") ?? 0);
   const initialQuantity = Number(searchParams.get("cantidad") ?? 1);
@@ -63,47 +64,121 @@ function CheckoutContent() {
     }
   }, [ticketTypeId, eventId, router]);
 
-
+  // Usamos localStorage para persistir `sessionId` y `expiresAt` por ticketType
   useEffect(() => {
-  if (!ticketTypeId) return;
+    if (!ticketTypeId || timerExpired) return;
 
-  const storageKey = `checkout_start_${ticketTypeId}`;
-  const storedStart = sessionStorage.getItem(storageKey);
+    const storageKey = `checkoutSession_${ticketTypeId}`;
 
-  if (!storedStart) {
-    sessionStorage.setItem(storageKey, String(Date.now()));
-  }
-}, [ticketTypeId]);
+    // Si hay una sesión guardada, usamos su expiresAt como referencia
+    const stored =
+      typeof window !== "undefined"
+        ? window.localStorage.getItem(storageKey)
+        : null;
+    if (stored) {
+      try {
+        const parsed = JSON.parse(stored) as {
+          sessionId?: string;
+          expiresAt?: string;
+        };
+        if (parsed?.expiresAt) {
+          const remaining = Math.floor(
+            (new Date(parsed.expiresAt).getTime() - Date.now()) / 1000,
+          );
+          if (remaining <= 0) {
+            if (typeof window !== "undefined")
+              window.localStorage.removeItem(storageKey);
+            setTimerExpired(true);
+            Swal.fire({
+              title: "TIEMPO AGOTADO",
+              text: "Tu reserva expiró. Volvé a seleccionar las entradas.",
+              icon: "warning",
+              confirmButtonText: "VOLVER A EVENTOS",
+              confirmButtonColor: "#6750e0",
+              background: "#f5f4f0",
+              color: "#171717",
+              allowOutsideClick: false,
+            }).then(() => router.push("/eventos"));
+            return;
+          }
+          setTimerSeconds(remaining);
+        }
+      } catch {
+        if (typeof window !== "undefined")
+          window.localStorage.removeItem(storageKey);
+      }
+    }
 
-useEffect(() => {
-  if (!ticketTypeId || timerExpired) return;
+    const interval = setInterval(() => {
+      // Recalcular cada segundo a partir de expiresAt (si existe)
+      const s =
+        typeof window !== "undefined"
+          ? window.localStorage.getItem(storageKey)
+          : null;
+      if (!s) return;
+      try {
+        const p = JSON.parse(s) as { expiresAt?: string };
+        if (!p?.expiresAt) return;
+        const remaining = Math.floor(
+          (new Date(p.expiresAt).getTime() - Date.now()) / 1000,
+        );
+        setTimerSeconds(Math.max(0, remaining));
+        if (remaining <= 0) {
+          clearInterval(interval);
+          if (typeof window !== "undefined")
+            window.localStorage.removeItem(storageKey);
+          setTimerExpired(true);
+          Swal.fire({
+            title: "TIEMPO AGOTADO",
+            text: "Tu reserva expiró. Volvé a seleccionar las entradas.",
+            icon: "warning",
+            confirmButtonText: "VOLVER A EVENTOS",
+            confirmButtonColor: "#6750e0",
+            background: "#f5f4f0",
+            color: "#171717",
+            allowOutsideClick: false,
+          }).then(() => router.push("/eventos"));
+        }
+      } catch {
+        // ignore parse errors
+      }
+    }, 1000);
 
-  const storageKey = `checkout_start_${ticketTypeId}`;
+    return () => clearInterval(interval);
+  }, [ticketTypeId, timerExpired, router]);
 
-  const interval = setInterval(() => {
-    const storedStart = sessionStorage.getItem(storageKey);
-    if (!storedStart) return;
+  const subtotal = ticketPrice * quantity;
+  const totalFinal = Math.max(0, subtotal - discount);
 
-    const startTime = Number(storedStart);
-    const elapsed = Math.floor((Date.now() - startTime) / 1000);
-    const remaining = Math.max(0, TIMER_SECONDS - elapsed);
+  const handleApplyCoupon = async () => {
+    if (!couponCode.trim()) return;
 
-    setTimerSeconds(remaining);
+    try {
+      const coupon = await checkoutService.validateCoupon(couponCode.trim());
 
-    if (remaining === 0) {
-      setTimerExpired(true);
-      sessionStorage.removeItem(storageKey);
-      clearInterval(interval);
+      // Calcular descuento según el tipo
+      let descuento = 0;
+      if (coupon.discountType === "PERCENTAGE") {
+        descuento = Math.round(subtotal * (coupon.discountValue / 100));
+      } else {
+        descuento = coupon.discountValue;
+      }
+
+      setDiscount(descuento);
+      setCouponApplied(true);
+      setCouponId(coupon.id);
 
       Swal.fire({
-        title: "TIEMPO AGOTADO",
-        text: "Tu reserva expiró. Volvé a seleccionar las entradas.",
-        icon: "warning",
-        confirmButtonText: "VOLVER A EVENTOS",
+        title: "CUPÓN APLICADO",
+        text:
+          coupon.discountType === "PERCENTAGE"
+            ? `Descuento del ${coupon.discountValue}%: -$${descuento.toLocaleString("es-MX")}`
+            : `Descuento fijo: -$${descuento.toLocaleString("es-MX")}`,
+        icon: "success",
+        confirmButtonText: "OK",
         confirmButtonColor: "#6750e0",
         background: "#f5f4f0",
         color: "#171717",
-        allowOutsideClick: false,
         customClass: {
           popup:
             "border-4 border-[#171717] rounded-none shadow-[6px_6px_0px_0px_#171717] font-mono",
@@ -111,76 +186,26 @@ useEffect(() => {
           confirmButton:
             "font-mono font-black uppercase tracking-wider border-2 border-[#171717] rounded-none",
         },
-      }).then(() => {
-        router.push("/eventos");
+      });
+    } catch {
+      Swal.fire({
+        title: "CUPÓN INVÁLIDO",
+        text: "El código ingresado no es válido, está vencido o ya fue usado.",
+        icon: "error",
+        confirmButtonText: "REINTENTAR",
+        confirmButtonColor: "#6750e0",
+        background: "#f5f4f0",
+        color: "#171717",
+        customClass: {
+          popup:
+            "border-4 border-[#171717] rounded-none shadow-[6px_6px_0px_0px_#171717] font-mono",
+          title: "uppercase font-black tracking-tighter",
+          confirmButton:
+            "font-mono font-black uppercase tracking-wider border-2 border-[#171717] rounded-none",
+        },
       });
     }
-  }, 1000);
-
-  return () => clearInterval(interval);
-}, [ticketTypeId, timerExpired, router]);
-
-
-
-  const subtotal = ticketPrice * quantity;
-  const totalFinal = Math.max(0, subtotal - discount);
-
-  const handleApplyCoupon = async () => {
-  if (!couponCode.trim()) return;
-
-  try {
-    const coupon = await checkoutService.validateCoupon(couponCode.trim());
-
-    // Calcular descuento según el tipo
-    let descuento = 0;
-    if (coupon.discountType === "PERCENTAGE") {
-      descuento = Math.round(subtotal * (coupon.discountValue / 100));
-    } else {
-      descuento = coupon.discountValue;
-    }
-
-    setDiscount(descuento);
-    setCouponApplied(true);
-    setCouponId(coupon.id);
-
-    Swal.fire({
-      title: "CUPÓN APLICADO",
-      text:
-        coupon.discountType === "PERCENTAGE"
-          ? `Descuento del ${coupon.discountValue}%: -$${descuento.toLocaleString("es-MX")}`
-          : `Descuento fijo: -$${descuento.toLocaleString("es-MX")}`,
-      icon: "success",
-      confirmButtonText: "OK",
-      confirmButtonColor: "#6750e0",
-      background: "#f5f4f0",
-      color: "#171717",
-      customClass: {
-        popup:
-          "border-4 border-[#171717] rounded-none shadow-[6px_6px_0px_0px_#171717] font-mono",
-        title: "uppercase font-black tracking-tighter",
-        confirmButton:
-          "font-mono font-black uppercase tracking-wider border-2 border-[#171717] rounded-none",
-      },
-    });
-  } catch {
-    Swal.fire({
-      title: "CUPÓN INVÁLIDO",
-      text: "El código ingresado no es válido, está vencido o ya fue usado.",
-      icon: "error",
-      confirmButtonText: "REINTENTAR",
-      confirmButtonColor: "#6750e0",
-      background: "#f5f4f0",
-      color: "#171717",
-      customClass: {
-        popup:
-          "border-4 border-[#171717] rounded-none shadow-[6px_6px_0px_0px_#171717] font-mono",
-        title: "uppercase font-black tracking-tighter",
-        confirmButton:
-          "font-mono font-black uppercase tracking-wider border-2 border-[#171717] rounded-none",
-      },
-    });
-  }
-};
+  };
 
   const handlePurchase = useCallback(async () => {
     if (!user || timerExpired) return;
@@ -256,14 +281,28 @@ useEffect(() => {
         throw new Error("Stripe no devolvió una URL de pago");
       }
 
+      // Guardar sessionId y expiresAt para sobrevivir refresh y usar el countdown del server
+      try {
+        if (typeof window !== "undefined") {
+          const storageKey = `checkoutSession_${ticketTypeId}`;
+          window.localStorage.setItem(
+            storageKey,
+            JSON.stringify({
+              sessionId: session.sessionId,
+              expiresAt: session.expiresAt,
+            }),
+          );
+        }
+      } catch {
+        // no bloquear por errores de storage
+      }
+
       window.location.href = session.url;
     } catch (error) {
       Swal.fire({
         title: "ERROR",
         text:
-          error instanceof Error
-            ? error.message
-            : "No se pudo iniciar el pago",
+          error instanceof Error ? error.message : "No se pudo iniciar el pago",
         icon: "error",
       });
     } finally {

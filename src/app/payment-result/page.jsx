@@ -1,21 +1,25 @@
-'use client';
+"use client";
 
-import { useSearchParams, useRouter } from 'next/navigation';
-import { useEffect, useState, Suspense } from 'react';
-import Link from 'next/link';
-import { useAuth } from '@/context/AuthContext';
-import { clearPendingPurchase, readPendingPurchase } from '@/lib/pendingPurchase';
-import { ticketService } from '@/services/ticketService';
+import { useSearchParams, useRouter } from "next/navigation";
+import { useEffect, useState, Suspense } from "react";
+import Link from "next/link";
+import { useAuth } from "@/context/AuthContext";
+import { getToken } from "@/lib/auth";
+import {
+  clearPendingPurchase,
+  readPendingPurchase,
+} from "@/lib/pendingPurchase";
+import { ticketService } from "@/services/ticketService";
 
 function PaymentResultContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const { user } = useAuth();
 
-  const status = searchParams.get('status');
-  const sessionId = searchParams.get('session_id');
+  const status = searchParams.get("status");
+  const sessionId = searchParams.get("session_id");
 
-  const isSuccess = status === 'success';
+  const isSuccess = status === "success";
 
   const [verified, setVerified] = useState(false);
   const [checkingPayment, setCheckingPayment] = useState(true);
@@ -24,31 +28,75 @@ function PaymentResultContent() {
 
   useEffect(() => {
     async function verifyPayment() {
-      try {
-        if (status !== 'success') {
-          setVerified(false);
-          setCheckingPayment(false);
-          return;
-        }
-
-        if (!sessionId) {
-          setVerified(false);
-          setCheckingPayment(false);
-          return;
-        }
-
-        const response = await fetch(`/api/backend/payments/verify/${sessionId}`);
-
-        if (!response.ok) {
-          throw new Error();
-        }
-
-        const data = await response.json();
-        setVerified(data.valid);
-      } catch {
+      if (status !== "success") {
         setVerified(false);
-      } finally {
         setCheckingPayment(false);
+        return;
+      }
+
+      let sessionToVerify = sessionId;
+      if (!sessionToVerify && typeof window !== "undefined") {
+        const fallbackKey = Object.keys(window.localStorage).find((k) =>
+          k.startsWith("checkoutSession_"),
+        );
+        if (fallbackKey) {
+          try {
+            const stored = JSON.parse(window.localStorage.getItem(fallbackKey));
+            if (stored?.sessionId) sessionToVerify = stored.sessionId;
+          } catch {
+            // ignore parse issues
+          }
+        }
+      }
+
+      if (!sessionToVerify) {
+        setVerified(false);
+        setCheckingPayment(false);
+        return;
+      }
+
+      const maxAttempts = 8;
+      let attempt = 0;
+      let valid = false;
+
+      while (attempt < maxAttempts && !valid) {
+        try {
+          const token = getToken();
+          const response = await fetch(
+            `/api/backend/payments/verify/${sessionToVerify}`,
+            {
+              headers: {
+                Authorization: `Bearer ${token}`,
+              },
+            },
+          );
+
+          if (response.ok) {
+            const data = await response.json();
+            valid = data.valid === true;
+            if (valid) {
+              setVerified(true);
+              break;
+            }
+          }
+        } catch {
+          // Ignorar error y reintentar
+        }
+
+        attempt += 1;
+        if (attempt < maxAttempts) {
+          await new Promise((resolve) => setTimeout(resolve, 1000));
+        }
+      }
+
+      setVerified(valid);
+      setCheckingPayment(false);
+
+      if (!valid && typeof window !== "undefined") {
+        Object.keys(window.localStorage).forEach((k) => {
+          if (k.startsWith("checkoutSession_"))
+            window.localStorage.removeItem(k);
+        });
       }
     }
 
@@ -72,10 +120,24 @@ function PaymentResultContent() {
       .then(() => {
         if (!active) return;
         clearPendingPurchase();
+        // limpiar localStorage de la sesión del checkout
+        if (typeof window !== "undefined") {
+          Object.keys(window.localStorage).forEach((k) => {
+            if (k.startsWith("checkoutSession_"))
+              window.localStorage.removeItem(k);
+          });
+        }
         setQrReady(true);
       })
       .catch(() => {
         if (!active) return;
+        // limpiar por si quedó algo pendiente
+        if (typeof window !== "undefined") {
+          Object.keys(window.localStorage).forEach((k) => {
+            if (k.startsWith("checkoutSession_"))
+              window.localStorage.removeItem(k);
+          });
+        }
         setQrReady(true);
       })
       .finally(() => {
@@ -87,7 +149,7 @@ function PaymentResultContent() {
     };
   }, [verified, user, qrReady]);
 
-  if (!status || !['success', 'failed'].includes(status)) {
+  if (!status || !["success", "failed"].includes(status)) {
     return (
       <div className="flex min-h-screen items-center justify-center">
         Ruta no válida
@@ -98,12 +160,12 @@ function PaymentResultContent() {
   if (checkingPayment || generatingQr) {
     return (
       <div className="flex min-h-screen items-center justify-center">
-        {checkingPayment ? 'Verificando pago...' : 'Generando tu QR...'}
+        {checkingPayment ? "Verificando pago..." : "Generando tu QR..."}
       </div>
     );
   }
 
-  if (!checkingPayment && status === 'success' && !verified) {
+  if (!checkingPayment && status === "success" && !verified) {
     return (
       <div className="flex min-h-screen items-center justify-center">
         Pago no válido
@@ -153,13 +215,13 @@ function PaymentResultContent() {
             </div>
 
             <h1 className="text-3xl font-black uppercase tracking-tight text-text">
-              {isSuccess ? 'Compra realizada' : 'Pago no completado'}
+              {isSuccess ? "Compra realizada" : "Pago no completado"}
             </h1>
 
             <p className="mt-3 text-text-soft">
               {isSuccess
-                ? 'Tu pago fue confirmado. Tu QR ya está disponible en Mis Entradas.'
-                : 'Hubo un problema al procesar el pago.'}
+                ? "Tu pago fue confirmado. Tu QR ya está disponible en Mis Entradas."
+                : "Hubo un problema al procesar el pago."}
             </p>
           </div>
 
@@ -189,7 +251,7 @@ function PaymentResultContent() {
             {isSuccess && (
               <button
                 type="button"
-                onClick={() => router.push('/mis-tickets')}
+                onClick={() => router.push("/mis-tickets")}
                 className="rounded-lg bg-primary px-6 py-3 font-bold text-white"
               >
                 Ver mis tickets
