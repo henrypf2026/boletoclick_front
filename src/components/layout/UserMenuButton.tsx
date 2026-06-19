@@ -45,7 +45,7 @@ export default function UserMenuButton() {
         )}
         <button
           onClick={handleLogout}
-          className="flex items-center h-9 px-3 text-sm font-bold text-text border-2 border-border hover:bg-surface-2 transition-colors duration-100 whitespace-nowrap"
+          className="flex items-center h-9 px-3 text-sm font-black whitespace-nowrap border-2 border-border bg-primary text-background shadow-[2px_2px_0px_0px_rgba(23,23,23,1)] transition-all duration-100 hover:-translate-y-px hover:shadow-[3px_3px_0px_0px_rgba(23,23,23,1)] dark:shadow-[2px_2px_0px_0px_rgba(255,255,255,1)]"
         >
           Salir
         </button>
