@@ -18,7 +18,11 @@ function PaymentResultContent() {
 
   const status = searchParams.get("status");
   const sessionId = searchParams.get("session_id");
+  const ticketTypeId = searchParams.get("ticketTypeId");
+  const quantity = searchParams.get("cantidad");
 
+  console.log({ticketTypeId, quantity});
+  
   const isSuccess = status === "success";
 
   const [verified, setVerified] = useState(false);
@@ -28,7 +32,43 @@ function PaymentResultContent() {
 
   useEffect(() => {
     async function verifyPayment() {
-      if (status !== "success") {
+      try {
+        if (status !== "success") {
+          setVerified(false);
+          setCheckingPayment(false);
+          return;
+        }
+
+        if (!sessionId) {
+          setVerified(false);
+          setCheckingPayment(false);
+          return;
+        }
+
+        const response = await fetch("/api/backend/payments/verify", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            // Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            ticketTypeId,
+            quantity,
+            sessionId,
+          }),
+        });
+
+        // const response = await fetch(
+        //   `/api/backend/payments/verify/${sessionId}`,
+        // );
+
+        if (!response.ok) {
+          throw new Error();
+        }
+
+        const data = await response.json();
+        setVerified(data.valid);
+      } catch {
         setVerified(false);
         setCheckingPayment(false);
         return;
