@@ -18,11 +18,7 @@ function PaymentResultContent() {
 
   const status = searchParams.get("status");
   const sessionId = searchParams.get("session_id");
-  const ticketTypeId = searchParams.get("ticketTypeId");
-  const quantity = searchParams.get("cantidad");
 
-  console.log({ticketTypeId, quantity});
-  
   const isSuccess = status === "success";
 
   const [verified, setVerified] = useState(false);
@@ -30,118 +26,118 @@ function PaymentResultContent() {
   const [generatingQr, setGeneratingQr] = useState(false);
   const [qrReady, setQrReady] = useState(false);
 
-  useEffect(() => {
-    async function verifyPayment() {
-      try {
-        if (status !== "success") {
-          setVerified(false);
-          setCheckingPayment(false);
-          return;
-        }
+ useEffect(() => {
+  const controller = new AbortController();
+  const signal = controller.signal;
 
-        if (!sessionId) {
-          setVerified(false);
-          setCheckingPayment(false);
-          return;
-        }
-
-        const response = await fetch("/api/backend/payments/verify", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            // Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({
-            ticketTypeId,
-            quantity,
-            sessionId,
-          }),
-        });
-
-        // const response = await fetch(
-        //   `/api/backend/payments/verify/${sessionId}`,
-        // );
-
-        if (!response.ok) {
-          throw new Error();
-        }
-
-        const data = await response.json();
-        setVerified(data.valid);
-      } catch {
-        setVerified(false);
-        setCheckingPayment(false);
-        return;
-      }
-
-      let sessionToVerify = sessionId;
-      if (!sessionToVerify && typeof window !== "undefined") {
-        const fallbackKey = Object.keys(window.localStorage).find((k) =>
-          k.startsWith("checkoutSession_"),
-        );
-        if (fallbackKey) {
-          try {
-            const stored = JSON.parse(window.localStorage.getItem(fallbackKey));
-            if (stored?.sessionId) sessionToVerify = stored.sessionId;
-          } catch {
-            // ignore parse issues
-          }
-        }
-      }
-
-      if (!sessionToVerify) {
-        setVerified(false);
-        setCheckingPayment(false);
-        return;
-      }
-
-      const maxAttempts = 8;
-      let attempt = 0;
-      let valid = false;
-
-      while (attempt < maxAttempts && !valid) {
-        try {
-          const token = getToken();
-          const response = await fetch(
-            `/api/backend/payments/verify/${sessionToVerify}`,
-            {
-              headers: {
-                Authorization: `Bearer ${token}`,
-              },
-            },
-          );
-
-          if (response.ok) {
-            const data = await response.json();
-            valid = data.valid === true;
-            if (valid) {
-              setVerified(true);
-              break;
-            }
-          }
-        } catch {
-          // Ignorar error y reintentar
-        }
-
-        attempt += 1;
-        if (attempt < maxAttempts) {
-          await new Promise((resolve) => setTimeout(resolve, 1000));
-        }
-      }
-
-      setVerified(valid);
+  async function verifyPayment() {
+    // 1. Validaciones iniciales tempranas
+    if (status !== "success") {
+      setVerified(false);
       setCheckingPayment(false);
+      return;
+    }
 
-      if (!valid && typeof window !== "undefined") {
-        Object.keys(window.localStorage).forEach((k) => {
-          if (k.startsWith("checkoutSession_"))
-            window.localStorage.removeItem(k);
-        });
+    // 2. Resolver el sessionId (Parámetro o Fallback de localStorage)
+    let sessionToVerify = sessionId;
+    
+    if (!sessionToVerify && typeof window !== "undefined") {
+      const fallbackKey = Object.keys(window.localStorage).find((k) =>
+        k.startsWith("checkoutSession_"),
+      );
+      if (fallbackKey) {
+        try {
+          const stored = JSON.parse(window.localStorage.getItem(fallbackKey) || "{}");
+          if (stored?.sessionId) sessionToVerify = stored.sessionId;
+        } catch {
+          // Ignorar errores de parseo
+        }
       }
     }
 
-    verifyPayment();
-  }, [sessionId, status]);
+    // Si después del fallback no hay sesión, salir
+    if (!sessionToVerify) {
+      setVerified(false);
+      setCheckingPayment(false);
+      return;
+    }
+
+    // 3. Configuración del ciclo de reintentos (Polling)
+    const maxAttempts = 8;
+    let attempt = 0;
+    let valid = false;
+
+    while (attempt < maxAttempts && !valid) {
+      // IMPORTANTE: Si React canceló este efecto, detenemos el bucle inmediatamente
+      if (signal.aborted) return;
+
+      try {
+        const token = getToken();
+        const response = await fetch(
+          `/api/backend/payments/verify/${sessionToVerify}`,
+          {
+            signal, // 🔴 Conectado para cancelar peticiones en vuelo
+            headers: {
+              Authorization: `Bearer ${token}`,
+              'Content-Type': 'application/json'
+            },
+          }
+        );
+
+        if (response.ok) {
+          const data = await response.json();
+          valid = data.valid === true;
+          if (valid) {
+            setVerified(true);
+            break; // Rompe el ciclo si ya es válido
+          }
+        }
+      } catch (error) {
+        // Si el error fue provocado por el aborto manual, salimos silenciosamente
+        if (error.name === 'AbortError') return;
+        // Otros errores (red, 500, etc) se ignoran para permitir el reintento
+      }
+
+      attempt += 1;
+      
+      if (attempt < maxAttempts && !valid) {
+        try {
+          // Esperar 1 segundo antes del próximo intento (sensible al aborto)
+          await new Promise((resolve, reject) => {
+            const timeout = setTimeout(resolve, 1000);
+            signal.addEventListener('abort', () => {
+              clearTimeout(timeout);
+              reject(new DOMException('Aborted', 'AbortError'));
+            });
+          });
+        } catch {
+          return; // Salir si se abortó durante la espera
+        }
+      }
+    }
+
+    // 4. Estados finales del procesamiento
+    if (!signal.aborted) {
+      setVerified(valid);
+      setCheckingPayment(false);
+
+      // Limpieza de localStorage si fallaron todos los intentos
+      if (!valid && typeof window !== "undefined") {
+        Object.keys(window.localStorage).forEach((k) => {
+          if (k.startsWith("checkoutSession_")) {
+            window.localStorage.removeItem(k);
+          }
+        });
+      }
+    }
+  }
+
+  verifyPayment();
+
+  // Limpieza de React: Cancela peticiones en vuelo y activa signal.aborted
+  return () => controller.abort();
+}, [sessionId, status]);
+
 
   useEffect(() => {
     if (!verified || !user || qrReady) return;
