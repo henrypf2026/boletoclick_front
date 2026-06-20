@@ -3,14 +3,18 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Alert, Button } from 'flowbite-react';
 import CategoryFilter from '@/components/ui/CategoryFilter';
+import CountryEventsBanner from '@/components/ui/CountryEventsBanner';
 import EventCard from '@/components/ui/EventCard';
 import EventGrid from '@/components/ui/EventGrid';
+import { useCountryFilter } from '@/context/CountryFilterContext';
+import { filterEventsByCountry } from '@/lib/geo/country';
 import { type Event } from '@/mocks/events';
 import { eventService, type CategoryOption } from '@/services/eventService';
 
 const ALL_CATEGORY: CategoryOption = { id: 'all', label: 'Todos' };
 
 export default function EventosPage() {
+  const { userCountry, showAllEvents } = useCountryFilter();
   const [search, setSearch] = useState('');
   const [category, setCategory] = useState('all');
   const [events, setEvents] = useState<Event[]>([]);
@@ -58,9 +62,14 @@ export default function EventosPage() {
     };
   }, [loadEvents, reloadKey]);
 
+  const countryFilteredEvents = useMemo(
+    () => filterEventsByCountry(events, userCountry, showAllEvents),
+    [events, userCountry, showAllEvents],
+  );
+
   const filteredEvents = useMemo(() => {
     const query = search.trim().toLowerCase();
-    return events.filter((event) => {
+    return countryFilteredEvents.filter((event) => {
       const matchesCategory = category === 'all' || event.category === category;
       const matchesSearch =
         !query ||
@@ -70,7 +79,7 @@ export default function EventosPage() {
         event.city.toLowerCase().includes(query);
       return matchesCategory && matchesSearch;
     });
-  }, [search, category, events]);
+  }, [search, category, countryFilteredEvents]);
 
   const featuredEvents = filteredEvents.filter((e) => e.featured);
   const upcomingEvents = filteredEvents.filter((e) => !e.featured);
@@ -89,6 +98,8 @@ export default function EventosPage() {
       </div>
 
       <div className="mx-auto max-w-6xl px-4 pb-8 pt-6">
+        <CountryEventsBanner />
+
         <section className="mb-6 space-y-4">
           <input
             type="text"

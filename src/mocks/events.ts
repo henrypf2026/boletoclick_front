@@ -49,6 +49,7 @@ export interface Event {
   address?: string;
   capacity?: number;
   coordinates: EventCoordinates;
+  country: "MX" | "CO" | "AR" | null;
   date: string;
   time: string;
   priceFrom: number;
@@ -70,6 +71,7 @@ export const events: Event[] = [
     venue: 'Estadio Ciudad de los Deportes',
     city: 'CDMX',
     coordinates: { lat: 19.3974, lng: -99.1794 },
+    country: 'MX',
     date: '2026-05-30',
     time: '21:00',
     priceFrom: 500,
@@ -91,6 +93,7 @@ export const events: Event[] = [
     venue: 'Estadio Azteca',
     city: 'CDMX',
     coordinates: { lat: 19.3029, lng: -99.1506 },
+    country: 'MX',
     date: '2026-06-05',
     time: '19:00',
     priceFrom: 450,
@@ -112,6 +115,7 @@ export const events: Event[] = [
     venue: 'Arena CDMX',
     city: 'CDMX',
     coordinates: { lat: 19.4326, lng: -99.1332 },
+    country: 'MX',
     date: '2026-06-06',
     time: '23:00',
     priceFrom: 350,
@@ -132,6 +136,7 @@ export const events: Event[] = [
     venue: 'Foro Sol',
     city: 'CDMX',
     coordinates: { lat: 19.4052, lng: -99.0907 },
+    country: 'MX',
     date: '2026-06-12',
     time: '20:30',
     priceFrom: 890,
@@ -153,6 +158,7 @@ export const events: Event[] = [
     venue: 'Estadio Akron',
     city: 'Guadalajara',
     coordinates: { lat: 20.6818, lng: -103.4624 },
+    country: 'MX',
     date: '2026-06-14',
     time: '19:06',
     priceFrom: 280,
@@ -173,6 +179,7 @@ export const events: Event[] = [
     venue: 'Teatro Metropolitan',
     city: 'CDMX',
     coordinates: { lat: 19.43, lng: -99.14 },
+    country: 'MX',
     date: '2026-06-19',
     time: '23:00',
     priceFrom: 420,

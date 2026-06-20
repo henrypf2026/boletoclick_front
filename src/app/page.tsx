@@ -3,7 +3,10 @@
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import EventCard from '@/components/ui/EventCard';
+import CountryEventsBanner from '@/components/ui/CountryEventsBanner';
 import { type Event } from '@/mocks/events';
+import { useCountryFilter } from '@/context/CountryFilterContext';
+import { filterEventsByCountry } from '@/lib/geo/country';
 import { eventService } from '@/services/eventService';
 import { useAuth } from '@/context/AuthContext';
 
@@ -49,6 +52,8 @@ function TicketDecoration() {
 
 export default function HomePage() {
   const { authenticated } = useAuth();
+  const { userCountry, showAllEvents } = useCountryFilter();
+  const [events, setEvents] = useState<Event[]>([]);
   const [featured, setFeatured] = useState<Event[]>([]);
   const [loadingEvents, setLoadingEvents] = useState(true);
   const [heroReady, setHeroReady] = useState(false);
@@ -66,13 +71,18 @@ export default function HomePage() {
     eventService.getEvents()
       .then((data) => {
         if (!active) return;
-        const feat = data.filter((e) => e.featured);
-        setFeatured((feat.length >= 3 ? feat : data).slice(0, 3));
+        setEvents(data);
       })
       .catch(() => {})
       .finally(() => { if (active) setLoadingEvents(false); });
     return () => { active = false; };
   }, []);
+
+  useEffect(() => {
+    const visibleEvents = filterEventsByCountry(events, userCountry, showAllEvents);
+    const feat = visibleEvents.filter((e) => e.featured);
+    setFeatured((feat.length >= 3 ? feat : visibleEvents).slice(0, 3));
+  }, [events, userCountry, showAllEvents]);
 
   return (
     <div className="min-h-dvh -my-8 overflow-x-hidden">
@@ -171,6 +181,8 @@ export default function HomePage() {
         className="border-b-4 border-border px-4 py-12 md:py-16"
       >
         <div className="mx-auto max-w-6xl">
+          <CountryEventsBanner />
+
           <div
             className="mb-8 flex flex-col gap-2 transition-all duration-600 sm:flex-row sm:items-end sm:justify-between"
             style={{
