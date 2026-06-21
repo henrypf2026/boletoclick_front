@@ -8,6 +8,8 @@ export interface Usuario {
   rol: "USER" | "PRODUCER" | "ADMIN";
   estado: "ACTIVO" | "SUSPENDIDO";
   fechaRegistro: string;
+  motivoSuspension?: string;
+  suspendidoHasta?: string;
 }
 
 export interface EventoPendiente {
@@ -76,6 +78,8 @@ export function AdminProvider({ children }: { children: React.ReactNode }) {
       rol: "USER",
       estado: "SUSPENDIDO",
       fechaRegistro: "2026-05-12",
+      motivoSuspension: "Violación de términos de servicio",
+      suspendidoHasta: "2026-11-12",
     },
     {
       id: 5,
