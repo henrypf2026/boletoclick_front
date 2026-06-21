@@ -80,6 +80,10 @@ p {
   line-height: 1.5;
 }
 
+[data-show="false"] {
+  display: none !important;
+}
+
 .neo-box {
   background-color: var(--surface);
   border: 4px solid var(--border);
