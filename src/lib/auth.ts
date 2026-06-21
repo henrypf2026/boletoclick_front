@@ -5,6 +5,7 @@ import type { UserRole } from '@/types';
 
 const TOKEN_KEY = 'auth_token';
 const ROLE_KEY = 'user_role';
+const TICKETS_KEY = 'boletoclick_tickets';
 const COOKIE_MAX_AGE = 60 * 60 * 24 * 7; // 7 días
 
 export interface User {
@@ -50,6 +51,11 @@ export function saveToken(token: string, role?: UserRole): void {
 export function clearToken(): void {
   localStorage.removeItem(TOKEN_KEY);
   localStorage.removeItem(ROLE_KEY);
+  localStorage.removeItem(TICKETS_KEY);
+  localStorage.removeItem('boletoclick_purchased_tickets');
+  Object.keys(localStorage)
+    .filter((key) => key.startsWith('checkoutSession_'))
+    .forEach((key) => localStorage.removeItem(key));
   document.cookie = `${TOKEN_KEY}=; path=/; max-age=0`;
   document.cookie = `${ROLE_KEY}=; path=/; max-age=0`;
 }
@@ -71,8 +77,6 @@ export async function getUserFromToken(): Promise<User | null> {
 }
 
 // --- Tickets (mock hasta Sprint 2) ---
-
-const TICKETS_KEY = 'boletoclick_tickets';
 
 export function getTicketsByUser(userId: string): Ticket[] {
   const raw = localStorage.getItem(TICKETS_KEY);
