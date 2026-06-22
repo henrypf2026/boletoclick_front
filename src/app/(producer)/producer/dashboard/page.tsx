@@ -30,6 +30,11 @@ interface Acceso {
   estado: "VALIDO" | "INVALIDO";
 }
 
+interface ApiItem {
+  id: string;
+  name: string;
+}
+
 export default function DashboardProducer() {
   const router = useRouter();
 
@@ -57,26 +62,18 @@ export default function DashboardProducer() {
   const [formTicketTypes, setFormTicketTypes] = useState<TicketType[]>([]);
 
   const [loadingAccion, setLoadingAccion] = useState<boolean>(false);
+  const [categorias, setCategorias] = useState<ApiItem[]>([]);
+  const [locaciones, setLocaciones] = useState<ApiItem[]>([]);
 
   useEffect(() => {
     const fetchEventosProductor = async () => {
       try {
         setLoading(true);
-        const rawToken = localStorage.getItem("auth_token");
 
-        if (!rawToken) {
-          throw new Error("No se encontró token de autenticación.");
-        }
-
-        const cleanToken = rawToken.replace(/['"]+/g, "");
-
-        // 🎯 Se corrigió la URL agregando '/producer' para consultar el endpoint filtrado del backend
         const response = await fetch("/api/backend/events/producer", {
           method: "GET",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${cleanToken}`,
-          },
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
         });
 
         if (!response.ok) {
@@ -95,6 +92,18 @@ export default function DashboardProducer() {
     };
 
     fetchEventosProductor();
+  }, []);
+
+  useEffect(() => {
+    const cargarDesplegables = async () => {
+      const [resCat, resVen] = await Promise.all([
+        fetch("/api/backend/categories").catch(() => null),
+        fetch("/api/backend/venues").catch(() => null),
+      ]);
+      if (resCat?.ok) setCategorias(await resCat.json());
+      if (resVen?.ok) setLocaciones(await resVen.json());
+    };
+    cargarDesplegables();
   }, []);
 
   const seleccionarEvento = (ev: Evento) => {
@@ -116,7 +125,6 @@ export default function DashboardProducer() {
       setFormCategory((ev.category as string) || "");
     }
 
-    // Copia profunda mapeando los objetos para romper la referencia de memoria
     setFormTicketTypes(
       ev.ticketTypes ? ev.ticketTypes.map((t) => ({ ...t })) : [],
     );
@@ -150,7 +158,7 @@ export default function DashboardProducer() {
       if (vendidos > 0) {
         if (original && original.price !== Number(modificado.price)) {
           alert(
-            `Error de Seguridad: No podés cambiar el precio de "${modificado.name}" because ya tiene ${vendidos} entradas vendidas.`,
+            `Error de Seguridad: No podés cambiar el precio de "${modificado.name}" porque ya tiene ${vendidos} entradas vendidas.`,
           );
           return;
         }
@@ -166,17 +174,12 @@ export default function DashboardProducer() {
     setLoadingAccion(true);
 
     try {
-      const rawToken = localStorage.getItem("auth_token");
-      if (!rawToken)
-        throw new Error(
-          "Sesión expirada. Por favor, reingresá a la aplicación.",
-        );
-      const cleanToken = rawToken.replace(/['"]+/g, "");
-
       const payloadDto = {
         title: formTitle,
         description: formDescription,
-        eventDate: formDate ? new Date(formDate).toISOString() : undefined,
+        eventDate: formDate
+          ? new Date(`${formDate}T12:00:00`).toISOString()
+          : undefined,
         ticketTypes: formTicketTypes.map((ticket) => ({
           name: ticket.name,
           zone: ticket.zone || ticket.name,
@@ -189,10 +192,8 @@ export default function DashboardProducer() {
         `/api/backend/events/${eventoSeleccionado.id}`,
         {
           method: "PATCH",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${cleanToken}`,
-          },
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
           body: JSON.stringify(payloadDto),
         },
       );
@@ -240,20 +241,10 @@ export default function DashboardProducer() {
     setLoadingAccion(true);
 
     try {
-      const rawToken = localStorage.getItem("auth_token");
-      if (!rawToken)
-        throw new Error(
-          "No se encontró sesión activa. Por favor, reingresá a la app.",
-        );
-
-      const cleanToken = rawToken.replace(/['"]+/g, "");
-
       const response = await fetch(`/api/backend/events/${idABorrar}`, {
         method: "DELETE",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${cleanToken}`,
-        },
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
       });
 
       if (!response.ok) {
@@ -279,7 +270,6 @@ export default function DashboardProducer() {
 
   const esConcluido = eventoSeleccionado?.status === "CONCLUIDO";
 
-  // Optimización con useMemo para evitar recálculos innecesarios al tipear
   const capacidadTotalPantalla = useMemo(() => {
     return formTicketTypes.reduce(
       (acc, curr) => acc + (Number(curr.stock) || 0),
@@ -295,6 +285,12 @@ export default function DashboardProducer() {
           className="px-4 py-2 bg-accent text-black border-2 border-text font-mono text-xs font-black uppercase tracking-wider hover:translate-x-0.5 hover:translate-y-0.5 transition-all shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] hover:shadow-none"
         >
           ➕ Crear Nuevo Evento
+        </button>
+        <button
+          onClick={() => router.push("/producer/venues/crear")}
+          className="px-4 py-2 bg-background text-text border-2 border-text font-mono text-xs font-black uppercase tracking-wider hover:translate-x-0.5 hover:translate-y-0.5 transition-all shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] hover:shadow-none"
+        >
+          📍 Registrar Venue
         </button>
         <button
           onClick={() => router.push("/producer/bank-accounts")}
@@ -395,18 +391,12 @@ export default function DashboardProducer() {
             >
               🛠️ Ajustes Avanzados
             </button>
+
             <button
-              disabled={!eventoSeleccionado || esConcluido}
-              onClick={() => setSeccionActiva("scanner")}
-              className={`px-4 py-2 font-mono text-xs font-black uppercase border-2 border-text ${
-                !eventoSeleccionado || esConcluido
-                  ? "opacity-30"
-                  : seccionActiva === "scanner"
-                    ? "bg-text text-surface"
-                    : "bg-surface"
-              }`}
+              onClick={() => router.push("/producer/scanner")}
+              className="px-4 py-2 bg-surface text-text font-mono text-xs font-black uppercase border-2 border-text hover:shadow-[2px_2px_0px_0px_var(--color-text)] hover:translate-x-0.5 hover:translate-y-0.5 transition-all"
             >
-              📷 Scanner
+              📷 Scanner General
             </button>
           </div>
 
@@ -443,12 +433,18 @@ export default function DashboardProducer() {
                       <label className="text-[10px] font-mono font-bold uppercase text-text-soft">
                         Categoría del Show
                       </label>
-                      <input
-                        type="text"
+                      <select
                         value={formCategory}
                         onChange={(e) => setFormCategory(e.target.value)}
                         className="w-full border-2 border-text p-2 bg-background font-bold text-xs uppercase shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] focus:outline-none"
-                      />
+                      >
+                        <option value="">-- Seleccioná Categoría --</option>
+                        {categorias.map((cat) => (
+                          <option key={cat.id} value={cat.id}>
+                            {cat.name}
+                          </option>
+                        ))}
+                      </select>
                     </div>
                   </div>
 
@@ -468,12 +464,18 @@ export default function DashboardProducer() {
                       <label className="text-[10px] font-mono font-bold uppercase text-text-soft">
                         Locación / Estadio
                       </label>
-                      <input
-                        type="text"
+                      <select
                         value={formLocation}
                         onChange={(e) => setFormLocation(e.target.value)}
                         className="w-full border-2 border-text p-2 bg-background font-bold text-xs uppercase shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] focus:outline-none"
-                      />
+                      >
+                        <option value="">-- Seleccioná Lugar --</option>
+                        {locaciones.map((ven) => (
+                          <option key={ven.id} value={ven.id}>
+                            {ven.name}
+                          </option>
+                        ))}
+                      </select>
                     </div>
                   </div>
 
@@ -541,15 +543,15 @@ export default function DashboardProducer() {
                                 </label>
                                 <input
                                   type="number"
-                                  value={ticket.price}
+                                  value={ticket.price === 0 ? "" : ticket.price}
                                   disabled={tieneVentas}
-                                  onChange={(e) =>
-                                    handleTicketTypeChange(
-                                      idx,
-                                      "price",
-                                      Number(e.target.value),
-                                    )
-                                  }
+                                  onChange={(e) => {
+                                    const val =
+                                      e.target.value === ""
+                                        ? 0
+                                        : Number(e.target.value);
+                                    handleTicketTypeChange(idx, "price", val);
+                                  }}
                                   className="w-full border border-text p-1.5 bg-background font-mono text-xs disabled:opacity-50 disabled:bg-surface"
                                 />
                               </div>
@@ -560,15 +562,15 @@ export default function DashboardProducer() {
                                 </label>
                                 <input
                                   type="number"
-                                  value={ticket.stock}
+                                  value={ticket.stock === 0 ? "" : ticket.stock}
                                   min={entradasVendidas}
-                                  onChange={(e) =>
-                                    handleTicketTypeChange(
-                                      idx,
-                                      "stock",
-                                      Number(e.target.value),
-                                    )
-                                  }
+                                  onChange={(e) => {
+                                    const val =
+                                      e.target.value === ""
+                                        ? 0
+                                        : Number(e.target.value);
+                                    handleTicketTypeChange(idx, "stock", val);
+                                  }}
                                   className="w-full border border-text p-1.5 bg-background font-mono text-xs"
                                 />
                               </div>

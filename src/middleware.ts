@@ -31,7 +31,7 @@ export function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  const token = request.cookies.get("auth_token")?.value;
+  const token = request.cookies.get("access_token")?.value;
   const role = request.cookies.get("user_role")?.value;
 
   const isAuthenticated = Boolean(token);

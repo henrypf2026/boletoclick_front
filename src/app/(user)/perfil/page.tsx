@@ -4,7 +4,6 @@ import { useState } from "react";
 import { useFormik } from "formik";
 import * as Yup from "yup";
 import { useAuth  } from "@/context/AuthContext";
-import { getToken } from "@/lib/auth";
 import { saveToken } from "@/lib/auth";
 
 interface ProfileFormValues {
@@ -15,8 +14,13 @@ async function uploadImage(file: File, userId: string): Promise<string> {
   const formData = new FormData();
   formData.append("file", file);
 
-  const response = await fetch(`/api/backend/files/uploadImage/${userId}`, {
+  const token = getToken();
+
+   const response = await fetch(`/api/backend/files/uploadImage/${userId}`, {
     method: "PUT",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
     body: formData,
   });
 
@@ -25,9 +29,13 @@ async function uploadImage(file: File, userId: string): Promise<string> {
     throw new Error(msg || "Error al subir la imagen");
   }
 
- const data = await response.json();
-  return data.profileImageUrl; 
+  const data = await response.json();
+  return data.profileImageUrl;
 }
+
+
+
+
 export default function PerfilPage() {
   const { user, setUser } = useAuth();
 
@@ -83,13 +91,10 @@ export default function PerfilPage() {
           finalImageUrl = uploadedUrl; 
           setUploadingImage(false);
         }
-        const token = getToken();
         const response = await fetch(`/api/backend/users/${user.id}`, {
           method: "PATCH",
-          headers: { 
-            "Content-Type": "application/json", 
-            Authorization: `Bearer ${token}` 
-          },
+          headers: { "Content-Type": "application/json" },
+          credentials: 'include',
           body: JSON.stringify({ 
             allowNewsletter: values.allowNewsletter,
             profileImageUrl: finalImageUrl 
@@ -106,8 +111,8 @@ export default function PerfilPage() {
         const responseData = await response.json();
         console.log("Respuesta completa del servidor:", responseData);
 
-        if (responseData.token) {
-          saveToken(responseData.token, responseData.user?.role || user.role);
+        if (responseData.user?.role) {
+          saveToken(responseData.user.role);
         }
 
         if (setUser) {

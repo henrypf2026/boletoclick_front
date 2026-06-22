@@ -4,7 +4,6 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
-import { getToken } from '@/lib/auth';
 import { favoritesService, type FavoriteEvent } from '@/services/favoritesService';
 
 export default function MisFavoritosPage() {
@@ -21,10 +20,7 @@ export default function MisFavoritosPage() {
       return;
     }
 
-    const token = getToken();
-    if (!token) return;
-
-    favoritesService.getAll(token)
+    favoritesService.getAll()
       .then(setFavorites)
       .catch(() => setFavorites([]))
       .finally(() => setLoadingFavorites(false));

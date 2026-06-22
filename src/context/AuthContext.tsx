@@ -34,23 +34,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     email: string;
     password: string;
   }) => {
-    const { token, user: account } = await authService.login({
-      email,
-      password,
-    });
-    saveToken(token, account.role);
+    const { user: account } = await authService.login({ email, password });
+    saveToken(account.role);
     setUser(account);
     return account;
   };
 
   const register = async (data: RegisterDto) => {
-    const { token, user: account } = await authService.register(data);
-    saveToken(token, account.role);
+    const { user: account } = await authService.register(data);
+    saveToken(account.role);
     setUser(account);
     return account;
   };
 
   const logout = async () => {
+    try { await authService.logout(); } catch { /* ignora si el back falla */ }
     await supabase.auth.signOut();
     clearToken();
     setUser(null);

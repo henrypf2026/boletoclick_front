@@ -14,18 +14,18 @@ export interface FavoriteEvent {
 }
 
 export const favoritesService = {
-  async toggle(eventId: string, token: string): Promise<{ added: boolean; message: string }> {
+  async toggle(eventId: string): Promise<{ added: boolean; message: string }> {
     const res = await fetch(`/api/backend/favorites/${eventId}/toggle`, {
       method: 'POST',
-      headers: { Authorization: `Bearer ${token}` },
+      credentials: 'include',
     });
     if (!res.ok) throw new Error('Error al actualizar favorito');
     return res.json();
   },
 
-  async getAll(token: string): Promise<FavoriteEvent[]> {
+  async getAll(): Promise<FavoriteEvent[]> {
     const res = await fetch('/api/backend/favorites', {
-      headers: { Authorization: `Bearer ${token}` },
+      credentials: 'include',
     });
     if (!res.ok) throw new Error('Error al obtener favoritos');
     return res.json();

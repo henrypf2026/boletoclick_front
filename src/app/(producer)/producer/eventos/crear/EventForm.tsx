@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import Swal from "sweetalert2";
 
 interface TicketType {
   name: string;
@@ -13,6 +14,17 @@ interface ApiItem {
   id: string;
   name: string;
 }
+
+
+//limite de fechas
+const HOY = new Date().toISOString().split("T")[0];
+const maxDate = new Date();
+maxDate.setFullYear(maxDate.getFullYear() + 1);
+const FECHA_MAXIMA = maxDate.toISOString().split("T")[0];
+
+//limite de imagen
+const MAX_IMAGE_SIZE_MB = 2;
+const FORMATOS_VALIDOS = ["image/jpeg", "image/png", "image/gif", "image/webp"];
 
 export default function EventForm() {
   const [evento, setEvento] = useState({
@@ -29,9 +41,12 @@ export default function EventForm() {
   const [archivoImagen, setArchivoImagen] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
 
+
   const [ticketTypes, setTicketTypes] = useState<TicketType[]>([
     { name: "General", price: 0, stock: 100, zone: "Planta Baja" },
   ]);
+
+
 
   const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState<{
@@ -71,13 +86,59 @@ export default function EventForm() {
     setEvento({ ...evento, [e.target.name]: e.target.value });
   };
 
-  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+//fecha de validacion 
+ const handleFechaChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  setEvento({ ...evento, fecha: e.target.value }); 
+};
+
+const handleFechaBlur = (e: React.FocusEvent<HTMLInputElement>) => {
+  const fechaSeleccionada = e.target.value;
+  if (!fechaSeleccionada) return;
+
+  if (fechaSeleccionada > FECHA_MAXIMA || fechaSeleccionada < HOY) {
+    Swal.fire({
+      icon: "warning",
+      title: "Fecha inválida",
+      text: `La fecha del evento debe estar entre hoy y ${FECHA_MAXIMA}.`,
+      confirmButtonColor: "#171717",
+    });
+    setEvento({ ...evento, fecha: "" }); 
+  }
+};
+
+
+//imagen con validacion
+   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      setArchivoImagen(file);
-      setPreviewUrl(URL.createObjectURL(file));
+    if (!file) return;
+ 
+    if (!FORMATOS_VALIDOS.includes(file.type)) {
+      Swal.fire({
+        icon: "error",
+        title: "Formato no permitido",
+        text: "Solo se aceptan imágenes JPG, PNG, GIF o WEBP.",
+        confirmButtonColor: "#171717",
+      });
+      e.target.value = "";
+      return;
     }
+ 
+    const sizeMB = file.size / (1024 * 1024);
+    if (sizeMB > MAX_IMAGE_SIZE_MB) {
+      Swal.fire({
+        icon: "error",
+        title: "Imagen demasiado grande",
+        text: `El archivo pesa ${sizeMB.toFixed(1)}MB. El máximo permitido es ${MAX_IMAGE_SIZE_MB}MB.`,
+        confirmButtonColor: "#171717",
+      });
+      e.target.value = "";
+      return;
+    }
+ 
+    setArchivoImagen(file);
+    setPreviewUrl(URL.createObjectURL(file));
   };
+ 
 
   const agregarLocalidad = () => {
     setTicketTypes([
@@ -94,7 +155,7 @@ export default function EventForm() {
   const handleLocalidadChange = (
     index: number,
     field: keyof TicketType,
-    value: string | number,
+    value: string,
   ) => {
     const nuevosTickets = [...ticketTypes];
     nuevosTickets[index] = {
@@ -109,6 +170,8 @@ export default function EventForm() {
     setLoading(true);
     setStatus(null);
 
+
+
     if (!archivoImagen) {
       setStatus({
         type: "error",
@@ -118,17 +181,25 @@ export default function EventForm() {
       return;
     }
 
-    const rawToken = localStorage.getItem("auth_token");
-    if (!rawToken) {
-      setStatus({
-        type: "error",
-        msg: "No se encontró un token de sesión. Por favor, volvé a iniciar sesión.",
-      });
+
+     const ticketInvalido = ticketTypes.find(
+      (t) =>
+        t.name.trim() === "" ||
+        String(t.price) === "" ||
+        String(t.stock) === "" ||
+        Number(t.price) <= 0 ||
+        Number(t.stock) <= 0,
+    );
+ 
+    if (ticketInvalido) {
+      setStatus({ type: "error", msg: "Todos los tipos de entrada necesitan nombre, precio mayor a 0 y stock mayor a 0." });
       setLoading(false);
       return;
     }
 
-    const cleanToken = rawToken.replace(/['"]+/g, "");
+
+
+
 
     try {
       // 1. Instanciamos el FormData exigido por el controlador con Multer
@@ -143,6 +214,7 @@ export default function EventForm() {
         `${evento.fecha}T${evento.hora}:00.000Z`,
       ).toISOString();
       formData.append("eventDate", combinedDate);
+      formData.append("status", "ACTIVE");
 
       // 2. Mapeamos los campos numéricos puros de los tickets
       const ticketsLimpios = ticketTypes.map((ticket) => ({
@@ -162,10 +234,8 @@ export default function EventForm() {
 
       const res = await fetch(`/api/backend/events`, {
         method: "POST",
-        headers: {
-          Authorization: `Bearer ${cleanToken}`,
-          // NO agregar Content-Type, dejamos que el navegador maneje los boundaries
-        },
+        // NO agregar Content-Type, dejamos que el navegador maneje los boundaries
+        credentials: 'include',
         body: formData,
       });
 
@@ -217,6 +287,9 @@ export default function EventForm() {
             <label className="text-xs font-black uppercase tracking-wide text-text block">
               Poster / Portada del Evento
             </label>
+              <p className="text-[10px] font-medium text-text-soft">
+              Formato JPG, PNG, GIF o WEBP. Tamaño máximo: {MAX_IMAGE_SIZE_MB}MB.
+            </p>
             <input
               type="file"
               accept="image/*"
@@ -254,15 +327,24 @@ export default function EventForm() {
           className="w-full p-3 border-2 border-border bg-background text-text font-medium shadow-[2px_2px_0px_0px_rgba(23,23,23,1)] text-sm"
         />
 
+        <label className="text-xs font-black uppercase tracking-wide text-text block">
+            Día y hora del evento
+          </label>
+
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <input
             type="date"
             name="fecha"
             value={evento.fecha}
-            onChange={handleEventoChange}
+            onChange={handleFechaChange}
+            onBlur={handleFechaBlur}
             required
+            min={HOY}
+            max={FECHA_MAXIMA}
             className="p-3 border-2 border-border bg-background text-text text-sm"
           />
+
+
           <input
             type="time"
             name="hora"
@@ -272,6 +354,7 @@ export default function EventForm() {
             className="p-3 border-2 border-border bg-background text-text text-sm"
           />
         </div>
+
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <select
@@ -393,14 +476,25 @@ export default function EventForm() {
           </div>
         ))}
       </div>
+          {status?.type === "success" && (
+        <div className="border-2 border-success bg-success/10 p-4 font-mono text-xs font-bold uppercase text-success">
+          ✅ {status.msg}
+        </div>
+      )}
+      {status?.type === "error" && (
+        <div className="border-2 border-red-500 bg-red-500/10 p-4 font-mono text-xs font-bold uppercase text-red-500">
+          ❌ {status.msg}
+        </div>
+       )}
 
-      <button
+    <button
         type="submit"
         disabled={loading}
         className="w-full p-4 font-black text-sm uppercase bg-primary text-background border-4 border-border shadow-[4px_4px_0px_0px_rgba(23,23,23,1)] disabled:opacity-50"
       >
         {loading ? "Creando en Sistema..." : "Crear Evento"}
       </button>
+ 
     </form>
   );
 }

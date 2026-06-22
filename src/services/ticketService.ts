@@ -1,4 +1,3 @@
-import { getToken } from '@/lib/auth';
 import { normalizeCoordinates } from '@/lib/geo/mapbox';
 import { createTicketQrUrl, normalizeQrUrl, type TicketQrData } from '@/lib/ticketQr';
 import type { Event, Zone } from '@/mocks/events';
@@ -228,21 +227,18 @@ export interface PurchaseInput {
 
 export const ticketService = {
   async getMyTickets(userId: string): Promise<ApiTicket[]> {
-    const token = getToken();
     let apiTickets: ApiTicket[] = [];
 
-    if (token) {
-      try {
-        const res = await fetch('/api/backend/tickets/me', {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        if (res.ok) {
-          apiTickets = (await res.json()) as ApiTicket[];
-          apiTickets = apiTickets.map((ticket) => mergeTicketWithLocal(ticket, userId));
-        }
-      } catch {
-        // Fallback a tickets locales
+    try {
+      const res = await fetch('/api/backend/tickets/me', {
+        credentials: 'include',
+      });
+      if (res.ok) {
+        apiTickets = (await res.json()) as ApiTicket[];
+        apiTickets = apiTickets.map((ticket) => mergeTicketWithLocal(ticket, userId));
       }
+    } catch {
+      // Fallback a tickets locales
     }
 
     const localTickets = readLocalTickets()
@@ -261,45 +257,40 @@ export const ticketService = {
   },
 
   async purchaseTickets(input: PurchaseInput): Promise<ApiTicket[]> {
-    const token = getToken();
     const { userId, event, zone, quantity, total } = input;
 
-    if (token) {
-      try {
-        const res = await fetch('/api/backend/orders', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({
-            ticketTypeId: zone.ticketTypeId,
-            quantity,
-          }),
-        });
+    try {
+      const res = await fetch('/api/backend/orders', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          ticketTypeId: zone.ticketTypeId,
+          quantity,
+        }),
+      });
 
-        if (res.ok) {
-          const order = (await res.json()) as { id: string };
-          const allTickets = await this.getMyTickets(userId);
-          const enriched = enrichApiTicketsFromPurchase(
-            allTickets,
-            userId,
-            event,
-            zone,
-            order.id,
-            total,
+      if (res.ok) {
+        const order = (await res.json()) as { id: string };
+        const allTickets = await this.getMyTickets(userId);
+        const enriched = enrichApiTicketsFromPurchase(
+          allTickets,
+          userId,
+          event,
+          zone,
+          order.id,
+          total,
+        );
+
+        return enriched
+          .filter((ticket) => ticket.order?.id === order.id)
+          .sort(
+            (a, b) =>
+              new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
           );
-
-          return enriched
-            .filter((ticket) => ticket.order?.id === order.id)
-            .sort(
-              (a, b) =>
-                new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
-            );
-        }
-      } catch {
-        // Continúa con persistencia local
       }
+    } catch {
+      // Continúa con persistencia local
     }
 
     const unitPrice = zone.price;
@@ -331,20 +322,17 @@ export const ticketService = {
   },
 
   async generateQrAfterPayment(userId: string, input: PurchaseInput): Promise<void> {
-    const token = getToken();
     let apiTickets: ApiTicket[] = [];
 
-    if (token) {
-      try {
-        const res = await fetch('/api/backend/tickets/me', {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        if (res.ok) {
-          apiTickets = (await res.json()) as ApiTicket[];
-        }
-      } catch {
-        // Continúa con QR local
+    try {
+      const res = await fetch('/api/backend/tickets/me', {
+        credentials: 'include',
+      });
+      if (res.ok) {
+        apiTickets = (await res.json()) as ApiTicket[];
       }
+    } catch {
+      // Continúa con QR local
     }
 
     const recentForType = apiTickets

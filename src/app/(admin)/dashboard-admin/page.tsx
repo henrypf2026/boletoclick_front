@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { useAdmin } from "@/context/AdminContext";
 
 interface LogEvent {
   id: string;
@@ -10,15 +11,12 @@ interface LogEvent {
   message: string;
 }
 
-type RangoTemporal = "HOY" | "7DIAS" | "MES" | "ANUAL";
 type FiltroLog = "ALL" | "SUCCESS" | "INFO" | "WARN" | "CRITICAL";
 
 export default function AdminDashboard() {
   const router = useRouter();
 
-  const [rangoTime, setRangoTime] = useState<RangoTemporal>("MES");
-  const [loadingMetrics, setLoadingMetrics] = useState(false);
-  const [comision, setComision] = useState(12);
+  const { eventos } = useAdmin();
 
   const [logsPausados, setLogsPausados] = useState(false);
   const [filtroLogActivo, setFiltroLogActivo] = useState<FiltroLog>("ALL");
@@ -50,45 +48,36 @@ export default function AdminDashboard() {
     },
   ]);
 
-  const datosFinancieros = {
-    HOY: { gmv: 85000, entradas: 45 },
-    "7DIAS": { gmv: 620000, entradas: 340 },
-    MES: { gmv: 2450000, entradas: 1420 },
-    ANUAL: { gmv: 28400000, entradas: 16800 },
-  };
-
   const [servicios, setServicios] = useState([
     {
       name: "API SERVER",
       status: "ONLINE",
       latency: "14ms",
-      color: "bg-success text-black",
+      color: "bg-emerald-500/10 text-emerald-500 border-emerald-500/30",
     },
     {
       name: "PASARELA (Stripe)",
       status: "ONLINE",
       latency: "42ms",
-      color: "bg-success text-black",
+      color: "bg-emerald-500/10 text-emerald-500 border-emerald-500/30",
     },
     {
       name: "BASE DE DATOS",
       status: "SINCRO",
       latency: "OK",
-      color: "bg-success text-black",
+      color: "bg-emerald-500/10 text-emerald-500 border-emerald-500/30",
     },
     {
       name: "PROVEEDOR QR",
       status: "LATENCIA",
       latency: "320ms",
-      color: "bg-secondary text-black",
+      color: "bg-amber-500/10 text-amber-500 border-amber-500/30",
     },
   ]);
 
-  useEffect(() => {
-    setLoadingMetrics(true);
-    const timer = setTimeout(() => setLoadingMetrics(false), 300);
-    return () => clearTimeout(timer);
-  }, [rangoTime]);
+  const pendientesCount = eventos.filter(
+    (e) => e.estado === "PENDIENTE",
+  ).length;
 
   useEffect(() => {
     const eventosMock = [
@@ -128,77 +117,78 @@ export default function AdminDashboard() {
       ]);
 
       setServicios((prev) =>
-        prev.map((s) => {
-          if (s.name === "API SERVER") {
-            return {
-              ...s,
-              latency: `${Math.floor(Math.random() * 10) + 10}ms`,
-            };
-          }
-          return s;
-        }),
+        prev.map((s) =>
+          s.name === "API SERVER"
+            ? { ...s, latency: `${Math.floor(Math.random() * 10) + 10}ms` }
+            : s,
+        ),
       );
     }, 4000);
 
     return () => clearInterval(interval);
   }, [logsPausados]);
 
-  const gmvActual = datosFinancieros[rangoTime].gmv;
-  const entradasActuales = datosFinancieros[rangoTime].entradas;
-  const netoTicketera = (gmvActual * comision) / 100;
-  const netoProductores = gmvActual - netoTicketera;
-
   const logsFiltrados = logs.filter(
     (log) => filtroLogActivo === "ALL" || log.type === filtroLogActivo,
   );
 
   return (
-    <div className="p-4 md:p-8 max-w-7xl mx-auto min-h-screen bg-background text-text">
+    <div className="p-4 md:p-8 max-w-7xl mx-auto min-h-screen bg-background text-text font-mono">
       <div className="mb-8 border-b-4 border-text pb-4 flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
         <div>
           <h1 className="uppercase font-black text-3xl md:text-4xl tracking-tighter">
             Consola de Control Global
           </h1>
-          <p className="text-text-soft mt-1 font-mono text-xs uppercase tracking-wide">
-            Auditoría de negocio, pasarela y métricas en tiempo real
+          <p className="text-text-soft mt-1 text-xs uppercase tracking-wide">
+            Infraestructura de red, auditoría de logs y enrutamiento operativo
           </p>
         </div>
-        <div className="bg-red-500 text-white border-2 border-text px-4 py-1.5 font-mono text-xs font-black uppercase tracking-widest shadow-[3px_3px_0px_0px_rgba(0,0,0,1)]">
-          SYSTEM_ACCESS: ROOT_ADMIN
+        <div className="bg-surface text-text border-2 border-text px-4 py-1.5 text-xs font-black uppercase tracking-widest shadow-[3px_3px_0px_0px_rgba(0,0,0,1)]">
+          ACCESS_LEVEL: ADMIN
         </div>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-8">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
         <button
           onClick={() => router.push("/admin/usuarios")}
-          className="p-4 bg-secondary text-text border-4 border-text font-mono font-black text-sm uppercase shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] hover:shadow-none hover:translate-x-1 hover:translate-y-1 transition-all text-left flex justify-between items-center cursor-pointer"
+          className="p-4 bg-surface text-text border-4 border-text font-black text-xs md:text-sm uppercase shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] hover:shadow-none hover:translate-x-1 hover:translate-y-1 transition-all text-left flex justify-between items-center cursor-pointer"
         >
-          <span>👥 Administrar Base de Usuarios</span>
+          <span>👥 Base de Usuarios</span>
           <span>→</span>
         </button>
         <button
           onClick={() => router.push("/admin/moderacion")}
-          className="p-4 bg-primary text-background border-4 border-text font-mono font-black text-sm uppercase shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] hover:shadow-none hover:translate-x-1 hover:translate-y-1 transition-all text-left flex justify-between items-center cursor-pointer"
+          className="p-4 bg-surface text-text border-4 border-text font-black text-xs md:text-sm uppercase shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] hover:shadow-none hover:translate-x-1 hover:translate-y-1 transition-all text-left flex justify-between items-center cursor-pointer"
         >
-          <span>🛡️ Configuración de Fees y Moderación</span>
-          <span>→</span>
+          <span className="text-amber-600">
+            🎪 Moderación de Eventos{" "}
+            {pendientesCount > 0 && `(${pendientesCount})`}
+          </span>
+          <span className="text-amber-600">→</span>
+        </button>
+        <button
+          onClick={() => router.push("/admin/finanzas")}
+          className="p-4 bg-surface text-text border-4 border-text font-black text-xs md:text-sm uppercase shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] hover:shadow-none hover:translate-x-1 hover:translate-y-1 transition-all text-left flex justify-between items-center cursor-pointer"
+        >
+          <span className="text-emerald-600">💸 Tesorería y Pasarela</span>
+          <span className="text-emerald-600">→</span>
         </button>
       </div>
 
       <div className="mb-8">
-        <p className="font-mono text-xs font-black uppercase tracking-wider text-text-soft mb-3">
-          🌐 MONITOREO DE PLATAFORMA INFRAESTRUCTURA
+        <p className="text-xs font-black uppercase tracking-wider text-text-soft mb-3">
+          MONITOREO DE PLATAFORMA (HARDWARE / API)
         </p>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {servicios.map((serv, idx) => (
             <div
               key={idx}
-              className="bg-surface border-2 border-text p-3 shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] flex justify-between items-center font-mono text-xs"
+              className="bg-surface border-2 border-text p-3 shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] flex justify-between items-center text-xs"
             >
-              <span className="font-bold">{serv.name}</span>
+              <span className="font-bold uppercase">{serv.name}</span>
               <div className="flex items-center gap-2">
                 <span
-                  className={`px-1.5 py-0.5 text-[10px] font-black border border-black ${serv.color}`}
+                  className={`px-1.5 py-0.5 text-[10px] font-black border uppercase ${serv.color}`}
                 >
                   {serv.status}
                 </span>
@@ -211,96 +201,23 @@ export default function AdminDashboard() {
         </div>
       </div>
 
-      <div className="flex border-b-2 border-text mb-6 gap-2 overflow-x-auto pb-0">
-        {(["HOY", "7DIAS", "MES", "ANUAL"] as const).map((tab) => (
-          <button
-            key={tab}
-            onClick={() => setRangoTime(tab)}
-            className={`pb-3 px-5 font-black text-xs tracking-wider transition-all whitespace-nowrap cursor-pointer border-t-2 border-x-2 ${
-              rangoTime === tab
-                ? "bg-text text-surface border-text translate-y-0.5"
-                : "border-transparent text-text-soft hover:text-text bg-surface/40"
-            }`}
-          >
-            {tab === "7DIAS" ? "📅 ÚLTIMOS 7 DÍAS" : `📊 REPORTE ${tab}`}
-          </button>
-        ))}
-      </div>
-
-      <div className="space-y-6">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-          <div className="bg-surface border-2 border-text p-5 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
-            <p className="text-text-soft text-[10px] font-mono font-black uppercase tracking-wider">
-              Volumen Bruto Procesado (GMV)
-            </p>
-            <p
-              className={`text-3xl md:text-4xl font-black text-text mt-2 font-mono transition-opacity ${loadingMetrics ? "opacity-40" : "opacity-100"}`}
-            >
-              ${gmvActual.toLocaleString("es-AR")}
-            </p>
-            <span className="text-[9px] font-mono text-success bg-success/10 border border-success/30 px-2 py-0.5 mt-3 inline-block font-black">
-              METRICAS EN VIVO ({rangoTime})
-            </span>
-          </div>
-
-          <div className="bg-surface border-2 border-text p-5 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
-            <p className="text-text-soft text-[10px] font-mono font-black uppercase tracking-wider">
-              Neto Retenido Ticketera
-            </p>
-            <p
-              className={`text-3xl md:text-4xl font-black text-primary mt-2 font-mono transition-opacity ${loadingMetrics ? "opacity-40" : "opacity-100"}`}
-            >
-              ${netoTicketera.toLocaleString("es-AR")}
-            </p>
-            <div className="mt-3 flex items-center gap-2">
-              <input
-                type="range"
-                min="5"
-                max="25"
-                value={comision}
-                onChange={(e) => setComision(Number(e.target.value))}
-                className="accent-primary cursor-pointer w-24 h-1.5 bg-background border border-text/20"
-              />
-              <span className="font-mono text-[10px] text-text-soft uppercase font-bold">
-                Fee Simulación: {comision}%
-              </span>
-            </div>
-          </div>
-
-          <div className="bg-surface border-2 border-text p-5 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] sm:col-span-2 lg:col-span-1">
-            <p className="text-text-soft text-[10px] font-mono font-black uppercase tracking-wider">
-              Distribución a Productores
-            </p>
-            <p
-              className={`text-3xl md:text-4xl font-black text-text mt-2 font-mono transition-opacity ${loadingMetrics ? "opacity-40" : "opacity-100"}`}
-            >
-              ${netoProductores.toLocaleString("es-AR")}
-            </p>
-            <p className="text-[10px] font-mono text-text-soft uppercase mt-3 font-bold">
-              Tickets validados:{" "}
-              <span className="text-text font-black">
-                {entradasActuales} uds
-              </span>
-            </p>
-          </div>
-        </div>
-
-        <div className="bg-surface border-2 border-text p-6 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+        <div className="bg-surface border-2 border-text p-6 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] lg:col-span-2">
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b-2 border-text pb-3 mb-4">
-            <h3 className="font-black text-xs uppercase tracking-wider font-mono flex items-center gap-2">
+            <h3 className="font-black text-xs uppercase tracking-wider flex items-center gap-2">
               <span
-                className={`w-2 h-2 rounded-full ${logsPausados ? "bg-amber-500" : "bg-success animate-ping"}`}
+                className={`w-2 h-2 border ${logsPausados ? "bg-amber-500/40 border-amber-500" : "bg-emerald-500 border-emerald-600 animate-pulse"}`}
               ></span>
               AUDITORÍA LOGS CONTROLLER {logsPausados && "(CONGELADO)"}
             </h3>
 
             <div className="flex flex-wrap items-center gap-2">
-              <div className="flex border border-text font-mono text-[10px] font-bold">
+              <div className="flex border border-text text-[10px] font-bold">
                 {(["ALL", "SUCCESS", "WARN", "CRITICAL"] as const).map((f) => (
                   <button
                     key={f}
                     onClick={() => setFiltroLogActivo(f)}
-                    className={`px-2 py-0.5 cursor-pointer ${filtroLogActivo === f ? "bg-text text-surface" : "bg-background text-text hover:bg-surface"}`}
+                    className={`px-2 py-0.5 cursor-pointer uppercase ${filtroLogActivo === f ? "bg-text text-surface" : "bg-surface text-text hover:bg-background"}`}
                   >
                     {f}
                   </button>
@@ -309,41 +226,37 @@ export default function AdminDashboard() {
 
               <button
                 onClick={() => setLogsPausados(!logsPausados)}
-                className={`px-3 py-0.5 border-2 border-text font-mono text-[10px] font-black uppercase tracking-wider cursor-pointer shadow-[1px_1px_0px_0px_rgba(0,0,0,1)] active:shadow-none transition-all ${
-                  logsPausados
-                    ? "bg-success text-black animate-pulse"
-                    : "bg-red-500 text-white"
-                }`}
+                className="px-3 py-0.5 border-2 border-text text-[10px] font-black uppercase cursor-pointer bg-surface text-text shadow-[1px_1px_0px_0px_rgba(0,0,0,1)] hover:bg-text hover:text-surface transition-all"
               >
                 {logsPausados ? "▶️ REANUDAR" : "⏸️ PAUSAR LIVE"}
               </button>
             </div>
           </div>
 
-          <div className="font-mono text-xs space-y-2.5 max-h-60 overflow-y-auto bg-background/50 p-4 border-2 border-text/20">
+          <div className="text-xs space-y-2.5 max-h-96 overflow-y-auto bg-background p-4 border-2 border-text/10">
             {logsFiltrados.length > 0 ? (
               logsFiltrados.map((log) => (
                 <p
                   key={log.id}
-                  className="text-text leading-relaxed uppercase break-all animate-fadeIn"
+                  className="text-text leading-relaxed uppercase break-all flex items-start sm:items-center gap-2 animate-fadeIn"
                 >
-                  <span className="text-neutral-500 font-bold mr-2">
+                  <span className="text-text-soft font-bold whitespace-nowrap">
                     [{log.timestamp}]
                   </span>
                   <span
-                    className={`px-1.5 py-0.2 text-[9px] font-black mr-2 border border-black ${
+                    className={`px-2 py-0.5 text-[9px] font-black border uppercase tracking-wider rounded-sm ${
                       log.type === "SUCCESS"
-                        ? "bg-success text-black"
-                        : log.type === "WARN"
-                          ? "bg-secondary text-black"
-                          : log.type === "CRITICAL"
-                            ? "bg-red-500 text-white"
-                            : "bg-text text-surface"
+                        ? "bg-emerald-500/10 text-emerald-500 border-emerald-500/30"
+                        : log.type === "INFO"
+                          ? "bg-blue-500/10 text-blue-500 border-blue-500/30"
+                          : log.type === "WARN"
+                            ? "bg-amber-500/10 text-amber-500 border-amber-500/30"
+                            : "bg-rose-500/10 text-rose-500 border-rose-500/40"
                     }`}
                   >
                     {log.type}
                   </span>
-                  {log.message}
+                  <span className="text-text font-medium">{log.message}</span>
                 </p>
               ))
             ) : (
@@ -351,6 +264,59 @@ export default function AdminDashboard() {
                 No hay logs de tipo [{filtroLogActivo}] en el búfer actual.
               </p>
             )}
+          </div>
+        </div>
+
+        <div className="bg-surface border-2 border-text p-5 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] space-y-4">
+          <p className="text-xs font-black uppercase text-text border-b-2 border-text pb-2">
+            🚨 Estado de cola crítica
+          </p>
+
+          {pendientesCount > 0 ? (
+            <div className="border-2 border-amber-500 bg-amber-500/10 p-3 space-y-2">
+              <p className="text-[11px] font-black uppercase text-amber-700">
+                ⚠️ PROPUESTAS ESPERANDO AUDITORÍA
+              </p>
+              <p className="text-xs font-bold uppercase text-text">
+                Hay {pendientesCount} evento(s) nuevos enviados por productores
+                en la cola de revisión.
+              </p>
+              <button
+                onClick={() => router.push("/admin/moderacion")}
+                className="w-full bg-amber-500 text-text text-[10px] font-black p-1.5 border border-text uppercase shadow-[1px_1px_0px_0px_rgba(0,0,0,1)] cursor-pointer hover:bg-background"
+              >
+                Abrir Panel de Moderación →
+              </button>
+            </div>
+          ) : (
+            <div className="border-2 border-emerald-500 bg-emerald-500/10 p-3 text-center">
+              <p className="text-[11px] font-black text-emerald-700 uppercase">
+                ✓ CARTELERA SINCRO
+              </p>
+              <p className="text-[10px] uppercase text-text-soft font-bold mt-1">
+                No hay propuestas pendientes en este bloque.
+              </p>
+            </div>
+          )}
+
+          <div className="border-2 border-text bg-background p-3 space-y-2 text-xs uppercase font-bold">
+            <p className="text-[10px] font-black text-text-soft border-b border-text/10 pb-1">
+              Seguridad del Sistema
+            </p>
+            <div className="space-y-1.5 text-[11px]">
+              <div className="flex justify-between">
+                <span>SSL Certificate:</span>
+                <span className="text-emerald-600 font-black">VALID</span>
+              </div>
+              <div className="flex justify-between">
+                <span>CORS Policy:</span>
+                <span className="text-emerald-600 font-black">STRICT</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Filtro Inyecciones:</span>
+                <span className="text-emerald-600 font-black">ACTIVO</span>
+              </div>
+            </div>
           </div>
         </div>
       </div>
