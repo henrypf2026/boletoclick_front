@@ -214,6 +214,7 @@ const handleFechaBlur = (e: React.FocusEvent<HTMLInputElement>) => {
         `${evento.fecha}T${evento.hora}:00.000Z`,
       ).toISOString();
       formData.append("eventDate", combinedDate);
+      formData.append("status", "ACTIVE");
 
       // 2. Mapeamos los campos numéricos puros de los tickets
       const ticketsLimpios = ticketTypes.map((ticket) => ({
