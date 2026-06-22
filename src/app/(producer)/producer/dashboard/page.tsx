@@ -291,6 +291,12 @@ export default function DashboardProducer() {
           ➕ Crear Nuevo Evento
         </button>
         <button
+          onClick={() => router.push("/producer/venues/crear")}
+          className="px-4 py-2 bg-background text-text border-2 border-text font-mono text-xs font-black uppercase tracking-wider hover:translate-x-0.5 hover:translate-y-0.5 transition-all shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] hover:shadow-none"
+        >
+          📍 Registrar Venue
+        </button>
+        <button
           onClick={() => router.push("/producer/bank-accounts")}
           className="px-4 py-2 bg-background text-text border-2 border-text font-mono text-xs font-black uppercase tracking-wider hover:translate-x-0.5 hover:translate-y-0.5 transition-all shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] hover:shadow-none"
         >
