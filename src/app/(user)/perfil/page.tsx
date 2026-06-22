@@ -15,8 +15,13 @@ async function uploadImage(file: File, userId: string): Promise<string> {
   const formData = new FormData();
   formData.append("file", file);
 
-  const response = await fetch(`/api/backend/files/uploadImage/${userId}`, {
+  const token = getToken();
+
+   const response = await fetch(`/api/backend/files/uploadImage/${userId}`, {
     method: "PUT",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
     body: formData,
   });
 
@@ -25,9 +30,13 @@ async function uploadImage(file: File, userId: string): Promise<string> {
     throw new Error(msg || "Error al subir la imagen");
   }
 
- const data = await response.json();
-  return data.profileImageUrl; 
+  const data = await response.json();
+  return data.profileImageUrl;
 }
+
+
+
+
 export default function PerfilPage() {
   const { user, setUser } = useAuth();
 
