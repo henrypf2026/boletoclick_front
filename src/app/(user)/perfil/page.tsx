@@ -18,9 +18,7 @@ async function uploadImage(file: File, userId: string): Promise<string> {
 
    const response = await fetch(`/api/backend/files/uploadImage/${userId}`, {
     method: "PUT",
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
+    credentials: 'include',
     body: formData,
   });
 
@@ -44,7 +42,7 @@ export default function PerfilPage() {
   if (user?.profileImageUrl && imagePreview === null && !imageFile) {
   setImagePreview(user.profileImageUrl);
 }
-  
+
   const [uploadingImage, setUploadingImage] = useState(false);
   const [submitStatus, setSubmitStatus] = useState<"success" | "error" | null>(null);
   const [errorMsg, setErrorMsg] = useState<string>("");
@@ -69,7 +67,7 @@ export default function PerfilPage() {
     initialValues: {
       allowNewsletter: user?.allowNewsletter ?? false,
     },
-    enableReinitialize: true, 
+    enableReinitialize: true,
     validationSchema: Yup.object({
       allowNewsletter: Yup.boolean().required(),
     }),
@@ -80,30 +78,30 @@ export default function PerfilPage() {
       try {
         setSubmitStatus(null);
         setErrorMsg("");
-      
-        let finalImageUrl = user.profileImageUrl; 
+
+        let finalImageUrl = user.profileImageUrl;
 
         if (imageFile) {
           setUploadingImage(true);
           const uploadedUrl = await uploadImage(imageFile, user.id);
           console.log("Imagen subida a Cloudinary:", uploadedUrl);
-          
-          finalImageUrl = uploadedUrl; 
+
+          finalImageUrl = uploadedUrl;
           setUploadingImage(false);
         }
         const response = await fetch(`/api/backend/users/${user.id}`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           credentials: 'include',
-          body: JSON.stringify({ 
+          body: JSON.stringify({
             allowNewsletter: values.allowNewsletter,
-            profileImageUrl: finalImageUrl 
+            profileImageUrl: finalImageUrl
           }),
         });
 
       if (!response.ok) {
           const badData = await response.json().catch(() => null);
-          const badMsg = badData?.message 
+          const badMsg = badData?.message
             ? (Array.isArray(badData.message) ? badData.message.join(", ") : badData.message)
             : "Error al actualizar perfil";
           throw new Error(badMsg);
@@ -119,7 +117,7 @@ export default function PerfilPage() {
           setUser(responseData.user || responseData);
         }
         setSubmitStatus("success");
-        setImageFile(null); 
+        setImageFile(null);
         setTimeout(() => setSubmitStatus(null), 3500);
 
       } catch (error: unknown) {
