@@ -1,5 +1,6 @@
 import { api } from "@/lib/apiClient";
 import { getCategoryImage } from "@/lib/categoryImages";
+import { inferEventCountry } from "@/lib/geo/country";
 import { teams, type Event, type Zone } from "@/mocks/events";
 
 interface ApiVenue {
@@ -98,6 +99,8 @@ function mapApiEvent(apiEvent: ApiEvent): Event {
     .filter((n) => !Number.isNaN(n));
   const categorySlug = apiEvent.category?.slug ?? "otros";
   const categoryImage = getCategoryImage(categorySlug, apiEvent.id);
+  const lat = Number(venue?.latitude);
+  const lng = Number(venue?.longitude);
 
   const zones: Zone[] = ticketTypes.map((ticket) => ({
     id: ticket.id,
@@ -119,9 +122,13 @@ function mapApiEvent(apiEvent: ApiEvent): Event {
     address: venue?.address ?? undefined,
     capacity: venue?.capacity ?? undefined,
     coordinates: {
-      lat: Number(venue?.latitude) || 19.4326,
-      lng: Number(venue?.longitude) || -99.1332,
+      lat: Number.isNaN(lat) ? 19.4326 : lat,
+      lng: Number.isNaN(lng) ? -99.1332 : lng,
     },
+    country: inferEventCountry(
+      Number.isNaN(lat) ? 19.4326 : lat,
+      Number.isNaN(lng) ? -99.1332 : lng,
+    ),
     date,
     time,
     priceFrom: prices.length ? Math.min(...prices) : 0,

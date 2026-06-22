@@ -225,6 +225,7 @@ function CheckoutContent() {
         city,
         address,
         coordinates: { lat: lat || 19.4326, lng: lng || -99.1332 },
+        country: null,
         date: eventDate,
         time: eventTime,
         priceFrom: ticketPrice,
