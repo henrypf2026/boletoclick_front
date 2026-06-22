@@ -201,18 +201,6 @@ const handleFechaBlur = (e: React.FocusEvent<HTMLInputElement>) => {
 
 
 
-    const rawToken = localStorage.getItem("auth_token");
-    if (!rawToken) {
-      setStatus({
-        type: "error",
-        msg: "No se encontró un token de sesión. Por favor, volvé a iniciar sesión.",
-      });
-      setLoading(false);
-      return;
-    }
-
-    const cleanToken = rawToken.replace(/['"]+/g, "");
-
     try {
       // 1. Instanciamos el FormData exigido por el controlador con Multer
       const formData = new FormData();
@@ -245,10 +233,8 @@ const handleFechaBlur = (e: React.FocusEvent<HTMLInputElement>) => {
 
       const res = await fetch(`/api/backend/events`, {
         method: "POST",
-        headers: {
-          Authorization: `Bearer ${cleanToken}`,
-          // NO agregar Content-Type, dejamos que el navegador maneje los boundaries
-        },
+        // NO agregar Content-Type, dejamos que el navegador maneje los boundaries
+        credentials: 'include',
         body: formData,
       });
 

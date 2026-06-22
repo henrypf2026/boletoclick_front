@@ -4,7 +4,6 @@ import { useSearchParams, useRouter } from "next/navigation";
 import { useEffect, useState, Suspense } from "react";
 import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
-import { getToken } from "@/lib/auth";
 import {
   clearPendingPurchase,
   readPendingPurchase,
@@ -72,15 +71,12 @@ function PaymentResultContent() {
       if (signal.aborted) return;
 
       try {
-        const token = getToken();
         const response = await fetch(
           `/api/backend/payments/verify/${sessionToVerify}`,
           {
             signal, // 🔴 Conectado para cancelar peticiones en vuelo
-            headers: {
-              Authorization: `Bearer ${token}`,
-              'Content-Type': 'application/json'
-            },
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
           }
         );
 

@@ -5,9 +5,8 @@ import Link from 'next/link';
 import { useRouter, useParams } from 'next/navigation';
 import { Alert } from 'flowbite-react';
 import { useAuth } from '@/context/AuthContext';
-import { formatEventDate, formatPrice, type Event } from '@/mocks/events';
+import { formatEventDate, formatPrice, isEventPast, type Event } from '@/mocks/events';
 import { eventService } from '@/services/eventService';
-import { getToken } from '@/lib/auth';
 import EventMap from '@/components/ui/EventMap';
 import { favoritesService } from '@/services/favoritesService';
 
@@ -40,20 +39,16 @@ export default function EventoPage() {
 
   useEffect(() => {
     if (!authenticated) return;
-    const token = getToken();
-    if (!token) return;
-    favoritesService.getAll(token).then((favs) => {
+    favoritesService.getAll().then((favs) => {
       setIsFavorite(favs.some((f) => f.eventId === id));
     }).catch(() => {});
   }, [authenticated, id]);
 
   const handleToggleFavorite = async () => {
     if (!authenticated) { router.push(`/login?from=/eventos/${id}`); return; }
-    const token = getToken();
-    if (!token) return;
     setLoadingFav(true);
     try {
-      const { added } = await favoritesService.toggle(id, token);
+      const { added } = await favoritesService.toggle(id);
       setIsFavorite(added);
     } catch {
       setMessage('No se pudo actualizar favoritos. Intentá de nuevo.');
@@ -63,6 +58,9 @@ export default function EventoPage() {
   };
 
   const isProducer = authenticated && user?.role === 'producer';
+  const isPast = event ? isEventPast(event.date, event.time) : false;
+  const isCancelled = event?.status === 'CANCELLED' || event?.status === 'INACTIVE';
+  const isSoldOut = event?.status === 'SOLDOUT';
 
   const selectedZone = event?.zones.find((zone) => zone.id === zoneId);
   const date = event ? formatEventDate(event.date, event.time) : null;
@@ -93,6 +91,16 @@ export default function EventoPage() {
   }
 
   const handlePurchase = () => {
+    if (isPast) {
+      setMessage('No podés comprar entradas para un evento que ya finalizó.');
+      return;
+    }
+
+    if (isCancelled) {
+      setMessage('Este evento fue cancelado y no acepta compras.');
+      return;
+    }
+
     if (!authenticated || !user) {
       router.push(`/login?from=/eventos/${event.id}`);
       return;
@@ -211,13 +219,23 @@ export default function EventoPage() {
             </div>
           </div>
 
-          {/* Comprar entradas / Vista productor */}
+          {/* Comprar entradas / Estados especiales */}
           <div className="border-4 border-border bg-surface p-6 shadow-[4px_4px_0px_0px_rgba(23,23,23,1)] dark:shadow-[4px_4px_0px_0px_rgba(255,255,255,1)] lg:col-span-2">
             <h2 className="mb-5 text-base font-black uppercase tracking-wide text-text">
-              {isProducer ? 'Entradas' : 'Comprar entradas'}
+              {isCancelled || isPast || isProducer || isSoldOut ? 'Entradas' : 'Comprar entradas'}
             </h2>
 
-            {isProducer ? (
+            {isCancelled ? (
+              <div className="border-2 border-border bg-surface-2 p-4 text-sm text-text-soft">
+                <p className="font-black uppercase tracking-wide text-text mb-1">Evento cancelado</p>
+                Este evento fue cancelado. Si tenés entradas compradas, comunicate con el organizador.
+              </div>
+            ) : isPast ? (
+              <div className="border-2 border-border bg-surface-2 p-4 text-sm text-text-soft">
+                <p className="font-black uppercase tracking-wide text-text mb-1">Evento finalizado</p>
+                Este evento ya se realizó. ¡Gracias a quienes participaron!
+              </div>
+            ) : isProducer ? (
               <div className="flex flex-col gap-4">
                 <div className="border-2 border-border bg-surface-2 p-4">
                   <p className="text-sm font-bold uppercase tracking-wide text-text">
@@ -239,6 +257,24 @@ export default function EventoPage() {
                 <div className="border-2 border-border bg-surface-2 p-4 text-sm text-text-soft">
                   <p className="font-black uppercase tracking-wide text-text mb-1">Cuenta productora</p>
                   Los productores solo pueden visualizar eventos. Para comprar entradas, creá una cuenta de usuario.
+                </div>
+              </div>
+            ) : isSoldOut ? (
+              <div className="flex flex-col gap-4">
+                <div className="border-2 border-border bg-surface-2 p-4">
+                  <p className="text-sm font-bold uppercase tracking-wide text-text mb-2">Zonas</p>
+                  <ul className="flex flex-col gap-2">
+                    {event.zones.map((zone) => (
+                      <li key={zone.id} className="flex items-center justify-between text-sm">
+                        <span className="text-text-soft">{zone.zone} · {zone.name}</span>
+                        <span className="font-black text-text line-through opacity-50">{formatPrice(zone.price)}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+                <div className="border-2 border-border bg-surface-2 p-4 text-sm text-text-soft">
+                  <p className="font-black uppercase tracking-wide text-text mb-1">Entradas agotadas</p>
+                  No quedan entradas disponibles para este evento.
                 </div>
               </div>
             ) : (

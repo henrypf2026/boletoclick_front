@@ -8,10 +8,11 @@ import EventCard from '@/components/ui/EventCard';
 import EventGrid from '@/components/ui/EventGrid';
 import { useCountryFilter } from '@/context/CountryFilterContext';
 import { filterEventsByCountry } from '@/lib/geo/country';
-import { type Event } from '@/mocks/events';
+import { isEventPast, type Event } from '@/mocks/events';
 import { eventService, type CategoryOption } from '@/services/eventService';
 
 const ALL_CATEGORY: CategoryOption = { id: 'all', label: 'Todos' };
+const PAST_PAGE_SIZE = 6;
 
 export default function EventosPage() {
   const { userCountry, showAllEvents } = useCountryFilter();
@@ -22,6 +23,7 @@ export default function EventosPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
+  const [pastVisible, setPastVisible] = useState(PAST_PAGE_SIZE);
 
   const loadEvents = useCallback(async (signal?: { cancelled: boolean }) => {
     setLoading(true);
@@ -57,9 +59,7 @@ export default function EventosPage() {
   useEffect(() => {
     const signal = { cancelled: false };
     void loadEvents(signal);
-    return () => {
-      signal.cancelled = true;
-    };
+    return () => { signal.cancelled = true; };
   }, [loadEvents, reloadKey]);
 
   const countryFilteredEvents = useMemo(
@@ -81,8 +81,22 @@ export default function EventosPage() {
     });
   }, [search, category, countryFilteredEvents]);
 
-  const featuredEvents = filteredEvents.filter((e) => e.featured);
-  const upcomingEvents = filteredEvents.filter((e) => !e.featured);
+  const activeEvents = useMemo(() =>
+    filteredEvents.filter(
+      (e) => (e.status === 'ACTIVE' || e.status === 'SOLDOUT') && !isEventPast(e.date, e.time)
+    ),
+    [filteredEvents],
+  );
+
+  const pastEvents = useMemo(() =>
+    filteredEvents
+      .filter((e) => (e.status === 'ACTIVE' || e.status === 'SOLDOUT') && isEventPast(e.date, e.time))
+      .sort((a, b) => new Date(`${b.date}T${b.time}:00`).getTime() - new Date(`${a.date}T${a.time}:00`).getTime()),
+    [filteredEvents],
+  );
+
+  const featuredEvents = activeEvents.filter((e) => e.featured);
+  const upcomingEvents = activeEvents.filter((e) => !e.featured);
 
   return (
     <div className="min-h-dvh -my-8">
@@ -149,6 +163,34 @@ export default function EventosPage() {
               : 'No encontramos eventos con esos filtros. Probá otra búsqueda.'
           }
         />
+
+        {pastEvents.length > 0 && (
+          <section className="mt-16 border-t-4 border-border pt-8">
+            <div className="mb-6">
+              <h2 className="text-xl font-black uppercase tracking-tight text-text">
+                Eventos pasados
+              </h2>
+              <p className="mt-1 text-sm text-text-soft">
+                Shows que ya se realizaron
+              </p>
+            </div>
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {pastEvents.slice(0, pastVisible).map((event) => (
+                <EventCard key={event.id} event={event} isPast />
+              ))}
+            </div>
+            {pastVisible < pastEvents.length && (
+              <div className="mt-6 flex justify-center">
+                <button
+                  onClick={() => setPastVisible((v) => v + PAST_PAGE_SIZE)}
+                  className="border-2 border-border px-6 py-2.5 text-sm font-black uppercase tracking-wider text-text transition-all hover:-translate-y-0.5 hover:bg-surface-2"
+                >
+                  Ver más eventos pasados ({pastEvents.length - pastVisible} restantes)
+                </button>
+              </div>
+            )}
+          </section>
+        )}
       </div>
     </div>
   );

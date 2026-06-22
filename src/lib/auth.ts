@@ -3,7 +3,6 @@
 import { authService } from '@/services/authService';
 import type { UserRole } from '@/types';
 
-const TOKEN_KEY = 'auth_token';
 const ROLE_KEY = 'user_role';
 const TICKETS_KEY = 'boletoclick_tickets';
 const COOKIE_MAX_AGE = 60 * 60 * 24 * 7; // 7 días
@@ -34,14 +33,7 @@ export interface Ticket {
   purchasedAt: string;
 }
 
-export function getToken(): string | null {
-  if (typeof window === 'undefined') return null;
-  return localStorage.getItem(TOKEN_KEY);
-}
-
-export function saveToken(token: string, role?: UserRole): void {
-  localStorage.setItem(TOKEN_KEY, token);
-  document.cookie = `${TOKEN_KEY}=${token}; path=/; SameSite=Strict; max-age=${COOKIE_MAX_AGE}`;
+export function saveToken(role?: UserRole): void {
   if (role) {
     localStorage.setItem(ROLE_KEY, role);
     document.cookie = `${ROLE_KEY}=${role}; path=/; SameSite=Strict; max-age=${COOKIE_MAX_AGE}`;
@@ -49,22 +41,18 @@ export function saveToken(token: string, role?: UserRole): void {
 }
 
 export function clearToken(): void {
-  localStorage.removeItem(TOKEN_KEY);
   localStorage.removeItem(ROLE_KEY);
   localStorage.removeItem(TICKETS_KEY);
   localStorage.removeItem('boletoclick_purchased_tickets');
   Object.keys(localStorage)
     .filter((key) => key.startsWith('checkoutSession_'))
     .forEach((key) => localStorage.removeItem(key));
-  document.cookie = `${TOKEN_KEY}=; path=/; max-age=0`;
   document.cookie = `${ROLE_KEY}=; path=/; max-age=0`;
 }
 
 export async function getUserFromToken(): Promise<User | null> {
-  const token = getToken();
-  if (!token) return null;
   try {
-    const user = await authService.getMe(token);
+    const user = await authService.getMe();
     if (!user) {
       clearToken();
       return null;

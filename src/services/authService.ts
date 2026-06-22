@@ -55,24 +55,30 @@ async function fetchProfile(userId: string): Promise<AuthUser | null> {
 }
 
 export const authService = {
-  async login(credentials: LoginDto): Promise<{ token: string; user: AuthUser }> {
+  async login(credentials: LoginDto): Promise<{ user: AuthUser }> {
     const data = await api.post<LoginApiResponse>('/auth/login', credentials);
     const profile = await fetchProfile(data.user.id);
-    return { token: data.access_token, user: profile ?? fromSupabaseUser(data.user) };
+    return { user: profile ?? fromSupabaseUser(data.user) };
   },
 
-  async register(dto: RegisterDto): Promise<{ token: string; user: AuthUser }> {
+  async register(dto: RegisterDto): Promise<{ user: AuthUser }> {
     const data = await api.post<RegisterApiResponse>('/auth/register', dto);
-    return { token: data.session.access_token, user: fromUserProfile(data.userProfile) };
+    // el back no setea cookie en register, así que hacemos login para obtenerla
+    await api.post<unknown>('/auth/login', { email: dto.email, password: dto.password });
+    return { user: fromUserProfile(data.userProfile) };
   },
 
   async forgotPassword(email: string): Promise<void> {
     await api.post('/auth/forgot-password', { email });
   },
 
-  async getMe(token: string): Promise<AuthUser | null> {
-    const supabaseUser = await api.get<SupabaseUser>('/auth/me', token);
+  async getMe(): Promise<AuthUser | null> {
+    const supabaseUser = await api.get<SupabaseUser>('/auth/me');
     if (!supabaseUser?.id) return null;
     return (await fetchProfile(supabaseUser.id)) ?? fromSupabaseUser(supabaseUser);
+  },
+
+  async logout(): Promise<void> {
+    await api.post('/auth/logout', {});
   },
 };

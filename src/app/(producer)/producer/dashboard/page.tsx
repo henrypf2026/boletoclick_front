@@ -69,21 +69,12 @@ export default function DashboardProducer() {
     const fetchEventosProductor = async () => {
       try {
         setLoading(true);
-        const rawToken = localStorage.getItem("auth_token");
-
-        if (!rawToken) {
-          throw new Error("No se encontró token de autenticación.");
-        }
-
-        const cleanToken = rawToken.replace(/['"]+/g, "");
 
         // 🎯 Se corrigió la URL agregando '/producer' para consultar el endpoint filtrado del backend
         const response = await fetch("/api/backend/events/producer", {
           method: "GET",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${cleanToken}`,
-          },
+          headers: { "Content-Type": "application/json" },
+          credentials: 'include',
         });
 
         if (!response.ok) {
@@ -188,13 +179,6 @@ export default function DashboardProducer() {
     setLoadingAccion(true);
 
     try {
-      const rawToken = localStorage.getItem("auth_token");
-      if (!rawToken)
-        throw new Error(
-          "Sesión expirada. Por favor, reingresá a la aplicación.",
-        );
-      const cleanToken = rawToken.replace(/['"]+/g, "");
-
       const payloadDto = {
         title: formTitle,
         description: formDescription,
@@ -211,10 +195,8 @@ export default function DashboardProducer() {
         `/api/backend/events/${eventoSeleccionado.id}`,
         {
           method: "PATCH",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${cleanToken}`,
-          },
+          headers: { "Content-Type": "application/json" },
+          credentials: 'include',
           body: JSON.stringify(payloadDto),
         },
       );
@@ -262,20 +244,10 @@ export default function DashboardProducer() {
     setLoadingAccion(true);
 
     try {
-      const rawToken = localStorage.getItem("auth_token");
-      if (!rawToken)
-        throw new Error(
-          "No se encontró sesión activa. Por favor, reingresá a la app.",
-        );
-
-      const cleanToken = rawToken.replace(/['"]+/g, "");
-
       const response = await fetch(`/api/backend/events/${idABorrar}`, {
         method: "DELETE",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${cleanToken}`,
-        },
+        headers: { "Content-Type": "application/json" },
+        credentials: 'include',
       });
 
       if (!response.ok) {

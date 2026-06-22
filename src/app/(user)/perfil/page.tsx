@@ -4,7 +4,6 @@ import { useState } from "react";
 import { useFormik } from "formik";
 import * as Yup from "yup";
 import { useAuth  } from "@/context/AuthContext";
-import { getToken } from "@/lib/auth";
 import { saveToken } from "@/lib/auth";
 
 interface ProfileFormValues {
@@ -92,13 +91,10 @@ export default function PerfilPage() {
           finalImageUrl = uploadedUrl; 
           setUploadingImage(false);
         }
-        const token = getToken();
         const response = await fetch(`/api/backend/users/${user.id}`, {
           method: "PATCH",
-          headers: { 
-            "Content-Type": "application/json", 
-            Authorization: `Bearer ${token}` 
-          },
+          headers: { "Content-Type": "application/json" },
+          credentials: 'include',
           body: JSON.stringify({ 
             allowNewsletter: values.allowNewsletter,
             profileImageUrl: finalImageUrl 
@@ -115,8 +111,8 @@ export default function PerfilPage() {
         const responseData = await response.json();
         console.log("Respuesta completa del servidor:", responseData);
 
-        if (responseData.token) {
-          saveToken(responseData.token, responseData.user?.role || user.role);
+        if (responseData.user?.role) {
+          saveToken(responseData.user.role);
         }
 
         if (setUser) {
