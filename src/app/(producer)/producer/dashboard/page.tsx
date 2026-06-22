@@ -30,6 +30,11 @@ interface Acceso {
   estado: "VALIDO" | "INVALIDO";
 }
 
+interface ApiItem {
+  id: string;
+  name: string;
+}
+
 export default function DashboardProducer() {
   const router = useRouter();
 
@@ -57,6 +62,8 @@ export default function DashboardProducer() {
   const [formTicketTypes, setFormTicketTypes] = useState<TicketType[]>([]);
 
   const [loadingAccion, setLoadingAccion] = useState<boolean>(false);
+  const [categorias, setCategorias] = useState<ApiItem[]>([]);
+  const [locaciones, setLocaciones] = useState<ApiItem[]>([]);
 
   useEffect(() => {
     const fetchEventosProductor = async () => {
@@ -96,6 +103,21 @@ export default function DashboardProducer() {
 
     fetchEventosProductor();
   }, []);
+
+//useEffect que carga categorias y venues desde la BD
+  useEffect(() => {
+  const cargarDesplegables = async () => {
+    const [resCat, resVen] = await Promise.all([
+      fetch("/api/backend/categories").catch(() => null),
+      fetch("/api/backend/venues").catch(() => null),
+    ]);
+    if (resCat?.ok) setCategorias(await resCat.json());
+    if (resVen?.ok) setLocaciones(await resVen.json());
+  };
+  cargarDesplegables();
+}, []);
+
+
 
   const seleccionarEvento = (ev: Evento) => {
     setEventoSeleccionado(ev);
@@ -438,17 +460,23 @@ export default function DashboardProducer() {
                         onChange={(e) => setFormTitle(e.target.value)}
                         className="w-full border-2 border-text p-2 bg-background font-bold text-xs uppercase shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] focus:outline-none"
                       />
+
+
                     </div>
                     <div className="space-y-1">
                       <label className="text-[10px] font-mono font-bold uppercase text-text-soft">
                         Categoría del Show
                       </label>
-                      <input
-                        type="text"
+                      <select
                         value={formCategory}
                         onChange={(e) => setFormCategory(e.target.value)}
                         className="w-full border-2 border-text p-2 bg-background font-bold text-xs uppercase shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] focus:outline-none"
-                      />
+                      >
+                        <option value="">-- Seleccioná Categoría --</option>
+                        {categorias.map((cat) => (
+                          <option key={cat.id} value={cat.id}>{cat.name}</option>
+                        ))}
+                      </select>
                     </div>
                   </div>
 
@@ -474,6 +502,10 @@ export default function DashboardProducer() {
                         onChange={(e) => setFormLocation(e.target.value)}
                         className="w-full border-2 border-text p-2 bg-background font-bold text-xs uppercase shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] focus:outline-none"
                       />
+                       <option value="">-- Seleccioná Lugar --</option>
+                            {locaciones.map((ven) => (
+                              <option key={ven.id} value={ven.id}>{ven.name}</option>
+                            ))}
                     </div>
                   </div>
 
