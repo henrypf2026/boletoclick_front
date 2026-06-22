@@ -14,9 +14,7 @@ async function uploadImage(file: File, userId: string): Promise<string> {
   const formData = new FormData();
   formData.append("file", file);
 
-  const token = getToken();
-
-   const response = await fetch(`/api/backend/files/uploadImage/${userId}`, {
+  const response = await fetch(`/api/backend/files/uploadImage/${userId}`, {
     method: "PUT",
     credentials: 'include',
     body: formData,
