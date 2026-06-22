@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useState } from "react";
-import { getToken } from "@/lib/auth";
 import {
   mapFormToApi,
   type BankFormData,
@@ -58,23 +57,11 @@ export default function BankForm({ initialData }: BankFormProps) {
     setLoading(true);
     setStatus(null);
 
-    const token = getToken();
-    if (!token) {
-      setStatus({
-        type: "error",
-        msg: "Tenés que iniciar sesión como productor para guardar los datos.",
-      });
-      setLoading(false);
-      return;
-    }
-
     try {
       const res = await fetch("/api/backend/bank-accounts", {
         method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
+        headers: { "Content-Type": "application/json" },
+        credentials: 'include',
         body: JSON.stringify(mapFormToApi(formData)),
       });
 

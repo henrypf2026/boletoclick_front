@@ -3,7 +3,6 @@
 import { useState, useEffect, useCallback, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
-import { getToken } from "@/lib/auth";
 import { savePendingPurchase } from "@/lib/pendingPurchase";
 import { checkoutService } from "@/services/checkoutService";
 import type { Event, Zone } from "@/mocks/events";
@@ -213,8 +212,6 @@ function CheckoutContent() {
     setLoadingPurchase(true);
 
     try {
-      const token = getToken();
-
       const checkoutEvent: Event = {
         id: eventId,
         title: ticketTypeName,
@@ -231,6 +228,7 @@ function CheckoutContent() {
         priceFrom: ticketPrice,
         featured: false,
         badge: null,
+        status: 'ACTIVE',
         imageGradient: "linear-gradient(135deg, #1a1a2e 0%, #e94560 100%)",
         zones: [],
       };
@@ -254,10 +252,8 @@ function CheckoutContent() {
 
       const res = await fetch("/api/backend/payments/create-session", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
+        headers: { "Content-Type": "application/json" },
+        credentials: 'include',
         body: JSON.stringify({
           ticketTypeId,
           quantity,

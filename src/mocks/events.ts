@@ -38,6 +38,8 @@ export interface EventCoordinates {
   lng: number;
 }
 
+export type EventStatus = 'ACTIVE' | 'SOLDOUT' | 'CANCELLED' | 'INACTIVE' | 'DRAFT';
+
 export interface Event {
   id: string;
   title: string;
@@ -59,6 +61,7 @@ export interface Event {
   zones: Zone[];
   posterUrl?: string | null;
   fallbackImageUrl?: string | null;
+  status: EventStatus;
 }
 
 export const events: Event[] = [
@@ -76,6 +79,7 @@ export const events: Event[] = [
     time: '21:00',
     priceFrom: 500,
     featured: true,
+    status: 'ACTIVE',
     badge: 'Preventa',
     imageGradient: 'linear-gradient(135deg, #0046ad 0%, #c8102e 100%)',
     zones: [
@@ -98,6 +102,7 @@ export const events: Event[] = [
     time: '19:00',
     priceFrom: 450,
     featured: true,
+    status: 'ACTIVE',
     badge: 'Alta demanda',
     imageGradient: 'linear-gradient(135deg, #ffcc00 0%, #003087 100%)',
     zones: [
@@ -120,6 +125,7 @@ export const events: Event[] = [
     time: '23:00',
     priceFrom: 350,
     featured: false,
+    status: 'ACTIVE',
     badge: 'Nuevo',
     imageGradient: 'linear-gradient(135deg, #1a1a2e 0%, #e94560 100%)',
     zones: [
@@ -141,6 +147,7 @@ export const events: Event[] = [
     time: '20:30',
     priceFrom: 890,
     featured: false,
+    status: 'ACTIVE',
     badge: 'Agotándose',
     imageGradient: 'linear-gradient(135deg, #7b2cbf 0%, #ff006e 100%)',
     zones: [
@@ -164,6 +171,7 @@ export const events: Event[] = [
     priceFrom: 280,
     featured: false,
     badge: null,
+    status: 'ACTIVE',
     imageGradient: 'linear-gradient(135deg, #c8102e 0%, #000000 100%)',
     zones: [
       mockZone('general', 'General', 280, 500, 'Tribuna Popular'),
@@ -185,6 +193,7 @@ export const events: Event[] = [
     priceFrom: 420,
     featured: false,
     badge: null,
+    status: 'ACTIVE',
     imageGradient: 'linear-gradient(135deg, #2d6a4f 0%, #ffd166 100%)',
     zones: [
       mockZone('general', 'General', 420, 180, 'Platea Baja'),
@@ -219,4 +228,16 @@ export function formatPrice(amount: number): string {
     currency: 'MXN',
     minimumFractionDigits: 0,
   }).format(amount);
+}
+
+const LOW_STOCK_PERCENT = 0.05;
+
+export function isEventPast(date: string, time: string): boolean {
+  return new Date(`${date}T${time}:00`) < new Date();
+}
+
+export function isLowStock(zones: Zone[], capacity?: number): boolean {
+  if (!capacity) return false;
+  const totalAvailable = zones.reduce((sum, z) => sum + z.available, 0);
+  return totalAvailable > 0 && totalAvailable / capacity <= LOW_STOCK_PERCENT;
 }

@@ -10,15 +10,15 @@ const BACKEND_URL =
 async function getBankData() {
   try {
     const cookieStore = await cookies();
-    const token = cookieStore.get("auth_token")?.value;
+    const accessToken = cookieStore.get("access_token")?.value;
 
-    if (!token) return null;
+    if (!accessToken) return null;
 
     const res = await fetch(`${BACKEND_URL}/bank-accounts/me`, {
       method: "GET",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
+        Cookie: `access_token=${accessToken}`,
       },
       cache: "no-store",
     });

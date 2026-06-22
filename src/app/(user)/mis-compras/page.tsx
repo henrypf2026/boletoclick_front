@@ -3,7 +3,6 @@
 import { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
-import { getToken } from "@/lib/auth";
 import Swal from "sweetalert2";
 import jsPDF from "jspdf";
 
@@ -177,10 +176,8 @@ export default function MisComprasPage() {
 
   useEffect(() => {
     if (!user) return;
-    const token = getToken();
-
     fetch("/api/backend/orders/me", {
-      headers: { Authorization: `Bearer ${token}` },
+      credentials: 'include',
     })
       .then((res) => {
         if (!res.ok) throw new Error("Error al traer órdenes");

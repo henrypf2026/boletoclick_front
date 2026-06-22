@@ -1,7 +1,7 @@
 import { api } from "@/lib/apiClient";
 import { getCategoryImage } from "@/lib/categoryImages";
 import { inferEventCountry } from "@/lib/geo/country";
-import { teams, type Event, type Zone } from "@/mocks/events";
+import { teams, type Event, type EventStatus, type Zone } from "@/mocks/events";
 
 interface ApiVenue {
   id: string;
@@ -33,6 +33,7 @@ interface ApiEvent {
   title: string;
   description: string;
   eventDate: string;
+  status?: string;
   posterUrl?: string | null;
   venue?: ApiVenue | null;
   category?: ApiCategory | null;
@@ -111,12 +112,18 @@ function mapApiEvent(apiEvent: ApiEvent): Event {
     available: ticket.stock,
   }));
 
+  const validStatuses: EventStatus[] = ['ACTIVE', 'SOLDOUT', 'CANCELLED', 'INACTIVE', 'DRAFT'];
+  const status: EventStatus = validStatuses.includes(apiEvent.status as EventStatus)
+    ? (apiEvent.status as EventStatus)
+    : 'ACTIVE';
+
   return {
     id: apiEvent.id,
     title: apiEvent.title,
     subtitle,
     category: categorySlug,
     teamId: inferTeamId(apiEvent.title),
+    status,
     venue: venue?.name ?? "Por confirmar",
     city: venue?.city ?? "",
     address: venue?.address ?? undefined,
@@ -163,9 +170,9 @@ export const eventService = {
       .filter((category) => category?.slug && category?.name)
       .map((category) => ({ id: category.slug, label: category.name }));
   },
-  async getMyProducerEvents(token: string): Promise<Event[]> {
+  async getMyProducerEvents(): Promise<Event[]> {
     try {
-      const data = await api.get<ApiEvent[]>('/events/producer', token);
+      const data = await api.get<ApiEvent[]>('/events/producer');
       return Array.isArray(data) ? data.map(mapApiEvent) : [];
     } catch (error) {
       console.error("Error en getMyProducerEvents:", error);

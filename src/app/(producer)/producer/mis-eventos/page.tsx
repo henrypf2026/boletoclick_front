@@ -4,7 +4,6 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
-import { getToken } from '@/lib/auth';
 import { eventService } from '@/services/eventService';
 import type { Event } from '@/mocks/events';
 
@@ -19,10 +18,7 @@ export default function MisEventosPage() {
     if (loading) return;
     if (!authenticated) { router.push('/login?from=/producer/mis-eventos'); return; }
 
-    const token = getToken();
-    if (!token) return;
-
-    eventService.getMyProducerEvents(token)
+    eventService.getMyProducerEvents()
       .then(setEvents)
       .catch(() => setError('No se pudieron cargar tus eventos.'))
       .finally(() => setLoadingEvents(false));

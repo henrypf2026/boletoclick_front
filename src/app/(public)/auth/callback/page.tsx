@@ -20,14 +20,14 @@ export default function AuthCallbackPage() {
       if (!mounted || handled) return;
       handled = true;
       try {
-        const user = await authService.getMe(session.access_token);
+        const user = await authService.getMe();
         if (!mounted) return;
         if (!user || !user.role) {
           await supabase.auth.signOut();
           if (mounted) setError('No encontramos una cuenta registrada con ese correo. Registrate primero desde el formulario.');
           return;
         }
-        saveToken(session.access_token, user.role);
+        saveToken(user.role);
         window.location.href = '/';
       } catch {
         if (mounted) setError('No se pudo conectar con el servidor.');

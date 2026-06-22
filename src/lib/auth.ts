@@ -39,9 +39,7 @@ export function getToken(): string | null {
   return localStorage.getItem(TOKEN_KEY);
 }
 
-export function saveToken(token: string, role?: UserRole): void {
-  localStorage.setItem(TOKEN_KEY, token);
-  document.cookie = `${TOKEN_KEY}=${token}; path=/; SameSite=Strict; max-age=${COOKIE_MAX_AGE}`;
+export function saveToken(role?: UserRole): void {
   if (role) {
     localStorage.setItem(ROLE_KEY, role);
     document.cookie = `${ROLE_KEY}=${role}; path=/; SameSite=Strict; max-age=${COOKIE_MAX_AGE}`;
@@ -61,10 +59,8 @@ export function clearToken(): void {
 }
 
 export async function getUserFromToken(): Promise<User | null> {
-  const token = getToken();
-  if (!token) return null;
   try {
-    const user = await authService.getMe(token);
+    const user = await authService.getMe();
     if (!user) {
       clearToken();
       return null;
