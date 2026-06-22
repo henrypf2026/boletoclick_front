@@ -43,7 +43,7 @@ export default function EventForm() {
 
 
   const [ticketTypes, setTicketTypes] = useState<TicketType[]>([
-    { name: "General", price: "", stock: 100, zone: "Planta Baja" },
+    { name: "General", price: 0, stock: 100, zone: "Planta Baja" },
   ]);
 
 
