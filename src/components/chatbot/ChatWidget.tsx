@@ -29,6 +29,7 @@ export function ChatWidget() {
   const [suggestions, setSuggestions] = useState(getInitialSuggestions());
   const [isTyping, setIsTyping] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
+  const [bottomOffset, setBottomOffset] = useState(24);
   const listRef = useRef<HTMLDivElement>(null);
 
   const isHiddenRoute = HIDDEN_ROUTE_PREFIXES.some((prefix) =>
@@ -41,6 +42,19 @@ export function ChatWidget() {
       behavior: "smooth",
     });
   }, [messages, isTyping]);
+
+  useEffect(() => {
+    const footer = document.querySelector("footer");
+    if (!footer) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        setBottomOffset(entry.isIntersecting ? footer.offsetHeight + 24 : 24);
+      },
+      { threshold: 0 },
+    );
+    observer.observe(footer);
+    return () => observer.disconnect();
+  }, []);
 
   if (isHiddenRoute) {
     return null;
@@ -90,7 +104,8 @@ export function ChatWidget() {
       <button
         type="button"
         onClick={() => setIsOpen(true)}
-        className="fixed bottom-6 right-6 z-50 flex h-14 w-14 items-center justify-center rounded-full border-2 border-border bg-primary text-2xl text-white shadow-lg transition hover:bg-primary-deep"
+        style={{ bottom: bottomOffset }}
+        className="fixed right-6 z-50 flex h-14 w-14 items-center justify-center rounded-full border-2 border-border bg-primary text-2xl text-white shadow-lg transition-[bottom] duration-200 hover:bg-primary-deep"
         aria-label="Abrir asistente"
       >
         💬
@@ -99,7 +114,7 @@ export function ChatWidget() {
   }
 
   return (
-    <div className="fixed bottom-6 right-6 z-50 flex w-[min(100vw-2rem,24rem)] flex-col overflow-hidden rounded-3xl border-2 border-border bg-background shadow-2xl">
+    <div style={{ bottom: bottomOffset }} className="fixed right-6 z-50 flex w-[min(100vw-2rem,24rem)] flex-col overflow-hidden rounded-3xl border-2 border-border bg-background shadow-2xl transition-[bottom] duration-200">
       <header className="flex items-center justify-between bg-primary px-4 py-3 text-white">
         <div>
           <p className="text-xs font-black uppercase tracking-wider opacity-80">
