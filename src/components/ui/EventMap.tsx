@@ -80,9 +80,19 @@ export default function EventMap({ coordinates, venue, city, address }: EventMap
 
   return (
     <div className="space-y-3">
+      <style>{`
+        .bc-map .mapboxgl-popup-content {
+          color: #171717 !important;
+          background: #ffffff !important;
+        }
+        .bc-map .mapboxgl-popup-tip {
+          border-top-color: #ffffff !important;
+          border-bottom-color: #ffffff !important;
+        }
+      `}</style>
       <div
         ref={containerRef}
-        className="h-64 w-full min-h-[16rem] overflow-hidden rounded-xl border border-border md:h-80"
+        className="bc-map h-64 w-full min-h-[16rem] overflow-hidden rounded-xl border border-border md:h-80"
         aria-label={`Mapa de ${venue}, ${city}`}
       />
       <a
