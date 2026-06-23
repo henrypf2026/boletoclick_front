@@ -20,6 +20,13 @@ export default function AuthCallbackPage() {
       if (!mounted || handled) return;
       handled = true;
       try {
+        const setRes = await fetch('/api/backend/auth/set-session', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ access_token: session.access_token }),
+        });
+        if (!setRes.ok) throw new Error('set-session failed');
         const user = await authService.getMe();
         if (!mounted) return;
         if (!user || !user.role) {
@@ -28,7 +35,9 @@ export default function AuthCallbackPage() {
           return;
         }
         saveToken(user.role);
-        window.location.href = '/';
+        const destination = localStorage.getItem('oauth_redirect') || '/';
+        localStorage.removeItem('oauth_redirect');
+        window.location.href = destination;
       } catch {
         if (mounted) setError('No se pudo conectar con el servidor.');
       }

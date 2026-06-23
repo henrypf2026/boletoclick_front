@@ -7,6 +7,8 @@ import MobileMenu from "./MobileMenu";
 
 export default function Navbar() {
   return (
+    <>
+      <div className="fixed inset-x-0 top-0 z-40 h-2 bg-background sm:h-4" />
     <header className="sticky top-2 z-50 mx-auto mb-4 w-full max-w-7xl select-none px-3 sm:top-4 sm:px-4">
       <nav className="relative flex h-14 items-center border-4 border-border bg-surface px-3 shadow-[4px_4px_0px_0px_rgba(23,23,23,1)] sm:h-16 sm:px-6 dark:shadow-[4px_4px_0px_0px_rgba(255,255,255,1)]">
         <Link
@@ -35,5 +37,6 @@ export default function Navbar() {
         </div>
       </nav>
     </header>
+    </>
   );
 }

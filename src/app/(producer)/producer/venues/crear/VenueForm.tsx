@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 
 interface Province {
   id: string;
@@ -15,6 +16,7 @@ interface Municipality {
 const MAPBOX_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN ?? "";
 
 export default function VenueForm() {
+  const router = useRouter();
   const [provinces, setProvinces] = useState<Province[]>([]);
   const [municipalities, setMunicipalities] = useState<Municipality[]>([]);
   const [loadingMunicipalities, setLoadingMunicipalities] = useState(false);
@@ -153,6 +155,7 @@ export default function VenueForm() {
       }
 
       setStatus({ type: "success", msg: "¡Venue creado con éxito! Ya podés seleccionarlo al crear un evento." });
+      setTimeout(() => router.push("/producer/dashboard"), 1500);
       setVenue({ name: "", address: "", provinceId: "", municipalityId: "", capacity: "", latitude: "", longitude: "", imgUrl: "" });
       setMunicipalities([]);
       setGeocodedAddress(null);
