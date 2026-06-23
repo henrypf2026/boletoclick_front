@@ -19,6 +19,7 @@ function LoginForm() {
   const redirectTo = searchParams.get('from') || '/';
 
   const handleGoogleLogin = async () => {
+    if (redirectTo !== '/') localStorage.setItem('oauth_redirect', redirectTo);
     await supabase.auth.signOut();
     await supabase.auth.signInWithOAuth({
       provider: 'google',
