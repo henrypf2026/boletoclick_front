@@ -25,8 +25,8 @@ export default function EventosPage() {
   const [reloadKey, setReloadKey] = useState(0);
   const [pastVisible, setPastVisible] = useState(PAST_PAGE_SIZE);
 
-  const loadEvents = useCallback(async (signal?: { cancelled: boolean }) => {
-    setLoading(true);
+  const loadEvents = useCallback(async (signal?: { cancelled: boolean }, silent = false) => {
+    if (!silent) setLoading(true);
     setError(null);
 
     const [eventsResult, categoriesResult] = await Promise.allSettled([
@@ -53,7 +53,7 @@ export default function EventosPage() {
       setCategories([ALL_CATEGORY, ...categoriesResult.value]);
     }
 
-    setLoading(false);
+    if (!silent) setLoading(false);
   }, []);
 
   useEffect(() => {
@@ -61,6 +61,14 @@ export default function EventosPage() {
     void loadEvents(signal);
     return () => { signal.cancelled = true; };
   }, [loadEvents, reloadKey]);
+
+  useEffect(() => {
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') void loadEvents(undefined, true);
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
+    return () => document.removeEventListener('visibilitychange', handleVisibility);
+  }, [loadEvents]);
 
   const countryFilteredEvents = useMemo(
     () => filterEventsByCountry(events, userCountry, showAllEvents),

@@ -287,11 +287,15 @@ export default function EventoPage() {
                     id="quantity"
                     value={quantity}
                     onChange={(e) => setQuantity(Number(e.target.value))}
-                    className="w-full border-2 border-border bg-background px-3 py-2.5 text-sm font-bold text-text focus:outline-none focus:border-primary transition-colors"
+                    disabled={!selectedZone || selectedZone.available === 0}
+                    className="w-full border-2 border-border bg-background px-3 py-2.5 text-sm font-bold text-text focus:outline-none focus:border-primary transition-colors disabled:opacity-50"
                   >
-                    {[1, 2, 3, 4, 5, 6].map((v) => (
-                      <option key={v} value={v}>{v}</option>
-                    ))}
+                    {selectedZone && selectedZone.available > 0
+                      ? Array.from({ length: Math.min(selectedZone.available, 10) }, (_, i) => i + 1).map((v) => (
+                          <option key={v} value={v}>{v}</option>
+                        ))
+                      : <option value={0}>Sin stock</option>
+                    }
                   </select>
                 </div>
 
@@ -302,7 +306,7 @@ export default function EventoPage() {
                   <select
                     id="zone"
                     value={zoneId}
-                    onChange={(e) => setZoneId(e.target.value)}
+                    onChange={(e) => { setZoneId(e.target.value); setQuantity(1); }}
                     disabled={event.zones.length === 0}
                     className="w-full border-2 border-border bg-background px-3 py-2.5 text-sm font-bold text-text focus:outline-none focus:border-primary transition-colors disabled:opacity-50"
                   >
