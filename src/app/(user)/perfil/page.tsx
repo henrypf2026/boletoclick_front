@@ -282,9 +282,6 @@ export default function PerfilPage() {
                 className="sr-only"
               />
               <div
-                onClick={() =>
-                  formik.setFieldValue("allowNewsletter", !formik.values.allowNewsletter)
-                }
                 className={`w-6 h-6 border-2 border-text flex items-center justify-center transition-all cursor-pointer ${
                   formik.values.allowNewsletter ? "bg-primary" : "bg-surface-2"
                 }`}
