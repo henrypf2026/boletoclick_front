@@ -230,14 +230,13 @@ export function formatPrice(amount: number): string {
   }).format(amount);
 }
 
-const LOW_STOCK_PERCENT = 0.05;
+const LOW_STOCK_THRESHOLD = 20;
 
 export function isEventPast(date: string, time: string): boolean {
   return new Date(`${date}T${time}:00`) < new Date();
 }
 
-export function isLowStock(zones: Zone[], capacity?: number): boolean {
-  if (!capacity) return false;
+export function isLowStock(zones: Zone[]): boolean {
   const totalAvailable = zones.reduce((sum, z) => sum + z.available, 0);
-  return totalAvailable > 0 && totalAvailable / capacity <= LOW_STOCK_PERCENT;
+  return totalAvailable > 0 && totalAvailable <= LOW_STOCK_THRESHOLD;
 }
