@@ -32,6 +32,7 @@ export default function MisTicketsPage() {
   const [tickets, setTickets] = useState<ApiTicket[]>([]);
   const [loading, setLoading] = useState(true);
   const [ticketExpandido, setTicketExpandido] = useState<ApiTicket | null>(null);
+  const [eventTitles, setEventTitles] = useState<Record<string, string>>({});
 
   
   useEffect(() => {
@@ -43,6 +44,28 @@ export default function MisTicketsPage() {
       .catch(() => setTickets([]))
       .finally(() => setLoading(false));
   }, [user]);
+
+  useEffect(() => {
+    const needsTitle = tickets.filter((t) => !t.eventTitle && t.ticketType.eventId);
+    const uniqueIds = [...new Set(needsTitle.map((t) => t.ticketType.eventId!))];
+    if (!uniqueIds.length) return;
+    Promise.all(
+      uniqueIds.map(async (id) => {
+        try {
+          const res = await fetch(`/api/backend/events/${id}`, { credentials: "include" });
+          if (!res.ok) return null;
+          const data = await res.json();
+          return { id, title: data.title as string };
+        } catch {
+          return null;
+        }
+      })
+    ).then((results) => {
+      const map: Record<string, string> = {};
+      results.forEach((r) => { if (r) map[r.id] = r.title; });
+      setEventTitles(map);
+    });
+  }, [tickets]);
 
   
   if (!user) {
@@ -124,7 +147,7 @@ export default function MisTicketsPage() {
                 <div className="flex flex-col gap-1.5">
                   <div className="flex items-center gap-2 flex-wrap">
                     <h2 className="text-lg font-black uppercase tracking-tight text-text group-hover:text-primary transition-colors">
-                      {ticket.eventTitle ?? ticket.ticketType.name}
+                      {eventTitles[ticket.ticketType.eventId ?? ""] ?? ticket.eventTitle ?? ticket.ticketType.name}
                     </h2>
                     <span className={`text-[10px] font-mono font-black uppercase border px-2 py-0.5 ${statusStyle(ticket.order.status)}`}>
                       {statusLabel(ticket.order.status)}
@@ -187,7 +210,7 @@ export default function MisTicketsPage() {
                 PASES DIGITALES BOLETOCLICK
               </span>
               <h2 className="text-black font-black text-2xl uppercase tracking-tighter mt-4 leading-tight">
-                {ticketExpandido.eventTitle ?? ticketExpandido.ticketType.name}
+                {eventTitles[ticketExpandido.ticketType.eventId ?? ""] ?? ticketExpandido.eventTitle ?? ticketExpandido.ticketType.name}
               </h2>
               {ticketExpandido.ticketType.zone && (
                 <div className="mt-3">
