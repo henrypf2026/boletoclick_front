@@ -13,6 +13,7 @@ export interface ApiTicket {
   eventTitle?: string;
   ticketType: {
     id: string;
+    eventId?: string;
     name: string;
     price: number;
     zone: string | null;
