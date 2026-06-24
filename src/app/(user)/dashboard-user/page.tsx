@@ -333,6 +333,8 @@ export default function UserDashboard() {
   const [errorOrders, setErrorOrders]         = useState(false);
   const [pdfLoading, setPdfLoading]           = useState<string | null>(null);
   const [cancellingId, setCancellingId]       = useState<string | null>(null);
+  const [ticketEventTitles, setTicketEventTitles] = useState<Record<string, string>>({});
+  const [orderEventTitles, setOrderEventTitles]   = useState<Record<string, string>>({});
 
   useEffect(() => {
     if (!user) return;
@@ -363,6 +365,35 @@ export default function UserDashboard() {
     };
     fetchOrders();
   }, [user]);
+
+  useEffect(() => {
+    const needsTitle = tickets.filter((t) => !t.eventTitle && t.ticketType.eventId);
+    const uniqueIds = [...new Set(needsTitle.map((t) => t.ticketType.eventId!))];
+    if (!uniqueIds.length) return;
+    Promise.all(uniqueIds.map((id) => fetchEvent(id).then((e) => ({ id, title: e?.title ?? null }))))
+      .then((results) => {
+        const map: Record<string, string> = {};
+        results.forEach(({ id, title }) => { if (title) map[id] = title; });
+        setTicketEventTitles(map);
+      });
+  }, [tickets]);
+
+  useEffect(() => {
+    if (!orders.length) return;
+    const pairs = orders
+      .map((o) => ({ orderId: o.id, eventId: o.tickets?.[0]?.ticketType?.eventId }))
+      .filter((p): p is { orderId: string; eventId: string } => !!p.eventId);
+    if (!pairs.length) return;
+    const uniqueEventIds = [...new Set(pairs.map((p) => p.eventId))];
+    Promise.all(uniqueEventIds.map((id) => fetchEvent(id).then((e) => ({ id, title: e?.title ?? null }))))
+      .then((results) => {
+        const eventMap: Record<string, string> = {};
+        results.forEach(({ id, title }) => { if (title) eventMap[id] = title; });
+        const orderMap: Record<string, string> = {};
+        pairs.forEach((p) => { if (eventMap[p.eventId]) orderMap[p.orderId] = eventMap[p.eventId]; });
+        setOrderEventTitles(orderMap);
+      });
+  }, [orders]);
 
   const ordenesFiltradas = orders.filter(
     (o) =>
@@ -536,7 +567,7 @@ export default function UserDashboard() {
                   <div className="border-b-2 border-dashed border-text/40 pb-4 mb-4">
                     <div className="flex justify-between items-start gap-2">
                       <h3 className="text-text font-black text-lg uppercase tracking-tight group-hover:text-primary transition-colors">
-                        {ticket.eventTitle ?? ticket.ticketType.name}
+                        {ticketEventTitles[ticket.ticketType.eventId ?? ""] ?? ticket.eventTitle ?? ticket.ticketType.name}
                       </h3>
                       <span className={`text-[9px] font-mono px-1.5 py-0.5 font-bold whitespace-nowrap border ${orderStatusColor(ticket.order.status)}`}>
                         {orderStatusLabel(ticket.order.status)}
@@ -595,6 +626,11 @@ export default function UserDashboard() {
                     className="p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-surface"
                   >
                     <div>
+                      {orderEventTitles[orden.id] && (
+                        <p className="font-black text-sm uppercase tracking-tight text-text mb-2">
+                          {orderEventTitles[orden.id]}
+                        </p>
+                      )}
                       <div className="flex items-center gap-2 mb-1.5 flex-wrap">
                         <span className="font-mono bg-text text-surface px-2 py-0.5 font-bold text-[10px]">
                           {orden.id.slice(0, 8).toUpperCase()}
@@ -682,7 +718,7 @@ export default function UserDashboard() {
                 PASES DIGITALES BOLETOCLICK
               </span>
               <h2 className="text-black font-black text-2xl uppercase tracking-tighter mt-4 leading-tight">
-                {ticketExpandido.eventTitle ?? ticketExpandido.ticketType.name}
+                {ticketEventTitles[ticketExpandido.ticketType.eventId ?? ""] ?? ticketExpandido.eventTitle ?? ticketExpandido.ticketType.name}
               </h2>
               {ticketExpandido.ticketType.zone && (
                 <div className="mt-3">
