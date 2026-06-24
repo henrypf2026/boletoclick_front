@@ -30,6 +30,13 @@ interface Acceso {
   estado: "VALIDO" | "INVALIDO";
 }
 
+interface EventStats {
+  total: number;
+  arrived: number;
+  pending: number;
+  percentage: number;
+}
+
 interface ApiItem {
   id: string;
   name: string;
@@ -45,9 +52,11 @@ export default function DashboardProducer() {
   const [eventoSeleccionado, setEventoSeleccionado] = useState<Evento | null>(
     null,
   );
-  const [seccionActiva, setSeccionActiva] = useState<"ajustes" | "scanner">(
+  const [seccionActiva, setSeccionActiva] = useState<"ajustes" | "stats" | "scanner">(
     "ajustes",
   );
+  const [eventStats, setEventStats] = useState<EventStats | null>(null);
+  const [loadingStats, setLoadingStats] = useState(false);
   const [statusScanner, setStatusScanner] = useState<
     "idle" | "success" | "error"
   >("idle");
@@ -106,8 +115,15 @@ export default function DashboardProducer() {
     cargarDesplegables();
   }, []);
 
-  const seleccionarEvento = (ev: Evento) => {
+  const seleccionarEvento = async (ev: Evento) => {
     setEventoSeleccionado(ev);
+    setEventStats(null);
+    setLoadingStats(true);
+    fetch(`/api/backend/tickets/event/${ev.id}/stats`, { credentials: "include" })
+      .then((r) => r.ok ? r.json() : null)
+      .then((data) => { if (data) setEventStats(data); })
+      .catch(() => {})
+      .finally(() => setLoadingStats(false));
 
     setFormTitle(ev.title);
     setFormDescription(ev.description || "");
@@ -282,19 +298,19 @@ export default function DashboardProducer() {
       <div className="mb-6 flex flex-wrap gap-3 p-4 bg-surface border-4 border-text shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
         <button
           onClick={() => router.push("/producer/eventos/crear")}
-          className="px-4 py-2 bg-accent text-black border-2 border-text font-mono text-xs font-black uppercase tracking-wider hover:translate-x-0.5 hover:translate-y-0.5 transition-all shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] hover:shadow-none"
+          className="px-4 py-2 bg-primary text-background border-2 border-text font-mono text-sm font-black uppercase tracking-wider hover:translate-x-0.5 hover:translate-y-0.5 transition-all shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] hover:shadow-none"
         >
           ➕ Crear Nuevo Evento
         </button>
         <button
           onClick={() => router.push("/producer/venues/crear")}
-          className="px-4 py-2 bg-background text-text border-2 border-text font-mono text-xs font-black uppercase tracking-wider hover:translate-x-0.5 hover:translate-y-0.5 transition-all shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] hover:shadow-none"
+          className="px-4 py-2 bg-background text-text border-2 border-text font-mono text-sm font-black uppercase tracking-wider hover:translate-x-0.5 hover:translate-y-0.5 transition-all shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] hover:shadow-none"
         >
           📍 Registrar Venue
         </button>
         <button
           onClick={() => router.push("/producer/bank-accounts")}
-          className="px-4 py-2 bg-background text-text border-2 border-text font-mono text-xs font-black uppercase tracking-wider hover:translate-x-0.5 hover:translate-y-0.5 transition-all shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] hover:shadow-none"
+          className="px-4 py-2 bg-background text-text border-2 border-text font-mono text-sm font-black uppercase tracking-wider hover:translate-x-0.5 hover:translate-y-0.5 transition-all shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] hover:shadow-none"
         >
           🏦 Configurar Cuenta Bancaria
         </button>
@@ -390,6 +406,20 @@ export default function DashboardProducer() {
               }`}
             >
               🛠️ Ajustes Avanzados
+            </button>
+
+            <button
+              disabled={!eventoSeleccionado}
+              onClick={() => setSeccionActiva("stats")}
+              className={`px-4 py-2 font-mono text-xs font-black uppercase border-2 border-text ${
+                !eventoSeleccionado
+                  ? "opacity-30"
+                  : seccionActiva === "stats"
+                    ? "bg-text text-surface"
+                    : "bg-surface"
+              }`}
+            >
+              📊 Estadísticas
             </button>
 
             <button
@@ -595,11 +625,104 @@ export default function DashboardProducer() {
                     <button
                       onClick={eliminarEvento}
                       disabled={loadingAccion}
-                      className="bg-accent text-white border-2 border-text px-4 py-2.5 font-mono text-xs font-black uppercase shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] hover:translate-x-0.5 hover:translate-y-0.5 transition-all active:shadow-none"
+                      className="bg-red-600 text-white border-2 border-red-800 px-4 py-2.5 font-mono text-xs font-black uppercase shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] hover:bg-red-700 hover:translate-x-0.5 hover:translate-y-0.5 transition-all active:shadow-none disabled:opacity-50"
                     >
                       {loadingAccion ? "[ PROCESANDO... ]" : "🗑️ DAR DE BAJA"}
                     </button>
                   </div>
+                </div>
+              )}
+
+              {seccionActiva === "stats" && (
+                <div className="bg-surface border-2 border-text p-6 space-y-6 shadow-[4px_4px_0px_0px_var(--color-text)]">
+                  <h3 className="text-lg font-black uppercase border-b-2 border-text pb-2">
+                    Estadísticas de Ventas
+                  </h3>
+
+                  {loadingStats ? (
+                    <p className="font-mono text-xs text-text-soft uppercase animate-pulse">[ Cargando stats... ]</p>
+                  ) : !eventStats ? (
+                    <p className="font-mono text-xs text-text-soft uppercase">Sin datos disponibles.</p>
+                  ) : (() => {
+                    const totalStock = eventoSeleccionado?.ticketTypes?.reduce((acc, t) => acc + (Number(t.stock) || 0), 0) ?? 0;
+                    const totalInitial = eventStats.total + totalStock;
+                    const soldPct = totalInitial > 0 ? Math.round((eventStats.total / totalInitial) * 100) : 0;
+                    const isLowStock = totalStock > 0 && soldPct >= 80;
+
+                    return (
+                      <>
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                          {[
+                            { label: "Vendidas", value: eventStats.total },
+                            { label: "Disponibles", value: totalStock },
+                            { label: "Asistieron", value: eventStats.arrived },
+                            { label: "Sin escanear", value: eventStats.pending },
+                          ].map(({ label, value }) => (
+                            <div key={label} className="border-2 border-text p-3 text-center bg-background">
+                              <span className="block text-2xl font-black text-text">{value}</span>
+                              <span className="block text-[10px] font-mono font-bold uppercase text-text-soft mt-1">{label}</span>
+                            </div>
+                          ))}
+                        </div>
+
+                        <div>
+                          <div className="flex justify-between items-center mb-1.5">
+                            <span className="text-xs font-mono font-bold uppercase text-text-soft">Progreso de ventas</span>
+                            <span className="text-sm font-mono font-black text-text">{soldPct}% vendido</span>
+                          </div>
+                          <div className="h-4 border-2 border-text bg-background overflow-hidden">
+                            <div
+                              className={`h-full transition-all ${soldPct >= 100 ? "bg-red-500" : "bg-primary"}`}
+                              style={{ width: `${Math.min(soldPct, 100)}%` }}
+                            />
+                          </div>
+                          {isLowStock && soldPct < 100 && (
+                            <p className="mt-1.5 text-xs font-mono font-black uppercase text-primary">⚠ Últimas entradas disponibles</p>
+                          )}
+                          {soldPct >= 100 && (
+                            <p className="mt-1.5 text-xs font-mono font-black uppercase text-red-500">⛔ SOLD OUT</p>
+                          )}
+                        </div>
+
+                        <div>
+                          <h4 className="text-xs font-mono font-black uppercase text-text-soft mb-2">Desglose por zona</h4>
+                          <div className="space-y-2">
+                            {eventoSeleccionado?.ticketTypes?.map((tt, i) => {
+                              const zoneSold = totalInitial > 0 ? Math.max(0, eventStats.total - totalStock) : 0;
+                              const zonePct = (Number(tt.stock) === 0 && totalInitial > 0) ? 100 : 0;
+                              return (
+                                <div key={i} className="flex items-center justify-between border-2 border-text p-3 bg-background">
+                                  <div>
+                                    <span className="text-xs font-black uppercase text-text">{tt.zone || tt.name}</span>
+                                    <span className="block text-[10px] font-mono text-text-soft">${Number(tt.price).toLocaleString('es-AR')}</span>
+                                  </div>
+                                  <div className="text-right">
+                                    <span className={`text-sm font-black ${Number(tt.stock) === 0 ? "text-red-500" : "text-text"}`}>
+                                      {Number(tt.stock) === 0 ? "AGOTADO" : `${tt.stock} disp.`}
+                                    </span>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+
+                        <div>
+                          <div className="flex justify-between items-center mb-1.5">
+                            <span className="text-xs font-mono font-bold uppercase text-text-soft">Asistencia al evento</span>
+                            <span className="text-sm font-mono font-black text-text">{eventStats.percentage.toFixed(1)}%</span>
+                          </div>
+                          <div className="h-4 border-2 border-text bg-background overflow-hidden">
+                            <div
+                              className="h-full bg-primary transition-all"
+                              style={{ width: `${Math.min(eventStats.percentage, 100)}%` }}
+                            />
+                          </div>
+                          <p className="mt-1.5 text-xs font-mono text-text-soft">{eventStats.arrived} de {eventStats.total} tickets escaneados</p>
+                        </div>
+                      </>
+                    );
+                  })()}
                 </div>
               )}
 

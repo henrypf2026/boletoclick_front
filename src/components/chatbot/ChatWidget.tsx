@@ -105,10 +105,12 @@ export function ChatWidget() {
         type="button"
         onClick={() => setIsOpen(true)}
         style={{ bottom: bottomOffset }}
-        className="fixed right-6 z-50 flex h-14 w-14 items-center justify-center rounded-full bg-primary text-2xl text-background shadow-lg transition-[bottom] duration-200 hover:bg-primary-deep"
+        className="fixed right-6 z-50 flex h-14 w-14 items-center justify-center rounded-full bg-primary text-background shadow-lg transition-[bottom] duration-200 hover:bg-primary-deep"
         aria-label="Abrir asistente"
       >
-        💬
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-6 h-6">
+          <path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z"/>
+        </svg>
       </button>
     );
   }
