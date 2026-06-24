@@ -68,7 +68,7 @@ function CheckoutContent() {
     if (!ticketTypeId || timerExpired) return;
 
     const storageKey = `checkoutSession_${ticketTypeId}`;
-
+    const startKey   = `checkoutStart_${ticketTypeId}`;
     // Si hay una sesión guardada, usamos su expiresAt como referencia
     const stored =
       typeof window !== "undefined"
@@ -108,13 +108,46 @@ function CheckoutContent() {
       }
     }
 
-    const interval = setInterval(() => {
-      // Recalcular cada segundo a partir de expiresAt (si existe)
+  const interval = setInterval(() => {
       const s =
         typeof window !== "undefined"
           ? window.localStorage.getItem(storageKey)
           : null;
-      if (!s) return;
+
+      if (!s) {
+        const storedStart =
+          typeof window !== "undefined"
+            ? window.localStorage.getItem(startKey)
+            : null;
+
+        if (!storedStart) {
+          setTimerSeconds((prev) => Math.max(0, prev - 1));
+          return;
+        }
+
+        const elapsed   = Math.floor((Date.now() - Number(storedStart)) / 1000);
+        const remaining = Math.max(0, TIMER_SECONDS - elapsed);
+        setTimerSeconds(remaining);
+
+        if (remaining <= 0) {
+          clearInterval(interval);
+          if (typeof window !== "undefined")
+            window.localStorage.removeItem(startKey);
+          setTimerExpired(true);
+          Swal.fire({
+            title: "TIEMPO AGOTADO",
+            text: "Tu reserva expiró. Volvé a seleccionar las entradas.",
+            icon: "warning",
+            confirmButtonText: "VOLVER A EVENTOS",
+            confirmButtonColor: "#6750e0",
+            background: "#f5f4f0",
+            color: "#171717",
+            allowOutsideClick: false,
+          }).then(() => router.push("/eventos"));
+        }
+        return;
+      }
+
       try {
         const p = JSON.parse(s) as { expiresAt?: string };
         if (!p?.expiresAt) return;
@@ -124,8 +157,10 @@ function CheckoutContent() {
         setTimerSeconds(Math.max(0, remaining));
         if (remaining <= 0) {
           clearInterval(interval);
-          if (typeof window !== "undefined")
+          if (typeof window !== "undefined") {
             window.localStorage.removeItem(storageKey);
+            window.localStorage.removeItem(startKey);
+          }
           setTimerExpired(true);
           Swal.fire({
             title: "TIEMPO AGOTADO",
@@ -144,8 +179,7 @@ function CheckoutContent() {
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [ticketTypeId, timerExpired, router]);
-
+  }, [ticketTypeId, timerExpired, router]); 
   const subtotal = ticketPrice * quantity;
   const totalFinal = Math.max(0, subtotal - discount);
 

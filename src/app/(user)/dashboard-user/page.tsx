@@ -7,7 +7,7 @@ import { ticketService, type ApiTicket } from "@/services/ticketService";
 import { orderService } from "@/services/orderService";
 import TicketQrCode from "@/components/ui/TicketQrCode";
 import AddToWalletButton from "@/components/ui/AddToWalletButton";
-
+import jsPDF from "jspdf";
 
 
 interface OrderItem {
@@ -19,85 +19,360 @@ interface OrderItem {
   transactionId: string | null;
   createdAt: string;
   updatedAt: string;
+  tickets?: {
+    id: string;
+    ticketType?: {
+      id: string;
+      eventId: string;
+      name: string;
+      price: number;
+      zone: string;
+    };
+  }[];
 }
 
+interface EventData {
+  id: string;
+  title: string;
+  eventDate: string;
+  venue?: { name: string };
+}
 
-function orderStatusLabel(status: ApiTicket["order"]["status"]) {
+function orderStatusLabel(status: OrderItem["status"]) {
   switch (status) {
-    case "PAID": return "PAGADO";
-    case "PENDING": return "PENDIENTE";
-    case "FAILED": return "FALLIDO";
-    case "REFUNDED": return "REEMBOLSADO";
+    case "PAID":      return "PAGADO";
+    case "PENDING":   return "PENDIENTE";
+    case "FAILED":    return "FALLIDO";
+    case "REFUNDED":  return "REEMBOLSADO";
   }
 }
 
-function orderStatusColor(status: ApiTicket["order"]["status"]) {
+function orderStatusColor(status: OrderItem["status"]) {
   switch (status) {
-    case "PAID": return "text-success bg-success/10 border-success";
-    case "PENDING": return "text-yellow-600 bg-yellow-400/10 border-yellow-500";
-    case "FAILED": return "text-red-500 bg-red-500/10 border-red-500";
-    case "REFUNDED": return "text-text-soft bg-surface-2 border-text/30";
+    case "PAID":      return "text-success bg-success/10 border-success";
+    case "PENDING":   return "text-yellow-600 bg-yellow-400/10 border-yellow-500";
+    case "FAILED":    return "text-red-500 bg-red-500/10 border-red-500";
+    case "REFUNDED":  return "text-text-soft bg-surface-2 border-text/30";
   }
 }
 
 
-export default function UserDashboard() {
+async function fetchEvent(eventId: string): Promise<EventData | null> {
+  try {
+    const token = localStorage.getItem("auth_token");
+    const res = await fetch(`/api/backend/events/${eventId}`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      credentials: "include",
+    });
+    if (!res.ok) return null;
+    return await res.json();
+  } catch {
+    return null;
+  }
+}
 
-  const { user, authenticated, loading } = useAuth();
-  const router = useRouter();
-  const [seccionActiva, setSeccionActiva] = useState<"entradas" | "historial">("entradas");
-  const [ticketExpandido, setTicketExpandido] = useState<ApiTicket | null>(null);
-  const [filtroHistorial, setFiltroHistorial] = useState("");
-  const [tickets, setTickets] = useState<ApiTicket[]>([]);
-  const [orders, setOrders] = useState<OrderItem[]>([]);
-  const [loadingTickets, setLoadingTickets] = useState(true);
-  const [loadingOrders, setLoadingOrders] = useState(true);
-  const [errorTickets, setErrorTickets] = useState(false);
-  const [errorOrders, setErrorOrders] = useState(false);
+function formatFecha(iso: string) {
+  return new Date(iso).toLocaleDateString("es-AR", {
+    day: "numeric", month: "long", year: "numeric",
+  });
+}
+
+function formatHora(iso: string) {
+  return new Date(iso).toLocaleTimeString("es-AR", {
+    hour: "2-digit", minute: "2-digit",
+  });
+}
+
+function formatPeso(n: number) {
+  return "$" + n.toLocaleString("es-AR", { minimumFractionDigits: 2 });
+}
+
+// PDF
+
+async function generarComprobantePDF(orden: OrderItem) {
+  let evento: EventData | null = null;
+  const primerTicket = orden.tickets?.[0];
+  if (primerTicket?.ticketType?.eventId) {
+    evento = await fetchEvent(primerTicket.ticketType.eventId);
+  }
+
+  const doc = new jsPDF({ unit: "mm", format: "a4" });
+  const ancho  = doc.internal.pageSize.getWidth();
+  const margen = 20;
+  let y = margen;
+
+  const PURPLE = "#6750e0";
+  const ORANGE = "#ff6b00";
+  const BLACK  = "#171717";
+  const GRAY   = "#888888";
+  const LGRAY  = "#f2f2f2";
+  const WHITE  = "#ffffff";
 
 
-  useEffect(() => {
-  if (!user) return;
-  const fetchTickets = async () => {
-    try {
-      const data = await ticketService.getMyTickets(user.id);
-      setTickets(data);
-    } catch {
-      setErrorTickets(true);
-    } finally {
-      setLoadingTickets(false);
-    }
-  };
-  fetchTickets();
-}, [user]);
+  doc.setFillColor(BLACK);
+  doc.rect(0, 0, ancho, 30, "F");
+  doc.setFillColor(ORANGE);
+  doc.rect(0, 30, ancho, 2, "F");
+
+  doc.setFontSize(18);
+  doc.setFont("helvetica", "bold");
+  doc.setTextColor(WHITE);
+  doc.text("BOLETOCLICK", margen, 14);
+
+  doc.setFontSize(8);
+  doc.setFont("helvetica", "normal");
+  doc.setTextColor("#aaaaaa");
+  doc.text("COMPROBANTE DE COMPRA", margen, 21);
+
+  doc.setFontSize(8);
+  doc.setFont("helvetica", "normal");
+  doc.setTextColor("#aaaaaa");
+  doc.text("N° DE ORDEN", ancho - margen, 13, { align: "right" });
+  doc.setFontSize(11);
+  doc.setFont("helvetica", "bold");
+  doc.setTextColor(ORANGE);
+  doc.text(`#${orden.id.slice(0, 8).toUpperCase()}`, ancho - margen, 21, { align: "right" });
+
+  y = 42;
+
+
+  const estadoTexto = orderStatusLabel(orden.status);
+  const badgeColor = orden.status === "PAID" ? PURPLE : orden.status === "REFUNDED" ? "#555" : "#cc3333";
+  doc.setFillColor(badgeColor);
+  doc.roundedRect(margen, y - 4, 38, 7, 1, 1, "F");
+  doc.setFontSize(7);
+  doc.setFont("helvetica", "bold");
+  doc.setTextColor(WHITE);
+  doc.text(`✓ ${estadoTexto}`, margen + 4, y + 0.8);
+  y += 12;
+
+
+  if (evento) {
+    doc.setFillColor(LGRAY);
+    doc.rect(margen, y, ancho - margen * 2, 28, "F");
+    doc.setFillColor(PURPLE);
+    doc.rect(margen, y, 3, 28, "F");
+
+    doc.setFontSize(7);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(GRAY);
+    doc.text("EVENTO", margen + 7, y + 6);
+
+    doc.setFontSize(13);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(BLACK);
+    doc.text(evento.title ?? "—", margen + 7, y + 13);
+
+    doc.setFontSize(8);
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(GRAY);
+    if (evento.eventDate) doc.text(`📅  ${formatFecha(evento.eventDate)}`, margen + 7, y + 20);
+    if (evento.venue?.name) doc.text(`📍  ${evento.venue.name}`, margen + 7, y + 25);
+    y += 36;
+  }
+
+ 
+  doc.setFontSize(8);
+  doc.setFont("helvetica", "bold");
+  doc.setTextColor(GRAY);
+  doc.text("DETALLE DE LA TRANSACCIÓN", margen, y);
+  y += 7;
+
+  const col1 = margen;
+  const col2 = ancho / 2;
+
+  const celdas = [
+    { label: "Fecha de compra", value: formatFecha(orden.createdAt) },
+    { label: "Hora",            value: formatHora(orden.createdAt) },
+    { label: "Método de pago",  value: "Stripe" },
+    { label: "Estado",          value: estadoTexto },
+  ];
+
+  celdas.forEach((celda, i) => {
+    const x = i % 2 === 0 ? col1 : col2;
+    if (i % 2 === 0 && i > 0) y += 12;
+    doc.setFillColor(LGRAY);
+    doc.rect(x, y - 3.5, (ancho - margen * 2) / 2 - 2, 10, "F");
+    doc.setFontSize(7);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(GRAY);
+    doc.text(celda.label.toUpperCase(), x + 3, y + 1);
+    doc.setFontSize(9);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(BLACK);
+    doc.text(celda.value, x + 3, y + 6.5);
+  });
+  y += 18;
+
+  if (orden.transactionId) {
+    doc.setFillColor(LGRAY);
+    doc.rect(margen, y - 3.5, ancho - margen * 2, 10, "F");
+    doc.setFontSize(7);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(GRAY);
+    doc.text("ID DE TRANSACCIÓN", margen + 3, y + 1);
+    doc.setFontSize(7.5);
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(BLACK);
+    const txId = orden.transactionId.length > 55
+      ? orden.transactionId.slice(0, 55) + "..."
+      : orden.transactionId;
+    doc.text(txId, margen + 3, y + 6.5);
+    y += 16;
+  }
+
+  if (orden.tickets && orden.tickets.length > 0) {
+    y += 2;
+    doc.setFontSize(8);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(GRAY);
+    doc.text("DETALLE DE TICKETS", margen, y);
+    y += 7;
+
+    doc.setFillColor(PURPLE);
+    doc.rect(margen, y - 3.5, ancho - margen * 2, 8, "F");
+    doc.setFontSize(7);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(WHITE);
+    doc.text("TIPO",   margen + 3,       y + 1);
+    doc.text("ZONA",   margen + 60,      y + 1);
+    doc.text("PRECIO", ancho - margen - 25, y + 1);
+    y += 8;
+
+    orden.tickets.forEach((ticket, i) => {
+      doc.setFillColor(i % 2 === 0 ? WHITE : LGRAY);
+      doc.rect(margen, y - 3.5, ancho - margen * 2, 8, "F");
+      doc.setFontSize(8);
+      doc.setFont("helvetica", "normal");
+      doc.setTextColor(BLACK);
+      doc.text(ticket.ticketType?.name ?? "—", margen + 3, y + 1);
+      doc.text(ticket.ticketType?.zone ?? "—", margen + 60, y + 1);
+      doc.text(
+        ticket.ticketType?.price ? formatPeso(ticket.ticketType.price) : "—",
+        ancho - margen - 3, y + 1, { align: "right" }
+      );
+      y += 8;
+    });
+    y += 4;
+  }
 
   
-  useEffect(() => {
-  if (!user) return;
-  const fetchOrders = async () => {
-    try {
-      const data = await orderService.getMyOrders();
-      setOrders(data);
-    } catch {
-      setErrorOrders(true);
-    } finally {
-      setLoadingOrders(false);
-    }
+  doc.setFontSize(8);
+  doc.setFont("helvetica", "bold");
+  doc.setTextColor(GRAY);
+  doc.text("RESUMEN DE PAGO", margen, y);
+  y += 8;
+
+  const filaResumen = (label: string, valor: string, bold = false) => {
+    doc.setFontSize(9);
+    doc.setFont("helvetica", bold ? "bold" : "normal");
+    doc.setTextColor(bold ? BLACK : GRAY);
+    doc.text(label, margen, y);
+    doc.text(valor, ancho - margen, y, { align: "right" });
+    y += 6;
   };
-  fetchOrders();
-}, [user]);
- 
+
+  filaResumen("Subtotal productor",  formatPeso(orden.producerSubtotal));
+  filaResumen("Comisión plataforma", formatPeso(orden.platformFee));
+
+  y += 2;
+  doc.setDrawColor(PURPLE);
+  doc.setLineWidth(0.8);
+  doc.line(margen, y, ancho - margen, y);
+  y += 6;
+
+  doc.setFontSize(13);
+  doc.setFont("helvetica", "bold");
+  doc.setTextColor(BLACK);
+  doc.text("TOTAL ABONADO", margen, y);
+  doc.setTextColor(ORANGE);
+  doc.text(formatPeso(orden.total), ancho - margen, y, { align: "right" });
+  y += 14;
+
+  doc.setDrawColor("#dddddd");
+  doc.setLineWidth(0.3);
+  doc.line(margen, y, ancho - margen, y);
+  y += 6;
+  doc.setFontSize(7.5);
+  doc.setFont("helvetica", "normal");
+  doc.setTextColor(GRAY);
+  doc.text("Este comprobante es válido como constancia de pago.", ancho / 2, y, { align: "center" });
+  y += 4;
+  doc.text("Guardalo para futuros reclamos o devoluciones.", ancho / 2, y, { align: "center" });
+  y += 6;
+  doc.setFont("helvetica", "bold");
+  doc.setTextColor(PURPLE);
+  doc.text("boletoclick.com", ancho / 2, y, { align: "center" });
+
+  doc.save(`boletoclick-comprobante-${orden.id.slice(0, 8).toUpperCase()}.pdf`);
+}
+
+export default function UserDashboard() {
+  const { user, authenticated, loading } = useAuth();
+  const router = useRouter();
+  const [seccionActiva, setSeccionActiva]     = useState<"entradas" | "historial">("entradas");
+  const [ticketExpandido, setTicketExpandido] = useState<ApiTicket | null>(null);
+  const [filtroHistorial, setFiltroHistorial] = useState("");
+  const [tickets, setTickets]                 = useState<ApiTicket[]>([]);
+  const [orders, setOrders]                   = useState<OrderItem[]>([]);
+  const [loadingTickets, setLoadingTickets]   = useState(true);
+  const [loadingOrders, setLoadingOrders]     = useState(true);
+  const [errorTickets, setErrorTickets]       = useState(false);
+  const [errorOrders, setErrorOrders]         = useState(false);
+  const [pdfLoading, setPdfLoading]           = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!user) return;
+    const fetchTickets = async () => {
+      try {
+        const data = await ticketService.getMyTickets(user.id);
+        setTickets(data);
+      } catch {
+        setErrorTickets(true);
+      } finally {
+        setLoadingTickets(false);
+      }
+    };
+    fetchTickets();
+  }, [user]);
+
+  useEffect(() => {
+    if (!user) return;
+    const fetchOrders = async () => {
+      try {
+        const data = await orderService.getMyOrders();
+        setOrders(data);
+      } catch {
+        setErrorOrders(true);
+      } finally {
+        setLoadingOrders(false);
+      }
+    };
+    fetchOrders();
+  }, [user]);
+
   const ordenesFiltradas = orders.filter(
     (o) =>
       o.id.toLowerCase().includes(filtroHistorial.toLowerCase()) ||
-      o.status.toLowerCase().includes(filtroHistorial.toLowerCase()),
+      o.status.toLowerCase().includes(filtroHistorial.toLowerCase())
   );
 
-   const firstName = user
+  const firstName = user
     ? (user.name ?? user.email.split("@")[0]).split(" ")[0]
     : "";
 
-    
+  async function handleDescargarPDF(orden: OrderItem) {
+    setPdfLoading(orden.id);
+    try {
+      await generarComprobantePDF(orden);
+    } catch (err) {
+      console.error("Error generando PDF:", err);
+      alert("No se pudo generar el comprobante. Intentá de nuevo.");
+    } finally {
+      setPdfLoading(null);
+    }
+  }
+
   if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center">
@@ -113,11 +388,10 @@ export default function UserDashboard() {
     return null;
   }
 
-
   return (
     <div className="p-4 md:p-8 max-w-4xl mx-auto min-h-screen bg-background text-text transition-colors">
 
-      
+      {/* Título */}
       <div className="mb-8 border-b-4 border-text pb-4 flex flex-col md:flex-row justify-between items-start md:items-end gap-2">
         <div>
           <h1 className="uppercase font-black text-3xl md:text-4xl tracking-tighter">
@@ -134,11 +408,11 @@ export default function UserDashboard() {
         </div>
       </div>
 
-      
+      {/* Tabs */}
       <div className="flex border-b-2 border-text mb-6 gap-2 overflow-x-auto pb-0">
         {(
           [
-            { id: "entradas", label: "MIS ENTRADAS" },
+            { id: "entradas",  label: "MIS ENTRADAS" },
             { id: "historial", label: "HISTORIAL DE COMPRAS" },
           ] as const
         ).map((tab) => (
@@ -162,13 +436,13 @@ export default function UserDashboard() {
         </button>
       </div>
 
-      {/*  MIS ENTRADAS  */}
+      {/* MIS ENTRADAS */}
       {seccionActiva === "entradas" && (
         <>
           {loadingTickets ? (
             <div className="space-y-4 animate-pulse">
-              <div className="h-32 bg-surface border-2 border-text w-full"></div>
-              <div className="h-32 bg-surface border-2 border-text w-full"></div>
+              <div className="h-32 bg-surface border-2 border-text w-full" />
+              <div className="h-32 bg-surface border-2 border-text w-full" />
             </div>
           ) : errorTickets ? (
             <div className="p-8 text-center font-mono text-xs uppercase text-red-500 border-2 border-red-500 bg-red-500/10">
@@ -217,7 +491,7 @@ export default function UserDashboard() {
         </>
       )}
 
-      {/*  HISTORIAL DE COMPRAS  */}
+      {/* HISTORIAL DE COMPRAS */}
       {seccionActiva === "historial" && (
         <div className="space-y-4">
           <div className="bg-surface border-2 border-text p-3 shadow-[2px_2px_0px_0px_var(--color-text)]">
@@ -232,8 +506,8 @@ export default function UserDashboard() {
 
           {loadingOrders ? (
             <div className="space-y-4 animate-pulse">
-              <div className="h-24 bg-surface border-2 border-text w-full"></div>
-              <div className="h-24 bg-surface border-2 border-text w-full"></div>
+              <div className="h-24 bg-surface border-2 border-text w-full" />
+              <div className="h-24 bg-surface border-2 border-text w-full" />
             </div>
           ) : errorOrders ? (
             <div className="p-8 text-center font-mono text-xs uppercase text-red-500 border-2 border-red-500 bg-red-500/10">
@@ -253,10 +527,8 @@ export default function UserDashboard() {
                           {orden.id.slice(0, 8).toUpperCase()}
                         </span>
                         <span className="text-text-soft text-xs font-mono font-bold">
-                          {new Date(orden.createdAt).toLocaleDateString("es-MX", {
-                            day: "numeric",
-                            month: "short",
-                            year: "numeric",
+                          {new Date(orden.createdAt).toLocaleDateString("es-AR", {
+                            day: "numeric", month: "short", year: "numeric",
                           })}
                         </span>
                         <span className={`text-[10px] font-mono font-black uppercase border px-2 py-0.5 ${orderStatusColor(orden.status)}`}>
@@ -264,23 +536,36 @@ export default function UserDashboard() {
                         </span>
                       </div>
                       <p className="text-text-soft text-xs font-mono mt-0.5">
-                        Comisión plataforma: ${orden.platformFee.toLocaleString("es-MX")}
+                        Comisión plataforma: ${orden.platformFee.toLocaleString("es-AR")}
                       </p>
                     </div>
+
                     <div className="flex items-center justify-between sm:justify-end gap-6 border-t sm:border-t-0 pt-3 sm:pt-0 border-text/20">
                       <div className="sm:text-right">
                         <span className="text-text-soft text-[10px] block uppercase font-mono font-bold">
                           TOTAL ABONADO
                         </span>
                         <span className="font-black text-lg font-mono text-text">
-                          ${orden.total.toLocaleString("es-MX")}
+                          ${orden.total.toLocaleString("es-AR")}
                         </span>
                       </div>
+
                       <button
-                        onClick={() => alert(`Simulación: Descargando PDF de la orden ${orden.id}...`)}
-                        className="bg-primary hover:brightness-105 text-background font-mono font-black text-xs uppercase tracking-wider transition-all border-2 border-text px-4 py-2 shadow-[2px_2px_0px_0px_var(--color-text)] active:shadow-none active:translate-x-0.5 active:translate-y-0.5 cursor-pointer"
+                        onClick={() => handleDescargarPDF(orden)}
+                        disabled={orden.status !== "PAID" || pdfLoading === orden.id}
+                        className="bg-primary text-background font-mono font-black text-xs uppercase tracking-wider transition-all border-2 border-text px-4 py-2 shadow-[2px_2px_0px_0px_var(--color-text)] hover:shadow-none hover:translate-x-0.5 hover:translate-y-0.5 active:shadow-none active:translate-x-0.5 active:translate-y-0.5 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed disabled:shadow-none disabled:translate-x-0 disabled:translate-y-0 min-w-[64px] flex items-center justify-center gap-1"
                       >
-                        PDF
+                        {pdfLoading === orden.id ? (
+                          <>
+                            <svg className="animate-spin w-3 h-3" fill="none" viewBox="0 0 24 24">
+                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
+                            </svg>
+                            ...
+                          </>
+                        ) : (
+                          <>↓ PDF</>
+                        )}
                       </button>
                     </div>
                   </div>
@@ -305,8 +590,8 @@ export default function UserDashboard() {
             className="bg-white text-black border-4 border-black max-w-sm w-full p-6 rounded-none shadow-[8px_8px_0px_0px_#CCFF00] flex flex-col justify-between relative overflow-hidden"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="absolute left-0 top-1/2 -translate-y-1/2 w-4 h-8 bg-black/95 rounded-r-full border-r-4 border-y-4 border-black -ml-1"></div>
-            <div className="absolute right-0 top-1/2 -translate-y-1/2 w-4 h-8 bg-black/95 rounded-l-full border-l-4 border-y-4 border-black -mr-1"></div>
+            <div className="absolute left-0 top-1/2 -translate-y-1/2 w-4 h-8 bg-black/95 rounded-r-full border-r-4 border-y-4 border-black -ml-1" />
+            <div className="absolute right-0 top-1/2 -translate-y-1/2 w-4 h-8 bg-black/95 rounded-l-full border-l-4 border-y-4 border-black -mr-1" />
 
             <div className="border-b-4 border-black border-dashed pb-5 text-center">
               <span className="font-mono text-[10px] bg-black text-white px-2 py-0.5 uppercase font-black tracking-widest">
@@ -326,15 +611,12 @@ export default function UserDashboard() {
                 </div>
               )}
               <p className="text-neutral-500 font-mono text-xs mt-2">
-                {new Date(ticketExpandido.createdAt).toLocaleDateString("es-MX", {
-                  day: "numeric",
-                  month: "long",
-                  year: "numeric",
+                {new Date(ticketExpandido.createdAt).toLocaleDateString("es-AR", {
+                  day: "numeric", month: "long", year: "numeric",
                 })}
               </p>
             </div>
 
-            {/* QR */}
             <div className="my-6 bg-white p-4 border-4 border-black flex flex-col items-center justify-center aspect-square w-full max-w-60 mx-auto shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
               <TicketQrCode value={ticketExpandido.qrCode} size={200} className="w-full h-full" />
             </div>
