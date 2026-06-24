@@ -1,28 +1,36 @@
 "use client";
-
+ 
 import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-
+import { useAuth } from "@/context/AuthContext";
+ 
 interface Province {
   id: string;
   name: string;
 }
-
+ 
 interface Municipality {
   id: string;
   name: string;
 }
-
+ 
 const MAPBOX_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN ?? "";
-
+ 
 export default function VenueForm() {
   const router = useRouter();
+  const { user } = useAuth();
   const [provinces, setProvinces] = useState<Province[]>([]);
   const [municipalities, setMunicipalities] = useState<Municipality[]>([]);
+  const [allMunicipalities, setAllMunicipalities] = useState<Municipality[]>([]);
   const [loadingMunicipalities, setLoadingMunicipalities] = useState(false);
   const [geocoding, setGeocoding] = useState(false);
   const [geocodedAddress, setGeocodedAddress] = useState<string | null>(null);
-
+ 
+  // Imagen
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [uploadingImage, setUploadingImage] = useState(false);
+ 
   const [venue, setVenue] = useState({
     name: "",
     address: "",
@@ -31,73 +39,185 @@ export default function VenueForm() {
     capacity: "",
     latitude: "",
     longitude: "",
-    imgUrl: "",
   });
-
+ 
   const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState<{
     type: "success" | "error";
     msg: string;
   } | null>(null);
-
+ 
+  //cargar provincias en orden 
   useEffect(() => {
     fetch("/api/backend/province")
       .then((r) => r.json())
       .then((data) => {
-        const list = Array.isArray(data)
+        const list: Province[] = Array.isArray(data)
           ? data
           : (data.allProvincesFormatted ?? data.allProvinces ?? []);
-        setProvinces(list);
+        setProvinces([...list].sort((a, b) => a.name.localeCompare(b.name, "es")));
       })
       .catch(() => setProvinces([]));
   }, []);
 
-  async function handleProvinceChange(e: React.ChangeEvent<HTMLSelectElement>) {
+  //cambio de provincia 
+    async function handleProvinceChange(e: React.ChangeEvent<HTMLSelectElement>) {
     const provinceId = e.target.value;
     setVenue((prev) => ({ ...prev, provinceId, municipalityId: "" }));
     setMunicipalities([]);
+    setAllMunicipalities([]);
     if (!provinceId) return;
-
+ 
     setLoadingMunicipalities(true);
     try {
       const res = await fetch(`/api/backend/province/${provinceId}`);
       const data = await res.json();
       const found = data.province ?? data.provinceSearched ?? data;
-      setMunicipalities(Array.isArray(found.municipality) ? found.municipality : []);
+      const list: Municipality[] = Array.isArray(found.municipality)
+        ? found.municipality
+        : [];
+      const sorted = [...list].sort((a, b) => a.name.localeCompare(b.name, "es"));
+      setMunicipalities(sorted);
+      setAllMunicipalities(sorted);
     } catch {
       setMunicipalities([]);
+      setAllMunicipalities([]);
     } finally {
       setLoadingMunicipalities(false);
     }
   }
-
-  function handleChange(e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) {
+ 
+  function handleChange(
+    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
+  ) {
     const { name, value } = e.target;
     setVenue((prev) => ({ ...prev, [name]: value }));
     if (name === "address") setGeocodedAddress(null);
   }
 
+  //seleccionar archivo
+
+  function handleImageChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+ 
+    if (file.size > 2 * 1024 * 1024) {
+      setStatus({ type: "error", msg: "La imagen supera el tamaño máximo de 2MB." });
+      return;
+    }
+ 
+    setStatus(null);
+    setImageFile(file);
+    setImagePreview(URL.createObjectURL(file));
+  }
+
   async function geocodeAddress() {
     const query = venue.address.trim();
     if (!query) return;
-
+ 
     setGeocoding(true);
     setGeocodedAddress(null);
     try {
-      const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json?access_token=${MAPBOX_TOKEN}&limit=1&language=es`;
+      const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(
+        query
+      )}.json?access_token=${MAPBOX_TOKEN}&limit=1&language=es&country=MX`;
       const res = await fetch(url);
       const data = await res.json();
       const feature = data.features?.[0];
       if (!feature) {
-        setGeocodedAddress("No se encontró la dirección. Revisá el texto e intentá de nuevo.");
+        setGeocodedAddress(
+          "No se encontró la dirección. Revisá el texto e intentá de nuevo."
+        );
         return;
       }
+
+      //validar que es solo mexico
+      const contextRaw: { id: string; text: string }[] = feature.context ?? [];
+      const countryCtx = contextRaw.find((c) => c.id.startsWith("country"));
+      const esDeMexico =
+        countryCtx?.text?.toLowerCase().includes("méxico") ||
+        countryCtx?.text?.toLowerCase().includes("mexico") ||
+        feature.place_name?.toLowerCase().includes("mexico") ||
+        feature.place_name?.toLowerCase().includes("méxico");
+      if (!esDeMexico) {
+        setGeocodedAddress("Solo se permiten direcciones dentro de México. Revisá la dirección e intentá de nuevo.");
+        return;
+      }
+ 
       const [lng, lat] = feature.center as [number, number];
+
+      const context: { id: string; text: string }[] = contextRaw;
+      const regionCtx = context.find((c) => c.id.startsWith("region"));
+      const placeCtx = context.find((c) => c.id.startsWith("place"));
+ 
+      let newProvinceId = venue.provinceId;
+      let newMunicipalityId = venue.municipalityId;
+      let newMunicipalities = allMunicipalities;
+ 
+      if (regionCtx) {
+        const matchedProvince = provinces.find((p) =>
+          p.name.toLowerCase().includes(regionCtx.text.toLowerCase()) ||
+          regionCtx.text.toLowerCase().includes(p.name.toLowerCase())
+        );
+
+        if (!matchedProvince) {
+            setGeocodedAddress(
+            "El estado encontrado no está disponible en el sistema."
+          );
+          return;
+        }
+        
+        if (matchedProvince && matchedProvince.id !== venue.provinceId) {
+          newProvinceId = matchedProvince.id;
+          setLoadingMunicipalities(true);
+          try {
+            const mRes = await fetch(`/api/backend/province/${matchedProvince.id}`);
+            const mData = await mRes.json();
+            const found = mData.province ?? mData.provinceSearched ?? mData;
+            const list: Municipality[] = Array.isArray(found.municipality)
+              ? found.municipality
+              : [];
+            const sorted = [...list].sort((a, b) =>
+              a.name.localeCompare(b.name, "es")
+            );
+            setMunicipalities(sorted);
+            setAllMunicipalities(sorted);
+            newMunicipalities = sorted;
+          } catch {
+            setMunicipalities([]);
+            setAllMunicipalities([]);
+            newMunicipalities = [];
+          } finally {
+            setLoadingMunicipalities(false);
+          }
+        }
+      }
+ 
+      if (placeCtx && newMunicipalities.length > 0) {
+        const matchedMunicipality = newMunicipalities.find((m) =>
+          m.name.toLowerCase().includes(placeCtx.text.toLowerCase()) ||
+          placeCtx.text.toLowerCase().includes(m.name.toLowerCase())
+        );
+
+        if (!matchedMunicipality) {
+      setGeocodedAddress(
+        "El municipio encontrado no está disponible en el sistema."
+      );
+      return;
+  }
+        if (matchedMunicipality) {
+          newMunicipalityId = matchedMunicipality.id;
+        }
+      }
+ 
       setVenue((prev) => ({
         ...prev,
         latitude: String(lat),
         longitude: String(lng),
+        provinceId: newProvinceId,
+        municipalityId: newMunicipalityId,
       }));
+ 
       setGeocodedAddress(`📍 ${feature.place_name}`);
     } catch {
       setGeocodedAddress("Error al buscar la ubicación. Verificá tu conexión.");
@@ -110,23 +230,49 @@ export default function VenueForm() {
     e.preventDefault();
     setLoading(true);
     setStatus(null);
-
+ 
     const lat = parseFloat(venue.latitude);
     const lng = parseFloat(venue.longitude);
     const cap = parseInt(venue.capacity, 10);
-
+ 
     if (isNaN(lat) || isNaN(lng)) {
-      setStatus({ type: "error", msg: "Primero buscá la ubicación con el botón de geocodificación." });
+      setStatus({
+        type: "error",
+        msg: "Primero buscá la ubicación con el botón de geocodificación.",
+      });
       setLoading(false);
       return;
     }
     if (isNaN(cap) || cap <= 0) {
-      setStatus({ type: "error", msg: "La capacidad debe ser un número mayor a 0." });
+      setStatus({
+        type: "error",
+        msg: "La capacidad debe ser un número mayor a 0.",
+      });
       setLoading(false);
       return;
     }
-
+ 
     try {
+      // Subir imagen si hay archivo seleccionado
+      let imgUrl: string | undefined;
+      if (imageFile && user?.id) {
+        setUploadingImage(true);
+        const formData = new FormData();
+        formData.append("file", imageFile);
+        const uploadRes = await fetch(
+          `/api/backend/files/uploadImage/${user.id}`,
+          { method: "PUT", credentials: "include", body: formData }
+        );
+        if (!uploadRes.ok) {
+          const msg = await uploadRes.text().catch(() => "Error desconocido");
+          throw new Error(msg || "Error al subir la imagen");
+        }
+        const uploadData = await uploadRes.json();
+        // El endpoint devuelve profileImageUrl; usamos esa URL
+        imgUrl = uploadData.profileImageUrl ?? uploadData.imgUrl ?? uploadData.url;
+        setUploadingImage(false);
+      }
+ 
       const body: Record<string, unknown> = {
         name: venue.name.trim(),
         address: venue.address.trim(),
@@ -135,55 +281,74 @@ export default function VenueForm() {
         latitude: lat,
         longitude: lng,
       };
-      if (venue.imgUrl.trim()) body.imgUrl = venue.imgUrl.trim();
-
+      if (imgUrl) body.imgUrl = imgUrl;
+ 
       const res = await fetch("/api/backend/venues", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
         body: JSON.stringify(body),
       });
-
+ 
       const data = await res.json();
-
+ 
       if (!res.ok) {
         throw new Error(
           Array.isArray(data.message)
             ? data.message.join(" | ")
-            : data.message ?? "Error al crear el venue.",
+            : data.message ?? "Error al crear el venue."
         );
       }
-
-      setStatus({ type: "success", msg: "¡Venue creado con éxito! Ya podés seleccionarlo al crear un evento." });
+ 
+      setStatus({
+        type: "success",
+        msg: "¡Venue creado con éxito! Ya podés seleccionarlo al crear un evento.",
+      });
       setTimeout(() => router.push("/producer/dashboard"), 1500);
-      setVenue({ name: "", address: "", provinceId: "", municipalityId: "", capacity: "", latitude: "", longitude: "", imgUrl: "" });
+      setVenue({
+        name: "",
+        address: "",
+        provinceId: "",
+        municipalityId: "",
+        capacity: "",
+        latitude: "",
+        longitude: "",
+      });
       setMunicipalities([]);
+      setAllMunicipalities([]);
       setGeocodedAddress(null);
+      setImageFile(null);
+      setImagePreview(null);
     } catch (err: unknown) {
       setStatus({
         type: "error",
-        msg: err instanceof Error ? err.message : "Error de conexión con el servidor.",
+        msg:
+          err instanceof Error ? err.message : "Error de conexión con el servidor.",
       });
     } finally {
       setLoading(false);
+      setUploadingImage(false);
     }
   }
-
+ 
   const inputClass =
     "w-full p-3 border-2 border-border bg-background text-text font-medium shadow-[2px_2px_0px_0px_rgba(23,23,23,1)] text-sm focus:outline-none focus:border-primary";
   const selectClass =
     "w-full p-3 border-2 border-border bg-background text-text font-bold text-sm shadow-[2px_2px_0px_0px_rgba(23,23,23,1)] focus:outline-none focus:border-primary";
-  const labelClass = "text-xs font-black uppercase tracking-wide text-text block mb-1";
-
+  const labelClass =
+    "text-xs font-black uppercase tracking-wide text-text block mb-1";
+ 
+  const isSubmitting = loading || uploadingImage;
+ 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
-
+ 
       {/* 1. Datos del lugar */}
       <div className="bg-surface border-4 border-border p-6 shadow-[6px_6px_0px_0px_rgba(23,23,23,1)] dark:shadow-[6px_6px_0px_0px_rgba(255,255,255,1)] space-y-4">
         <h2 className="text-lg font-black uppercase tracking-wider text-text border-b-2 border-border pb-2">
           1. Datos del lugar
         </h2>
-
+ 
         <div>
           <label className={labelClass}>Nombre del lugar</label>
           <input
@@ -195,7 +360,7 @@ export default function VenueForm() {
             className={inputClass}
           />
         </div>
-
+ 
         {/* Dirección + botón geocodificar */}
         <div>
           <label className={labelClass}>Dirección completa</label>
@@ -208,6 +373,8 @@ export default function VenueForm() {
               placeholder="Ej: Siete Colinas 1772, Colonia Independencia, Guadalajara, Jalisco"
               className={inputClass}
             />
+  
+            
             <button
               type="button"
               onClick={geocodeAddress}
@@ -216,19 +383,28 @@ export default function VenueForm() {
             >
               {geocoding ? "..." : "Buscar"}
             </button>
-          </div>
+            </div>
 
+                  <div className="mt-2 flex items-center gap-2 bg-green-50 border border-green-300 text-green-700 px-3 py-2 text-sm rounded">
+          ℹ️ Para mejores resultados, escribí la dirección completa y lo más exacta posible.
+        </div>
+            
+         
+ 
           {geocodedAddress && (
-            <p className={`mt-2 text-xs font-medium px-3 py-2 border-2 ${
-              geocodedAddress.startsWith("📍")
-                ? "border-success bg-success/10 text-success"
-                : "border-red-400 bg-red-50 text-red-600"
-            }`}>
+            <p
+              className={`mt-2 text-xs font-medium px-3 py-2 border-2 ${
+                geocodedAddress.startsWith("📍")
+                  ? "border-success bg-success/10 text-success"
+                  : "border-red-400 bg-red-50 text-red-600"
+              }`}
+            >
               {geocodedAddress}
             </p>
           )}
         </div>
-
+        
+ 
         {/* Provincia / Municipio */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
@@ -242,7 +418,9 @@ export default function VenueForm() {
             >
               <option value="">-- Seleccioná estado --</option>
               {provinces.map((p) => (
-                <option key={p.id} value={p.id}>{p.name}</option>
+                <option key={p.id} value={p.id}>
+                  {p.name}
+                </option>
               ))}
             </select>
           </div>
@@ -264,12 +442,14 @@ export default function VenueForm() {
                   : "-- Seleccioná municipio --"}
               </option>
               {municipalities.map((m) => (
-                <option key={m.id} value={m.id}>{m.name}</option>
+                <option key={m.id} value={m.id}>
+                  {m.name}
+                </option>
               ))}
             </select>
           </div>
         </div>
-
+ 
         <div>
           <label className={labelClass}>Capacidad máxima (personas)</label>
           <input
@@ -284,15 +464,16 @@ export default function VenueForm() {
           />
         </div>
       </div>
-
-      {/* 2. Coordenadas (readonly después de geocodificar, editables si hace falta) */}
+ 
+      {/* 2. Coordenadas */}
       <div className="bg-surface border-4 border-border p-6 shadow-[6px_6px_0px_0px_rgba(23,23,23,1)] dark:shadow-[6px_6px_0px_0px_rgba(255,255,255,1)] space-y-4">
         <div>
           <h2 className="text-lg font-black uppercase tracking-wider text-text border-b-2 border-border pb-2">
             2. Coordenadas
           </h2>
           <p className="text-xs text-text-soft mt-2">
-            Se completan automáticamente al buscar la dirección. Podés editarlas si necesitás ajustar la ubicación.
+            Se completan automáticamente al buscar la dirección. Podés editarlas
+            si necesitás ajustar la ubicación.
           </p>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -324,7 +505,7 @@ export default function VenueForm() {
           </div>
         </div>
       </div>
-
+ 
       {/* 3. Imagen (opcional) */}
       <div className="bg-surface border-4 border-border p-6 shadow-[6px_6px_0px_0px_rgba(23,23,23,1)] dark:shadow-[6px_6px_0px_0px_rgba(255,255,255,1)] space-y-4">
         <h2 className="text-lg font-black uppercase tracking-wider text-text border-b-2 border-border pb-2">
@@ -333,19 +514,54 @@ export default function VenueForm() {
             (opcional)
           </span>
         </h2>
-        <div>
-          <label className={labelClass}>URL de la imagen del lugar</label>
-          <input
-            name="imgUrl"
-            type="url"
-            value={venue.imgUrl}
-            onChange={handleChange}
-            placeholder="https://..."
-            className={inputClass}
-          />
+ 
+        <div className="flex flex-col sm:flex-row items-center gap-6 p-4 border-2 border-dashed border-border bg-background/50">
+          {/* Preview */}
+          <div className="shrink-0">
+            {imagePreview ? (
+              <div className="w-24 h-24 border-4 border-border shadow-[3px_3px_0px_0px_rgba(23,23,23,1)] overflow-hidden bg-surface">
+                <img
+                  src={imagePreview}
+                  alt="Preview del venue"
+                  className="w-full h-full object-cover"
+                />
+              </div>
+            ) : (
+              <div className="w-24 h-24 border-4 border-border bg-surface flex items-center justify-center shadow-[3px_3px_0px_0px_rgba(23,23,23,1)]">
+                <span className="text-3xl">🏟️</span>
+              </div>
+            )}
+          </div>
+ 
+          {/* Input file */}
+          <div className="space-y-2 text-center sm:text-left w-full">
+            <label className={labelClass}>Subir imagen del lugar</label>
+            <p className="text-[11px] text-text-soft font-mono uppercase">
+              JPG, PNG, WEBP, GIF — Máx:{" "}
+              <span className="font-black text-text">2MB</span>
+            </p>
+            <label
+              htmlFor="venueImage"
+              className="inline-block px-4 py-2 bg-surface border-2 border-border font-mono text-xs font-black uppercase tracking-wider cursor-pointer transition-all shadow-[2px_2px_0px_0px_rgba(23,23,23,1)] hover:shadow-none hover:translate-x-0.5 hover:translate-y-0.5"
+            >
+              Elegir archivo
+            </label>
+            <input
+              id="venueImage"
+              type="file"
+              accept=".jpg,.png,.jpeg,.gif,.webp"
+              onChange={handleImageChange}
+              className="hidden"
+            />
+            {imageFile && (
+              <p className="font-mono text-[11px] text-text-soft mt-1 block">
+                ✔ {imageFile.name}
+              </p>
+            )}
+          </div>
         </div>
       </div>
-
+ 
       {status?.type === "success" && (
         <div className="border-2 border-success bg-success/10 p-4 font-mono text-xs font-bold uppercase text-success">
           ✅ {status.msg}
@@ -356,14 +572,20 @@ export default function VenueForm() {
           ❌ {status.msg}
         </div>
       )}
-
+ 
       <button
         type="submit"
-        disabled={loading}
+        disabled={isSubmitting}
         className="w-full p-4 font-black text-sm uppercase bg-primary text-background border-4 border-border shadow-[4px_4px_0px_0px_rgba(23,23,23,1)] disabled:opacity-50 transition-all hover:-translate-y-0.5"
       >
-        {loading ? "Creando venue..." : "Crear Venue"}
+        {isSubmitting
+          ? uploadingImage
+            ? "Subiendo imagen..."
+            : "Creando venue..."
+          : "Crear Venue"}
       </button>
     </form>
   );
 }
+ 
+ 
