@@ -118,10 +118,9 @@ export default function VenueForm() {
     setGeocoding(true);
     setGeocodedAddress(null);
     try {
-    const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(
-      query
-    )}.json?access_token=${MAPBOX_TOKEN}&limit=1&language=es&country=MX&types=address,poi`; 
-    
+      const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(
+        query
+      )}.json?access_token=${MAPBOX_TOKEN}&limit=1&language=es&country=MX`;
       const res = await fetch(url);
       const data = await res.json();
       const feature = data.features?.[0];
@@ -201,10 +200,10 @@ export default function VenueForm() {
         );
 
         if (!matchedMunicipality) {
-        setGeocodedAddress(
-          "El municipio encontrado no está disponible en el sistema."
-        );
-        return;
+      setGeocodedAddress(
+        "El municipio encontrado no está disponible en el sistema."
+      );
+      return;
   }
         if (matchedMunicipality) {
           newMunicipalityId = matchedMunicipality.id;
@@ -374,6 +373,8 @@ export default function VenueForm() {
               placeholder="Ej: Siete Colinas 1772, Colonia Independencia, Guadalajara, Jalisco"
               className={inputClass}
             />
+  
+            
             <button
               type="button"
               onClick={geocodeAddress}
@@ -382,7 +383,13 @@ export default function VenueForm() {
             >
               {geocoding ? "..." : "Buscar"}
             </button>
-          </div>
+            </div>
+
+                  <div className="mt-2 flex items-center gap-2 bg-green-50 border border-green-300 text-green-700 px-3 py-2 text-sm rounded">
+          ℹ️ Para mejores resultados, escribí la dirección completa y lo más exacta posible.
+        </div>
+            
+         
  
           {geocodedAddress && (
             <p
@@ -396,6 +403,7 @@ export default function VenueForm() {
             </p>
           )}
         </div>
+        
  
         {/* Provincia / Municipio */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
