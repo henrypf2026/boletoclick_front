@@ -1,6 +1,7 @@
 "use client";
 import React, { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
+import Swal from "sweetalert2";
 
 interface TicketType {
   name: string;
@@ -19,6 +20,8 @@ interface Evento {
   ticketTypes: TicketType[];
   poster?: string;
   location?: string;
+  venueId?: string;
+  categoryId?: string;
   category?: string | { name: string };
   venue?: string | { name?: string; address?: string };
 }
@@ -66,6 +69,7 @@ export default function DashboardProducer() {
   const [formTitle, setFormTitle] = useState("");
   const [formDescription, setFormDescription] = useState("");
   const [formDate, setFormDate] = useState("");
+  const [formTime, setFormTime] = useState("");
   const [formLocation, setFormLocation] = useState("");
   const [formCategory, setFormCategory] = useState("");
   const [formTicketTypes, setFormTicketTypes] = useState<TicketType[]>([]);
@@ -78,19 +82,14 @@ export default function DashboardProducer() {
     const fetchEventosProductor = async () => {
       try {
         setLoading(true);
-
         const response = await fetch("/api/backend/events/producer", {
           method: "GET",
           headers: { "Content-Type": "application/json" },
           credentials: "include",
         });
-
-        if (!response.ok) {
-          throw new Error(`Error al obtener eventos: ${response.status}`);
-        }
-
-        const data = await response.json();
-        setEventos(data);
+        if (!response.ok) throw new Error(`Error al obtener eventos: ${response.status}`);
+       const data = await response.json();
+       setEventos(data.filter((ev: Evento) => ev.status !== "INACTIVE"));
         setErrorApi(null);
       } catch (err: any) {
         console.error("🚨 Error capturado en Dashboard:", err.message);
@@ -99,7 +98,6 @@ export default function DashboardProducer() {
         setLoading(false);
       }
     };
-
     fetchEventosProductor();
   }, []);
 
@@ -129,37 +127,26 @@ export default function DashboardProducer() {
     setFormDescription(ev.description || "");
     setFormDate(ev.eventDate ? ev.eventDate.split("T")[0] : "");
 
-    if (ev.venue && typeof ev.venue === "object") {
-      setFormLocation(ev.venue.name || ev.venue.address || "");
-    } else {
-      setFormLocation(ev.location || (ev.venue as string) || "");
-    }
+    const date = new Date(ev.eventDate);
 
-    if (ev.category && typeof ev.category === "object") {
-      setFormCategory(ev.category.name || "");
-    } else {
-      setFormCategory((ev.category as string) || "");
-    }
+        setFormDate(ev.eventDate ? ev.eventDate.split("T")[0] : "");
 
-    setFormTicketTypes(
-      ev.ticketTypes ? ev.ticketTypes.map((t) => ({ ...t })) : [],
-    );
+        setFormTime(
+          ev.eventDate
+            ? `${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`
+            : ""
+        );
+    
+    setFormLocation(ev.venueId || "");
+    setFormCategory(ev.categoryId || "");
+    setFormTicketTypes(ev.ticketTypes ? ev.ticketTypes.map((t) => ({ ...t })) : []);
     setStatusScanner("idle");
-
-    if (ev.status === "CONCLUIDO") {
-      setSeccionActiva("ajustes");
-    }
+    if (ev.status === "CONCLUIDO") setSeccionActiva("ajustes");
   };
 
-  const handleTicketTypeChange = (
-    index: number,
-    field: keyof TicketType,
-    value: any,
-  ) => {
+  const handleTicketTypeChange = (index: number, field: keyof TicketType, value: any) => {
     setFormTicketTypes((prev) =>
-      prev.map((ticket, idx) =>
-        idx === index ? { ...ticket, [field]: value } : ticket,
-      ),
+      prev.map((ticket, idx) => (idx === index ? { ...ticket, [field]: value } : ticket))
     );
   };
 
@@ -173,15 +160,37 @@ export default function DashboardProducer() {
 
       if (vendidos > 0) {
         if (original && original.price !== Number(modificado.price)) {
-          alert(
-            `Error de Seguridad: No podés cambiar el precio de "${modificado.name}" porque ya tiene ${vendidos} entradas vendidas.`,
-          );
+          Swal.fire({
+            title: "ERROR DE SEGURIDAD",
+            text: `No podés cambiar el precio de "${modificado.name}" porque ya tiene ${vendidos} entradas vendidas.`,
+            icon: "error",
+            confirmButtonText: "OK",
+            confirmButtonColor: "#6750e0",
+            background: "#f5f4f0",
+            color: "#171717",
+            customClass: {
+              popup: "border-4 border-[#171717] rounded-none shadow-[6px_6px_0px_0px_#171717] font-mono",
+              title: "uppercase font-black tracking-tighter",
+              confirmButton: "font-mono font-black uppercase tracking-wider border-2 border-[#171717] rounded-none",
+            },
+          });
           return;
         }
         if (Number(modificado.stock) < vendidos) {
-          alert(
-            `Error de Seguridad: El stock de "${modificado.name}" no puede ser menor a las entradas ya vendidas (${vendidos}).`,
-          );
+          Swal.fire({
+            title: "ERROR DE SEGURIDAD",
+            text: `El stock de "${modificado.name}" no puede ser menor a las entradas ya vendidas (${vendidos}).`,
+            icon: "error",
+            confirmButtonText: "OK",
+            confirmButtonColor: "#6750e0",
+            background: "#f5f4f0",
+            color: "#171717",
+            customClass: {
+              popup: "border-4 border-[#171717] rounded-none shadow-[6px_6px_0px_0px_#171717] font-mono",
+              title: "uppercase font-black tracking-tighter",
+              confirmButton: "font-mono font-black uppercase tracking-wider border-2 border-[#171717] rounded-none",
+            },
+          });
           return;
         }
       }
@@ -194,8 +203,10 @@ export default function DashboardProducer() {
         title: formTitle,
         description: formDescription,
         eventDate: formDate
-          ? new Date(`${formDate}T12:00:00`).toISOString()
+          ? new Date(`${formDate}T${formTime || "12:00"}:00`).toISOString()
           : undefined,
+        categoryId: formCategory,
+        venueId: formLocation,
         ticketTypes: formTicketTypes.map((ticket) => ({
           name: ticket.name,
           zone: ticket.zone || ticket.name,
@@ -204,38 +215,52 @@ export default function DashboardProducer() {
         })),
       };
 
-      const response = await fetch(
-        `/api/backend/events/${eventoSeleccionado.id}`,
-        {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          credentials: "include",
-          body: JSON.stringify(payloadDto),
-        },
-      );
+      const response = await fetch(`/api/backend/events/${eventoSeleccionado.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify(payloadDto),
+      });
 
-      if (!response.ok) {
-        throw new Error(`Error del servidor al actualizar: ${response.status}`);
-      }
+      if (!response.ok) throw new Error(`Error del servidor al actualizar: ${response.status}`);
 
       const eventoActualizadoServidor = await response.json();
 
-      const eventosActualizados = eventos.map((ev) =>
-        ev.id === eventoSeleccionado.id
-          ? { ...ev, ...eventoActualizadoServidor }
-          : ev,
-      );
-      setEventos(eventosActualizados);
+      setEventos(eventos.map((ev) =>
+        ev.id === eventoSeleccionado.id ? { ...ev, ...eventoActualizadoServidor } : ev
+      ));
       setEventoSeleccionado(eventoActualizadoServidor);
 
-      alert(
-        "¡Ajustes de evento sincronizados y guardados en la base de datos!",
-      );
+      Swal.fire({
+        title: "¡GUARDADO!",
+        text: "Los cambios fueron guardados correctamente.",
+        icon: "success",
+        confirmButtonText: "OK",
+        confirmButtonColor: "#6750e0",
+        background: "#f5f4f0",
+        color: "#171717",
+        customClass: {
+          popup: "border-4 border-[#171717] rounded-none shadow-[6px_6px_0px_0px_#171717] font-mono",
+          title: "uppercase font-black tracking-tighter",
+          confirmButton: "font-mono font-black uppercase tracking-wider border-2 border-[#171717] rounded-none",
+        },
+      });
     } catch (error: any) {
       console.error("🚨 Error al guardar cambios en DB:", error);
-      alert(
-        error.message || "No se pudieron guardar los cambios en el servidor.",
-      );
+      Swal.fire({
+        title: "ERROR",
+        text: error.message || "No se pudieron guardar los cambios en el servidor.",
+        icon: "error",
+        confirmButtonText: "OK",
+        confirmButtonColor: "#6750e0",
+        background: "#f5f4f0",
+        color: "#171717",
+        customClass: {
+          popup: "border-4 border-[#171717] rounded-none shadow-[6px_6px_0px_0px_#171717] font-mono",
+          title: "uppercase font-black tracking-tighter",
+          confirmButton: "font-mono font-black uppercase tracking-wider border-2 border-[#171717] rounded-none",
+        },
+      });
     } finally {
       setLoadingAccion(false);
     }
@@ -244,16 +269,28 @@ export default function DashboardProducer() {
   const eliminarEvento = async () => {
     if (!eventoSeleccionado) return;
 
-    const confirmar = window.confirm(
-      `¿Estás seguro de que querés dar de baja el evento "${eventoSeleccionado.title}"?`,
-    );
-    if (!confirmar) return;
+    const resultado = await Swal.fire({
+      title: "¿DAR DE BAJA?",
+      text: `¿Estás seguro de que querés dar de baja "${eventoSeleccionado.title}"? Esta acción no se puede deshacer.`,
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonText: "SÍ, DAR DE BAJA",
+      cancelButtonText: "CANCELAR",
+      confirmButtonColor: "#ff6b00",
+      cancelButtonColor: "#6750e0",
+      background: "#f5f4f0",
+      color: "#171717",
+      customClass: {
+        popup: "border-4 border-[#171717] rounded-none shadow-[6px_6px_0px_0px_#171717] font-mono",
+        title: "uppercase font-black tracking-tighter",
+        confirmButton: "font-mono font-black uppercase tracking-wider border-2 border-[#171717] rounded-none",
+        cancelButton: "font-mono font-black uppercase tracking-wider border-2 border-[#171717] rounded-none",
+      },
+    });
 
-    const copiaEventosPrevios = [...eventos];
+    if (!resultado.isConfirmed) return;
+
     const idABorrar = eventoSeleccionado.id;
-
-    setEventos(eventos.filter((ev) => ev.id !== idABorrar));
-    setEventoSeleccionado(null);
     setLoadingAccion(true);
 
     try {
@@ -265,32 +302,68 @@ export default function DashboardProducer() {
 
       if (!response.ok) {
         if (response.status === 401) {
-          alert(
-            "Error 401: Tu sesión expiró o no tenés permisos de Productor activos para borrar este evento. Intentá cerrar sesión y volver a entrar.",
-          );
-          setEventos(copiaEventosPrevios);
+          Swal.fire({
+            title: "SIN PERMISOS",
+            text: "Tu sesión expiró o no tenés permisos de Productor para borrar este evento.",
+            icon: "error",
+            confirmButtonText: "OK",
+            confirmButtonColor: "#6750e0",
+            background: "#f5f4f0",
+            color: "#171717",
+            customClass: {
+              popup: "border-4 border-[#171717] rounded-none shadow-[6px_6px_0px_0px_#171717] font-mono",
+              title: "uppercase font-black tracking-tighter",
+              confirmButton: "font-mono font-black uppercase tracking-wider border-2 border-[#171717] rounded-none",
+            },
+          });
           return;
         }
         throw new Error(`Error del servidor: ${response.status}`);
       }
 
-      alert("El evento fue dado de baja correctamente en el sistema.");
+      // Solo si el backend confirmó OK, sacamos el evento de la lista
+      setEventos((prev) => prev.filter((ev) => ev.id !== idABorrar));
+      setEventoSeleccionado(null);
+
+      Swal.fire({
+        title: "EVENTO DADO DE BAJA",
+        text: "El evento fue desactivado correctamente.",
+        icon: "success",
+        confirmButtonText: "OK",
+        confirmButtonColor: "#6750e0",
+        background: "#f5f4f0",
+        color: "#171717",
+        customClass: {
+          popup: "border-4 border-[#171717] rounded-none shadow-[6px_6px_0px_0px_#171717] font-mono",
+          title: "uppercase font-black tracking-tighter",
+          confirmButton: "font-mono font-black uppercase tracking-wider border-2 border-[#171717] rounded-none",
+        },
+      });
     } catch (error: any) {
       console.error("🚨 Error en la petición de borrado:", error);
-      alert(error.message || "No se pudo completar la baja.");
-      setEventos(copiaEventosPrevios);
+      Swal.fire({
+        title: "ERROR",
+        text: error.message || "No se pudo completar la baja.",
+        icon: "error",
+        confirmButtonText: "OK",
+        confirmButtonColor: "#6750e0",
+        background: "#f5f4f0",
+        color: "#171717",
+        customClass: {
+          popup: "border-4 border-[#171717] rounded-none shadow-[6px_6px_0px_0px_#171717] font-mono",
+          title: "uppercase font-black tracking-tighter",
+          confirmButton: "font-mono font-black uppercase tracking-wider border-2 border-[#171717] rounded-none",
+        },
+      });
     } finally {
       setLoadingAccion(false);
     }
   };
 
-  const esConcluido = eventoSeleccionado?.status === "CONCLUIDO";
+  
 
   const capacidadTotalPantalla = useMemo(() => {
-    return formTicketTypes.reduce(
-      (acc, curr) => acc + (Number(curr.stock) || 0),
-      0,
-    );
+    return formTicketTypes.reduce((acc, curr) => acc + (Number(curr.stock) || 0), 0);
   }, [formTicketTypes]);
 
   return (
@@ -407,7 +480,6 @@ export default function DashboardProducer() {
             >
               🛠️ Ajustes Avanzados
             </button>
-
             <button
               disabled={!eventoSeleccionado}
               onClick={() => setSeccionActiva("stats")}
@@ -439,9 +511,7 @@ export default function DashboardProducer() {
               {seccionActiva === "ajustes" && (
                 <div className="bg-surface border-2 border-text p-6 space-y-5 shadow-[4px_4px_0px_0px_var(--color-text)]">
                   <div className="flex justify-between items-center border-b-2 border-text pb-1">
-                    <h3 className="text-lg font-black uppercase">
-                      Editor Maestro del Evento
-                    </h3>
+                    <h3 className="text-lg font-black uppercase">Editor Maestro del Evento</h3>
                     <span className="font-mono text-xs bg-secondary/10 border border-text px-2 py-0.5 font-bold uppercase">
                       Capacidad total: {capacidadTotalPantalla} pax
                     </span>
@@ -470,9 +540,7 @@ export default function DashboardProducer() {
                       >
                         <option value="">-- Seleccioná Categoría --</option>
                         {categorias.map((cat) => (
-                          <option key={cat.id} value={cat.id}>
-                            {cat.name}
-                          </option>
+                          <option key={cat.id} value={cat.id}>{cat.name}</option>
                         ))}
                       </select>
                     </div>
@@ -487,26 +555,38 @@ export default function DashboardProducer() {
                         type="date"
                         value={formDate}
                         onChange={(e) => setFormDate(e.target.value)}
+                         style={{ colorScheme: "dark" }}
                         className="w-full border-2 border-text p-2 bg-background font-mono text-xs shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] focus:outline-none"
                       />
                     </div>
                     <div className="space-y-1">
                       <label className="text-[10px] font-mono font-bold uppercase text-text-soft">
-                        Locación / Estadio
+                        Hora del Evento
                       </label>
-                      <select
-                        value={formLocation}
-                        onChange={(e) => setFormLocation(e.target.value)}
-                        className="w-full border-2 border-text p-2 bg-background font-bold text-xs uppercase shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] focus:outline-none"
-                      >
-                        <option value="">-- Seleccioná Lugar --</option>
-                        {locaciones.map((ven) => (
-                          <option key={ven.id} value={ven.id}>
-                            {ven.name}
-                          </option>
-                        ))}
-                      </select>
+                      <input
+                        type="time"
+                        value={formTime}
+                        onChange={(e) => setFormTime(e.target.value)}
+                         style={{ colorScheme: "dark" }}
+                        className="w-full border-2 border-text p-2 bg-background font-mono text-xs shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] focus:outline-none"
+                      />
                     </div>
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-mono font-bold uppercase text-text-soft">
+                      Locación / Estadio
+                    </label>
+                    <select
+                      value={formLocation}
+                      onChange={(e) => setFormLocation(e.target.value)}
+                      className="w-full border-2 border-text p-2 bg-background font-bold text-xs uppercase shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] focus:outline-none"
+                    >
+                      <option value="">-- Seleccioná Lugar --</option>
+                      {locaciones.map((ven) => (
+                        <option key={ven.id} value={ven.id}>{ven.name}</option>
+                      ))}
+                    </select>
                   </div>
 
                   <div className="space-y-1">
@@ -525,12 +605,10 @@ export default function DashboardProducer() {
                     <h4 className="text-xs font-mono font-black uppercase tracking-tight text-primary">
                       🔒 Gestión Macroeconómica de Tickets
                     </h4>
-
                     <div className="space-y-3">
                       {formTicketTypes.map((ticket, idx) => {
                         const entradasVendidas = ticket.sold || 0;
                         const tieneVentas = entradasVendidas > 0;
-
                         return (
                           <div
                             key={idx}
@@ -546,61 +624,34 @@ export default function DashboardProducer() {
                                 </span>
                               )}
                             </div>
-
                             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                               <div>
-                                <label className="text-[9px] font-mono font-bold text-text-soft uppercase">
-                                  Sector
-                                </label>
+                                <label className="text-[9px] font-mono font-bold text-text-soft uppercase">Sector</label>
                                 <input
                                   type="text"
                                   value={ticket.zone || ""}
                                   disabled={tieneVentas}
-                                  onChange={(e) =>
-                                    handleTicketTypeChange(
-                                      idx,
-                                      "zone",
-                                      e.target.value,
-                                    )
-                                  }
+                                  onChange={(e) => handleTicketTypeChange(idx, "zone", e.target.value)}
                                   className="w-full border border-text p-1.5 bg-background font-bold text-xs uppercase disabled:opacity-50 disabled:bg-surface"
                                 />
                               </div>
-
                               <div>
-                                <label className="text-[9px] font-mono font-bold text-text-soft uppercase">
-                                  Precio ($)
-                                </label>
+                                <label className="text-[9px] font-mono font-bold text-text-soft uppercase">Precio ($)</label>
                                 <input
                                   type="number"
                                   value={ticket.price === 0 ? "" : ticket.price}
                                   disabled={tieneVentas}
-                                  onChange={(e) => {
-                                    const val =
-                                      e.target.value === ""
-                                        ? 0
-                                        : Number(e.target.value);
-                                    handleTicketTypeChange(idx, "price", val);
-                                  }}
+                                  onChange={(e) => handleTicketTypeChange(idx, "price", e.target.value === "" ? 0 : Number(e.target.value))}
                                   className="w-full border border-text p-1.5 bg-background font-mono text-xs disabled:opacity-50 disabled:bg-surface"
                                 />
                               </div>
-
                               <div>
-                                <label className="text-[9px] font-mono font-bold text-text-soft uppercase">
-                                  Stock Disponible
-                                </label>
+                                <label className="text-[9px] font-mono font-bold text-text-soft uppercase">Stock Disponible</label>
                                 <input
                                   type="number"
                                   value={ticket.stock === 0 ? "" : ticket.stock}
                                   min={entradasVendidas}
-                                  onChange={(e) => {
-                                    const val =
-                                      e.target.value === ""
-                                        ? 0
-                                        : Number(e.target.value);
-                                    handleTicketTypeChange(idx, "stock", val);
-                                  }}
+                                  onChange={(e) => handleTicketTypeChange(idx, "stock", e.target.value === "" ? 0 : Number(e.target.value))}
                                   className="w-full border border-text p-1.5 bg-background font-mono text-xs"
                                 />
                               </div>
@@ -617,11 +668,8 @@ export default function DashboardProducer() {
                       disabled={loadingAccion}
                       className="flex-1 bg-primary text-background border-2 border-text py-2.5 font-mono text-xs font-black uppercase shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] hover:translate-x-0.5 hover:translate-y-0.5 transition-all active:shadow-none"
                     >
-                      {loadingAccion
-                        ? "[ ACTUALIZANDO... ]"
-                        : "💾 GUARDAR AJUSTES AVANZADOS"}
+                      {loadingAccion ? "[ ACTUALIZANDO... ]" : "💾 GUARDAR AJUSTES AVANZADOS"}
                     </button>
-
                     <button
                       onClick={eliminarEvento}
                       disabled={loadingAccion}
@@ -728,9 +776,7 @@ export default function DashboardProducer() {
 
               {seccionActiva === "scanner" && (
                 <div className="bg-surface border-2 border-text p-6 space-y-4 shadow-[4px_4px_0px_0px_var(--color-text)]">
-                  <h3 className="text-lg font-black uppercase">
-                    Módulo de Control de Accesos
-                  </h3>
+                  <h3 className="text-lg font-black uppercase">Módulo de Control de Accesos</h3>
                   <div className="border-2 border-dashed border-text p-8 text-center font-mono text-xs font-bold text-text-soft">
                     [ Aquí se inicializa la cámara para el escaneo de QRs ]
                   </div>
