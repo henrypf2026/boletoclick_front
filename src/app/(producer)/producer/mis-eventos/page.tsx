@@ -96,6 +96,11 @@ export default function MisEventosPage() {
                         {totalRemaining} entradas disp.
                       </span>
                     )}
+                    {event.category && event.category !== 'otros' && (
+                      <span className="text-[10px] font-black uppercase tracking-wider text-text-soft border border-text/30 px-2 py-0.5">
+                        {event.category.replace(/-/g, ' ')}
+                      </span>
+                    )}
                   </div>
                   <h2 className="font-black uppercase tracking-tight text-text">{event.title}</h2>
                   <p className="text-sm text-text-soft">

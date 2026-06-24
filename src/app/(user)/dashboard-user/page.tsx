@@ -8,6 +8,7 @@ import { orderService } from "@/services/orderService";
 import TicketQrCode from "@/components/ui/TicketQrCode";
 import AddToWalletButton from "@/components/ui/AddToWalletButton";
 import jsPDF from "jspdf";
+import Swal from "sweetalert2";
 
 
 interface OrderItem {
@@ -15,7 +16,7 @@ interface OrderItem {
   total: number;
   producerSubtotal: number;
   platformFee: number;
-  status: "PENDING" | "PAID" | "FAILED" | "REFUNDED";
+  status: "PENDING" | "PAID" | "FAILED" | "REFUNDED" | "CANCELLED";
   transactionId: string | null;
   createdAt: string;
   updatedAt: string;
@@ -38,23 +39,34 @@ interface EventData {
   venue?: { name: string };
 }
 
-function orderStatusLabel(status: OrderItem["status"]) {
+function orderStatusLabel(status: string) {
   switch (status) {
     case "PAID":      return "PAGADO";
     case "PENDING":   return "PENDIENTE";
     case "FAILED":    return "FALLIDO";
     case "REFUNDED":  return "REEMBOLSADO";
+    case "CANCELLED": return "CANCELADO";
+    default:          return status;
   }
 }
 
-function orderStatusColor(status: OrderItem["status"]) {
+function orderStatusColor(status: string) {
   switch (status) {
     case "PAID":      return "text-success bg-success/10 border-success";
     case "PENDING":   return "text-yellow-600 bg-yellow-400/10 border-yellow-500";
     case "FAILED":    return "text-red-500 bg-red-500/10 border-red-500";
     case "REFUNDED":  return "text-text-soft bg-surface-2 border-text/30";
+    case "CANCELLED": return "text-text-soft bg-surface-2 border-text/30";
+    default:          return "text-text-soft bg-surface-2 border-text/30";
   }
 }
+
+const SWAL_CUSTOM = {
+  popup: "border-4 border-[#171717] rounded-none shadow-[6px_6px_0px_0px_#171717] font-mono",
+  title: "uppercase font-black tracking-tighter",
+  confirmButton: "font-mono font-black uppercase tracking-wider border-2 border-[#171717] rounded-none",
+  cancelButton: "font-mono font-black uppercase tracking-wider border-2 border-[#171717] rounded-none",
+};
 
 
 async function fetchEvent(eventId: string): Promise<EventData | null> {
@@ -320,6 +332,7 @@ export default function UserDashboard() {
   const [errorTickets, setErrorTickets]       = useState(false);
   const [errorOrders, setErrorOrders]         = useState(false);
   const [pdfLoading, setPdfLoading]           = useState<string | null>(null);
+  const [cancellingId, setCancellingId]       = useState<string | null>(null);
 
   useEffect(() => {
     if (!user) return;
@@ -360,6 +373,66 @@ export default function UserDashboard() {
   const firstName = user
     ? (user.name ?? user.email.split("@")[0]).split(" ")[0]
     : "";
+
+  async function handleCancelOrder(orderId: string) {
+    const result = await Swal.fire({
+      title: "¿Cancelar esta compra?",
+      text: "Se anularán tus entradas y no podrás usarlas. Esta acción no tiene vuelta atrás. Solo podés cancelar hasta 48 hs antes del evento.",
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonText: "Sí, cancelar compra",
+      cancelButtonText: "No, volver",
+      confirmButtonColor: "#dc2626",
+      cancelButtonColor: "#6750e0",
+      background: "#f5f4f0",
+      color: "#171717",
+      customClass: SWAL_CUSTOM,
+    });
+
+    if (!result.isConfirmed) return;
+
+    setCancellingId(orderId);
+    try {
+      const res = await fetch(`/api/backend/orders/${orderId}/cancel`, {
+        method: "PATCH",
+        credentials: "include",
+      });
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.message || "No se pudo cancelar la orden.");
+      }
+
+      setOrders((prev) =>
+        prev.map((o) => o.id === orderId ? { ...o, status: "CANCELLED" as const } : o)
+      );
+
+      Swal.fire({
+        title: "COMPRA CANCELADA",
+        text: "Tu compra fue cancelada. Las entradas ya no son válidas.",
+        icon: "success",
+        confirmButtonText: "OK",
+        confirmButtonColor: "#6750e0",
+        background: "#f5f4f0",
+        color: "#171717",
+        customClass: SWAL_CUSTOM,
+      });
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "No se pudo cancelar la orden.";
+      Swal.fire({
+        title: "ERROR",
+        text: message,
+        icon: "error",
+        confirmButtonText: "OK",
+        confirmButtonColor: "#6750e0",
+        background: "#f5f4f0",
+        color: "#171717",
+        customClass: SWAL_CUSTOM,
+      });
+    } finally {
+      setCancellingId(null);
+    }
+  }
 
   async function handleDescargarPDF(orden: OrderItem) {
     setPdfLoading(orden.id);
@@ -540,7 +613,7 @@ export default function UserDashboard() {
                       </p>
                     </div>
 
-                    <div className="flex items-center justify-between sm:justify-end gap-6 border-t sm:border-t-0 pt-3 sm:pt-0 border-text/20">
+                    <div className="flex items-center justify-between sm:justify-end gap-4 border-t sm:border-t-0 pt-3 sm:pt-0 border-text/20 flex-wrap">
                       <div className="sm:text-right">
                         <span className="text-text-soft text-[10px] block uppercase font-mono font-bold">
                           TOTAL ABONADO
@@ -550,23 +623,34 @@ export default function UserDashboard() {
                         </span>
                       </div>
 
-                      <button
-                        onClick={() => handleDescargarPDF(orden)}
-                        disabled={orden.status !== "PAID" || pdfLoading === orden.id}
-                        className="bg-primary text-background font-mono font-black text-xs uppercase tracking-wider transition-all border-2 border-text px-4 py-2 shadow-[2px_2px_0px_0px_var(--color-text)] hover:shadow-none hover:translate-x-0.5 hover:translate-y-0.5 active:shadow-none active:translate-x-0.5 active:translate-y-0.5 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed disabled:shadow-none disabled:translate-x-0 disabled:translate-y-0 min-w-[64px] flex items-center justify-center gap-1"
-                      >
-                        {pdfLoading === orden.id ? (
-                          <>
-                            <svg className="animate-spin w-3 h-3" fill="none" viewBox="0 0 24 24">
-                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
-                            </svg>
-                            ...
-                          </>
-                        ) : (
-                          <>↓ PDF</>
+                      <div className="flex items-center gap-2">
+                        {orden.status === "PAID" && (
+                          <button
+                            onClick={() => handleCancelOrder(orden.id)}
+                            disabled={cancellingId === orden.id}
+                            className="bg-red-600 text-white font-mono font-black text-xs uppercase tracking-wider transition-all border-2 border-text px-3 py-2 shadow-[2px_2px_0px_0px_var(--color-text)] hover:shadow-none hover:translate-x-0.5 hover:translate-y-0.5 cursor-pointer whitespace-nowrap disabled:opacity-40 disabled:cursor-not-allowed disabled:shadow-none disabled:translate-x-0 disabled:translate-y-0"
+                          >
+                            {cancellingId === orden.id ? "..." : "✕ Cancelar"}
+                          </button>
                         )}
-                      </button>
+                        <button
+                          onClick={() => handleDescargarPDF(orden)}
+                          disabled={orden.status !== "PAID" || pdfLoading === orden.id}
+                          className="bg-primary text-background font-mono font-black text-xs uppercase tracking-wider transition-all border-2 border-text px-4 py-2 shadow-[2px_2px_0px_0px_var(--color-text)] hover:shadow-none hover:translate-x-0.5 hover:translate-y-0.5 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed disabled:shadow-none disabled:translate-x-0 disabled:translate-y-0 min-w-[64px] flex items-center justify-center gap-1"
+                        >
+                          {pdfLoading === orden.id ? (
+                            <>
+                              <svg className="animate-spin w-3 h-3" fill="none" viewBox="0 0 24 24">
+                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
+                              </svg>
+                              ...
+                            </>
+                          ) : (
+                            <>↓ PDF</>
+                          )}
+                        </button>
+                      </div>
                     </div>
                   </div>
                 ))

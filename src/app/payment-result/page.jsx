@@ -284,7 +284,7 @@ function PaymentResultContent() {
               <button
                 type="button"
                 onClick={() => router.push("/mis-tickets")}
-                className="rounded-lg bg-primary px-6 py-3 font-bold text-white"
+                className="rounded-lg bg-primary px-6 py-3 font-bold text-background"
               >
                 Ver mis tickets
               </button>
