@@ -8,7 +8,7 @@ import jsPDF from "jspdf";
 
 
 
-type OrderStatus = "PENDING" | "PAID" | "FAILED" | "REFUNDED";
+type OrderStatus = "PENDING" | "PAID" | "FAILED" | "REFUNDED" | "CANCELLED";
 
 interface Order {
   id: string;
@@ -28,6 +28,7 @@ function statusLabel(status: OrderStatus) {
     case "PENDING":   return "PENDIENTE";
     case "FAILED":    return "FALLIDO";
     case "REFUNDED":  return "REEMBOLSADO";
+    case "CANCELLED": return "CANCELADO";
   }
 }
 
@@ -37,10 +38,18 @@ function statusStyle(status: OrderStatus) {
     case "PENDING":   return "text-yellow-600 bg-yellow-400/10 border-yellow-500";
     case "FAILED":    return "text-red-500 bg-red-500/10 border-red-500";
     case "REFUNDED":  return "text-text-soft bg-surface-2 border-text/30";
+    case "CANCELLED": return "text-text-soft bg-surface-2 border-text/30";
   }
 }
 
-// Generador de PDF 
+const SWAL_CUSTOM = {
+  popup: "border-4 border-[#171717] rounded-none shadow-[6px_6px_0px_0px_#171717] font-mono",
+  title: "uppercase font-black tracking-tighter",
+  confirmButton: "font-mono font-black uppercase tracking-wider border-2 border-[#171717] rounded-none",
+  cancelButton: "font-mono font-black uppercase tracking-wider border-2 border-[#171717] rounded-none",
+};
+
+// Generador de PDF
 function generarComprobantePDF(orden: Order) {
   const doc = new jsPDF({ unit: "mm", format: "a4" });
 
@@ -48,7 +57,7 @@ function generarComprobantePDF(orden: Order) {
   const ancho  = doc.internal.pageSize.getWidth();   // 210 mm
   let   y      = margen;
 
- 
+
   const linea = (grosor = 0.3) => {
     doc.setLineWidth(grosor);
     doc.line(margen, y, ancho - margen, y);
@@ -68,7 +77,7 @@ function generarComprobantePDF(orden: Order) {
       align === "right"  ? ancho - margen :
       margen;
     doc.text(contenido, x, y, { align });
-    y += size * 0.5;   
+    y += size * 0.5;
   };
 
   const par = (etiqueta: string, valor: string) => {
@@ -83,7 +92,7 @@ function generarComprobantePDF(orden: Order) {
     y += 6;
   };
 
- 
+
   doc.setFillColor("#171717");
   doc.rect(0, 0, ancho, 28, "F");
 
@@ -98,7 +107,7 @@ function generarComprobantePDF(orden: Order) {
   doc.text("Plataforma de Tickets", ancho - margen, 17, { align: "right" });
 
   y = 38;
-  
+
   texto("Orden N°", { size: 8, color: "#888888" });
   texto(orden.id.toUpperCase(), { size: 14, bold: true });
   y += 2;
@@ -162,7 +171,7 @@ function generarComprobantePDF(orden: Order) {
   texto("Este comprobante es válido como constancia de pago.", { size: 8, color: "#888888", align: "center" });
   texto("Guardalo para futuros reclamos o devoluciones.", { size: 8, color: "#888888", align: "center" });
 
- 
+
   doc.save(`comprobante-${orden.id.slice(0, 8).toUpperCase()}.pdf`);
 }
 
@@ -173,6 +182,7 @@ export default function MisComprasPage() {
   const [orders,  setOrders]  = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [busqueda, setBusqueda] = useState("");
+  const [cancellingId, setCancellingId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!user) return;
@@ -193,17 +203,71 @@ export default function MisComprasPage() {
           confirmButtonColor: "#6750e0",
           background: "#f5f4f0",
           color: "#171717",
-          customClass: {
-            popup:
-              "border-4 border-[#171717] rounded-none shadow-[6px_6px_0px_0px_#171717] font-mono",
-            title: "uppercase font-black tracking-tighter",
-            confirmButton:
-              "font-mono font-black uppercase tracking-wider border-2 border-[#171717] rounded-none",
-          },
+          customClass: SWAL_CUSTOM,
         });
       })
       .finally(() => setLoading(false));
   }, [user]);
+
+  async function handleCancelOrder(orderId: string) {
+    const result = await Swal.fire({
+      title: "¿Cancelar orden?",
+      text: "Se anularán tus entradas y se restaurará el stock. Solo podés cancelar hasta 48 hs antes del evento.",
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonText: "Sí, cancelar",
+      cancelButtonText: "No, volver",
+      confirmButtonColor: "#dc2626",
+      cancelButtonColor: "#6750e0",
+      background: "#f5f4f0",
+      color: "#171717",
+      customClass: SWAL_CUSTOM,
+    });
+
+    if (!result.isConfirmed) return;
+
+    setCancellingId(orderId);
+    try {
+      const res = await fetch(`/api/backend/orders/${orderId}/cancel`, {
+        method: "PATCH",
+        credentials: "include",
+      });
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.message || "Error al cancelar la orden");
+      }
+
+      setOrders((prev) =>
+        prev.map((o) => o.id === orderId ? { ...o, status: "CANCELLED" as OrderStatus } : o)
+      );
+
+      Swal.fire({
+        title: "CANCELADO",
+        text: "Tu orden fue cancelada exitosamente.",
+        icon: "success",
+        confirmButtonText: "OK",
+        confirmButtonColor: "#6750e0",
+        background: "#f5f4f0",
+        color: "#171717",
+        customClass: SWAL_CUSTOM,
+      });
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "No se pudo cancelar la orden.";
+      Swal.fire({
+        title: "ERROR",
+        text: message,
+        icon: "error",
+        confirmButtonText: "OK",
+        confirmButtonColor: "#6750e0",
+        background: "#f5f4f0",
+        color: "#171717",
+        customClass: SWAL_CUSTOM,
+      });
+    } finally {
+      setCancellingId(null);
+    }
+  }
 
   const ordenesFiltradas = useMemo(
     () =>
@@ -215,7 +279,7 @@ export default function MisComprasPage() {
     [orders, busqueda]
   );
 
-  
+
   if (!user) {
     return (
       <div className="min-h-dvh flex items-center justify-center px-4">
@@ -236,7 +300,7 @@ export default function MisComprasPage() {
   return (
     <div className="p-4 md:p-8 max-w-2xl mx-auto min-h-screen bg-background text-text transition-colors">
 
-   
+
       <div className="mb-8 border-b-4 border-text pb-4">
         <p className="font-mono text-[11px] font-black uppercase tracking-widest text-text-soft mb-1">
           ↗ Tu historial
@@ -324,8 +388,7 @@ export default function MisComprasPage() {
                   </div>
                 </div>
 
-                {/* Total + botón PDF */}
-                <div className="flex items-center justify-between border-t-2 border-dashed border-text/30 pt-4 gap-4">
+                <div className="flex items-center justify-between border-t-2 border-dashed border-text/30 pt-4 gap-2 flex-wrap">
                   <div>
                     <span className="text-text-soft text-[10px] block uppercase font-mono font-bold">
                       Total abonado
@@ -335,14 +398,24 @@ export default function MisComprasPage() {
                     </span>
                   </div>
 
-                  {/* Solo habilitado si el pago fue exitoso */}
-                  <button
-                    onClick={() => generarComprobantePDF(orden)}
-                    disabled={orden.status !== "PAID"}
-                    className="flex items-center gap-2 bg-primary text-background font-mono font-black text-xs uppercase tracking-wider border-2 border-text px-4 py-2.5 shadow-[2px_2px_0px_0px_var(--color-text)] hover:shadow-none hover:translate-x-0.5 hover:translate-y-0.5 transition-all cursor-pointer whitespace-nowrap disabled:opacity-40 disabled:cursor-not-allowed disabled:shadow-none disabled:translate-x-0 disabled:translate-y-0"
-                  >
-                    ↓ Descargar PDF
-                  </button>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    {orden.status === "PAID" && (
+                      <button
+                        onClick={() => handleCancelOrder(orden.id)}
+                        disabled={cancellingId === orden.id}
+                        className="flex items-center gap-1.5 bg-red-600 text-white font-mono font-black text-xs uppercase tracking-wider border-2 border-text px-3 py-2.5 shadow-[2px_2px_0px_0px_var(--color-text)] hover:shadow-none hover:translate-x-0.5 hover:translate-y-0.5 transition-all cursor-pointer whitespace-nowrap disabled:opacity-40 disabled:cursor-not-allowed disabled:shadow-none disabled:translate-x-0 disabled:translate-y-0"
+                      >
+                        {cancellingId === orden.id ? "..." : "✕ Cancelar"}
+                      </button>
+                    )}
+                    <button
+                      onClick={() => generarComprobantePDF(orden)}
+                      disabled={orden.status !== "PAID"}
+                      className="flex items-center gap-2 bg-primary text-background font-mono font-black text-xs uppercase tracking-wider border-2 border-text px-4 py-2.5 shadow-[2px_2px_0px_0px_var(--color-text)] hover:shadow-none hover:translate-x-0.5 hover:translate-y-0.5 transition-all cursor-pointer whitespace-nowrap disabled:opacity-40 disabled:cursor-not-allowed disabled:shadow-none disabled:translate-x-0 disabled:translate-y-0"
+                    >
+                      ↓ Descargar PDF
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
