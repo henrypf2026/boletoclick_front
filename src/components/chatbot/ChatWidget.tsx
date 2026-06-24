@@ -105,17 +105,19 @@ export function ChatWidget() {
         type="button"
         onClick={() => setIsOpen(true)}
         style={{ bottom: bottomOffset }}
-        className="fixed right-6 z-50 flex h-14 w-14 items-center justify-center rounded-full border-2 border-border bg-primary text-2xl text-white shadow-lg transition-[bottom] duration-200 hover:bg-primary-deep"
+        className="fixed right-6 z-50 flex h-14 w-14 items-center justify-center rounded-full bg-primary text-background shadow-lg transition-[bottom] duration-200 hover:bg-primary-deep"
         aria-label="Abrir asistente"
       >
-        💬
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-6 h-6">
+          <path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z"/>
+        </svg>
       </button>
     );
   }
 
   return (
     <div style={{ bottom: bottomOffset }} className="fixed right-6 z-50 flex w-[min(100vw-2rem,24rem)] flex-col overflow-hidden rounded-3xl border-2 border-border bg-background shadow-2xl transition-[bottom] duration-200">
-      <header className="flex items-center justify-between bg-primary px-4 py-3 text-white">
+      <header className="flex items-center justify-between bg-primary px-4 py-3 text-background">
         <div>
           <p className="text-xs font-black uppercase tracking-wider opacity-80">
             Ayuda
@@ -125,7 +127,7 @@ export function ChatWidget() {
         <button
           type="button"
           onClick={() => setIsOpen(false)}
-          className="rounded-full border border-white/40 px-2 py-1 text-xs font-bold hover:bg-white/10"
+          className="rounded-full border-2 border-background px-2 py-1 text-xs font-bold text-background hover:bg-background/20"
           aria-label="Minimizar asistente"
         >
           —
@@ -165,7 +167,7 @@ export function ChatWidget() {
           <button
             type="submit"
             disabled={isTyping || input.trim().length === 0}
-            className="rounded-xl border-2 border-border bg-accent px-4 py-2 text-sm font-black uppercase text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+            className="rounded-xl border-2 border-border bg-primary px-4 py-2 text-sm font-black uppercase text-background transition hover:bg-primary-deep disabled:cursor-not-allowed disabled:opacity-50"
           >
             Enviar
           </button>

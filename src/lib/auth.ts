@@ -44,8 +44,9 @@ export function clearToken(): void {
   localStorage.removeItem(ROLE_KEY);
   localStorage.removeItem(TICKETS_KEY);
   localStorage.removeItem('boletoclick_purchased_tickets');
+  localStorage.removeItem('oauth_redirect');
   Object.keys(localStorage)
-    .filter((key) => key.startsWith('checkoutSession_'))
+    .filter((key) => key.startsWith('checkoutSession_') || key.startsWith('mapbox.'))
     .forEach((key) => localStorage.removeItem(key));
   document.cookie = `${ROLE_KEY}=; path=/; max-age=0`;
 }

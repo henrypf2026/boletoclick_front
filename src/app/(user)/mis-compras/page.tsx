@@ -6,9 +6,27 @@ import { useAuth } from "@/context/AuthContext";
 import Swal from "sweetalert2";
 import jsPDF from "jspdf";
 
+type OrderStatus = "PENDING" | "PAID" | "FAILED" | "REFUNDED" | "CANCELLED";
 
+interface TicketType {
+  id: string;
+  eventId: string;
+  name: string;
+  price: number;
+  stock: number;
+  zone: string;
+}
 
-type OrderStatus = "PENDING" | "PAID" | "FAILED" | "REFUNDED";
+interface Ticket {
+  id: string;
+  orderId: string;
+  ticketTypeId: string;
+  qrCode: string;
+  allowEntrance: boolean;
+  usedAt: string | null;
+  createdAt: string;
+  ticketType: TicketType;
+}
 
 interface Order {
   id: string;
@@ -19,7 +37,14 @@ interface Order {
   transactionId: string | null;
   createdAt: string;
   updatedAt: string;
-  tickets?: { id: string }[];
+  tickets: Ticket[];
+}
+
+interface EventData {
+  id: string;
+  title: string;
+  eventDate: string;
+  venue?: { name: string };
 }
 
 function statusLabel(status: OrderStatus) {
@@ -28,6 +53,7 @@ function statusLabel(status: OrderStatus) {
     case "PENDING":   return "PENDIENTE";
     case "FAILED":    return "FALLIDO";
     case "REFUNDED":  return "REEMBOLSADO";
+    case "CANCELLED": return "CANCELADO";
   }
 }
 
@@ -37,148 +63,288 @@ function statusStyle(status: OrderStatus) {
     case "PENDING":   return "text-yellow-600 bg-yellow-400/10 border-yellow-500";
     case "FAILED":    return "text-red-500 bg-red-500/10 border-red-500";
     case "REFUNDED":  return "text-text-soft bg-surface-2 border-text/30";
+    case "CANCELLED": return "text-text-soft bg-surface-2 border-text/30";
   }
 }
 
-// Generador de PDF 
-function generarComprobantePDF(orden: Order) {
+const SWAL_CUSTOM = {
+  popup: "border-4 border-[#171717] rounded-none shadow-[6px_6px_0px_0px_#171717] font-mono",
+  title: "uppercase font-black tracking-tighter",
+  confirmButton: "font-mono font-black uppercase tracking-wider border-2 border-[#171717] rounded-none",
+  cancelButton: "font-mono font-black uppercase tracking-wider border-2 border-[#171717] rounded-none",
+};
+
+async function fetchEvent(eventId: string): Promise<EventData | null> {
+  try {
+    const res = await fetch(`/api/backend/events/${eventId}`, {
+      credentials: "include",
+    });
+    if (!res.ok) return null;
+    return await res.json();
+  } catch {
+    return null;
+  }
+}
+
+function formatFecha(iso: string) {
+  return new Date(iso).toLocaleDateString("es-AR", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  });
+}
+
+function formatHora(iso: string) {
+  return new Date(iso).toLocaleTimeString("es-AR", {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+function formatPeso(n: number) {
+  return "$" + n.toLocaleString("es-AR", { minimumFractionDigits: 2 });
+}
+
+async function generarComprobantePDF(orden: Order) {
+  let evento: EventData | null = null;
+  const primerTicket = orden.tickets?.[0];
+  if (primerTicket?.ticketType?.eventId) {
+    evento = await fetchEvent(primerTicket.ticketType.eventId);
+  }
+
   const doc = new jsPDF({ unit: "mm", format: "a4" });
-
+  const ancho = doc.internal.pageSize.getWidth();
   const margen = 20;
-  const ancho  = doc.internal.pageSize.getWidth();   // 210 mm
-  let   y      = margen;
+  let y = margen;
 
- 
-  const linea = (grosor = 0.3) => {
-    doc.setLineWidth(grosor);
-    doc.line(margen, y, ancho - margen, y);
-    y += 4;
-  };
+  const PURPLE = "#6750e0";
+  const ORANGE = "#ff6b00";
+  const BLACK  = "#171717";
+  const GRAY   = "#888888";
+  const LGRAY  = "#f2f2f2";
+  const WHITE  = "#ffffff";
 
-  const texto = (
-    contenido: string,
-    opciones: { size?: number; bold?: boolean; color?: string; align?: "left" | "center" | "right" } = {}
-  ) => {
-    const { size = 10, bold = false, color = "#171717", align = "left" } = opciones;
-    doc.setFontSize(size);
-    doc.setFont("helvetica", bold ? "bold" : "normal");
-    doc.setTextColor(color);
-    const x =
-      align === "center" ? ancho / 2 :
-      align === "right"  ? ancho - margen :
-      margen;
-    doc.text(contenido, x, y, { align });
-    y += size * 0.5;   
-  };
+  doc.setFillColor(BLACK);
+  doc.rect(0, 0, ancho, 30, "F");
 
-  const par = (etiqueta: string, valor: string) => {
+  doc.setFillColor(ORANGE);
+  doc.rect(0, 30, ancho, 2, "F");
+
+  doc.setFontSize(18);
+  doc.setFont("helvetica", "bold");
+  doc.setTextColor(WHITE);
+  doc.text("BOLETOCLICK", margen, 14);
+
+  doc.setFontSize(8);
+  doc.setFont("helvetica", "normal");
+  doc.setTextColor("#aaaaaa");
+  doc.text("COMPROBANTE DE COMPRA", margen, 21);
+
+  doc.setFontSize(8);
+  doc.setFont("helvetica", "normal");
+  doc.setTextColor("#aaaaaa");
+  doc.text("N° DE ORDEN", ancho - margen, 13, { align: "right" });
+  doc.setFontSize(11);
+  doc.setFont("helvetica", "bold");
+  doc.setTextColor(ORANGE);
+  doc.text(`#${orden.id.slice(0, 8).toUpperCase()}`, ancho - margen, 21, { align: "right" });
+
+  y = 42;
+
+  const estadoTexto = statusLabel(orden.status);
+  const badgeColor = orden.status === "PAID" ? PURPLE : orden.status === "REFUNDED" ? "#555" : "#cc3333";
+  doc.setFillColor(badgeColor);
+  doc.roundedRect(margen, y - 4, 38, 7, 1, 1, "F");
+  doc.setFontSize(7);
+  doc.setFont("helvetica", "bold");
+  doc.setTextColor(WHITE);
+  doc.text(`✓ ${estadoTexto}`, margen + 4, y + 0.8);
+  y += 12;
+
+  if (evento) {
+    doc.setFillColor(LGRAY);
+    doc.rect(margen, y, ancho - margen * 2, 28, "F");
+
+    doc.setFillColor(PURPLE);
+    doc.rect(margen, y, 3, 28, "F");
+
+    doc.setFontSize(7);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(GRAY);
+    doc.text("EVENTO", margen + 7, y + 6);
+
+    doc.setFontSize(13);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(BLACK);
+    doc.text(evento.title ?? "—", margen + 7, y + 13);
+
+    doc.setFontSize(8);
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(GRAY);
+    const fechaEvento = evento.eventDate ? `📅  ${formatFecha(evento.eventDate)}` : "—";
+    const venue = evento.venue?.name ? `📍  ${evento.venue.name}` : "";
+    doc.text(fechaEvento, margen + 7, y + 20);
+    if (venue) doc.text(venue, margen + 7, y + 25);
+
+    y += 36;
+  }
+
+  doc.setFontSize(8);
+  doc.setFont("helvetica", "bold");
+  doc.setTextColor(GRAY);
+  doc.text("DETALLE DE LA TRANSACCIÓN", margen, y);
+  y += 7;
+
+  const col1 = margen;
+  const col2 = ancho / 2;
+
+  interface CeldaDato { label: string; value: string; }
+  const celdas: CeldaDato[] = [
+    { label: "Fecha de compra", value: formatFecha(orden.createdAt) },
+    { label: "Hora",            value: formatHora(orden.createdAt) },
+    { label: "Método de pago",  value: "Stripe" },
+    { label: "Estado",          value: estadoTexto },
+  ];
+
+  celdas.forEach((celda, i) => {
+    const x = i % 2 === 0 ? col1 : col2;
+    if (i % 2 === 0 && i > 0) y += 12;
+
+    doc.setFillColor(LGRAY);
+    doc.rect(x, y - 3.5, (ancho - margen * 2) / 2 - 2, 10, "F");
+
+    doc.setFontSize(7);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(GRAY);
+    doc.text(celda.label.toUpperCase(), x + 3, y + 1);
+
     doc.setFontSize(9);
     doc.setFont("helvetica", "bold");
-    doc.setTextColor("#555555");
-    doc.text(etiqueta.toUpperCase(), margen, y);
+    doc.setTextColor(BLACK);
+    doc.text(celda.value, x + 3, y + 6.5);
+  });
 
+  y += 18;
+
+  if (orden.transactionId) {
+    doc.setFillColor(LGRAY);
+    doc.rect(margen, y - 3.5, ancho - margen * 2, 10, "F");
+    doc.setFontSize(7);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(GRAY);
+    doc.text("ID DE TRANSACCIÓN", margen + 3, y + 1);
+    doc.setFontSize(7.5);
     doc.setFont("helvetica", "normal");
-    doc.setTextColor("#171717");
+    doc.setTextColor(BLACK);
+    const txId = orden.transactionId.length > 55
+      ? orden.transactionId.slice(0, 55) + "..."
+      : orden.transactionId;
+    doc.text(txId, margen + 3, y + 6.5);
+    y += 16;
+  }
+
+  if (orden.tickets && orden.tickets.length > 0) {
+    y += 2;
+    doc.setFontSize(8);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(GRAY);
+    doc.text("DETALLE DE TICKETS", margen, y);
+    y += 7;
+
+    doc.setFillColor(PURPLE);
+    doc.rect(margen, y - 3.5, ancho - margen * 2, 8, "F");
+    doc.setFontSize(7);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(WHITE);
+    doc.text("TIPO",   margen + 3, y + 1);
+    doc.text("ZONA",   margen + 60, y + 1);
+    doc.text("PRECIO", ancho - margen - 25, y + 1);
+    y += 8;
+
+    orden.tickets.forEach((ticket, i) => {
+      const bg = i % 2 === 0 ? WHITE : LGRAY;
+      doc.setFillColor(bg);
+      doc.rect(margen, y - 3.5, ancho - margen * 2, 8, "F");
+
+      doc.setFontSize(8);
+      doc.setFont("helvetica", "normal");
+      doc.setTextColor(BLACK);
+      doc.text(ticket.ticketType?.name ?? "—", margen + 3, y + 1);
+      doc.text(ticket.ticketType?.zone ?? "—", margen + 60, y + 1);
+      doc.text(
+        ticket.ticketType?.price ? formatPeso(ticket.ticketType.price) : "—",
+        ancho - margen - 3,
+        y + 1,
+        { align: "right" }
+      );
+      y += 8;
+    });
+
+    y += 4;
+  }
+
+  doc.setFontSize(8);
+  doc.setFont("helvetica", "bold");
+  doc.setTextColor(GRAY);
+  doc.text("RESUMEN DE PAGO", margen, y);
+  y += 8;
+
+  const filaResumen = (label: string, valor: string, bold = false) => {
+    doc.setFontSize(9);
+    doc.setFont("helvetica", bold ? "bold" : "normal");
+    doc.setTextColor(bold ? BLACK : GRAY);
+    doc.text(label, margen, y);
     doc.text(valor, ancho - margen, y, { align: "right" });
     y += 6;
   };
 
- 
-  doc.setFillColor("#171717");
-  doc.rect(0, 0, ancho, 28, "F");
-
-  doc.setFontSize(20);
-  doc.setFont("helvetica", "bold");
-  doc.setTextColor("#ffffff");
-  doc.text("COMPROBANTE DE PAGO", margen, 17);
-
-  doc.setFontSize(9);
-  doc.setFont("helvetica", "normal");
-  doc.setTextColor("#aaaaaa");
-  doc.text("Plataforma de Tickets", ancho - margen, 17, { align: "right" });
-
-  y = 38;
-  
-  texto("Orden N°", { size: 8, color: "#888888" });
-  texto(orden.id.toUpperCase(), { size: 14, bold: true });
-  y += 2;
-  linea(0.5);
-
-
-  texto("Detalle de la transacción", { size: 11, bold: true });
-  y += 2;
-
-  par("Fecha de compra", new Date(orden.createdAt).toLocaleDateString("es-AR", {
-    day: "numeric", month: "long", year: "numeric",
-  }));
-  par("Hora", new Date(orden.createdAt).toLocaleTimeString("es-AR", {
-    hour: "2-digit", minute: "2-digit",
-  }));
-  par("Estado", statusLabel(orden.status));
-
-  if (orden.transactionId) {
-    par("ID de transacción", orden.transactionId);
-  }
+  filaResumen("Subtotal productor",  formatPeso(orden.producerSubtotal));
+  filaResumen("Comisión plataforma", formatPeso(orden.platformFee));
 
   y += 2;
-  linea();
-
-
-  if (orden.tickets && orden.tickets.length > 0) {
-    texto("Entradas incluidas", { size: 11, bold: true });
-    y += 2;
-
-    orden.tickets.forEach((ticket, i) => {
-      par(`Entrada ${i + 1}`, ticket.id.slice(0, 12).toUpperCase() + "...");
-    });
-
-    y += 2;
-    linea();
-  }
-
-  texto("Resumen de pago", { size: 11, bold: true });
-  y += 2;
-
-  const formatPeso = (n: number) =>
-    "$" + n.toLocaleString("es-AR", { minimumFractionDigits: 2 });
-
-  par("Subtotal productor",  formatPeso(orden.producerSubtotal));
-  par("Comisión plataforma", formatPeso(orden.platformFee));
-
-  y += 1;
+  doc.setDrawColor(PURPLE);
   doc.setLineWidth(0.8);
   doc.line(margen, y, ancho - margen, y);
-  y += 5;
+  y += 6;
 
   doc.setFontSize(13);
   doc.setFont("helvetica", "bold");
-  doc.setTextColor("#171717");
+  doc.setTextColor(BLACK);
   doc.text("TOTAL ABONADO", margen, y);
+  doc.setTextColor(ORANGE);
   doc.text(formatPeso(orden.total), ancho - margen, y, { align: "right" });
-  y += 10;
+  y += 14;
 
-  linea();
+  doc.setDrawColor("#dddddd");
+  doc.setLineWidth(0.3);
+  doc.line(margen, y, ancho - margen, y);
+  y += 6;
 
-  texto("Este comprobante es válido como constancia de pago.", { size: 8, color: "#888888", align: "center" });
-  texto("Guardalo para futuros reclamos o devoluciones.", { size: 8, color: "#888888", align: "center" });
+  doc.setFontSize(7.5);
+  doc.setFont("helvetica", "normal");
+  doc.setTextColor(GRAY);
+  doc.text("Este comprobante es válido como constancia de pago.", ancho / 2, y, { align: "center" });
+  y += 4;
+  doc.text("Guardalo para futuros reclamos o devoluciones.", ancho / 2, y, { align: "center" });
+  y += 6;
+  doc.setFont("helvetica", "bold");
+  doc.setTextColor(PURPLE);
+  doc.text("boletoclick.com", ancho / 2, y, { align: "center" });
 
- 
-  doc.save(`comprobante-${orden.id.slice(0, 8).toUpperCase()}.pdf`);
+  doc.save(`boletoclick-comprobante-${orden.id.slice(0, 8).toUpperCase()}.pdf`);
 }
-
-
 
 export default function MisComprasPage() {
   const { user } = useAuth();
-  const [orders,  setOrders]  = useState<Order[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [busqueda, setBusqueda] = useState("");
+  const [orders,      setOrders]      = useState<Order[]>([]);
+  const [loading,     setLoading]     = useState(true);
+  const [busqueda,    setBusqueda]    = useState("");
+  const [cancellingId, setCancellingId] = useState<string | null>(null);
+  const [pdfLoading,  setPdfLoading]  = useState<string | null>(null);
 
   useEffect(() => {
     if (!user) return;
-    fetch("/api/backend/orders/me", {
-      credentials: 'include',
-    })
+    fetch("/api/backend/orders/me", { credentials: "include" })
       .then((res) => {
         if (!res.ok) throw new Error("Error al traer órdenes");
         return res.json();
@@ -193,17 +359,92 @@ export default function MisComprasPage() {
           confirmButtonColor: "#6750e0",
           background: "#f5f4f0",
           color: "#171717",
-          customClass: {
-            popup:
-              "border-4 border-[#171717] rounded-none shadow-[6px_6px_0px_0px_#171717] font-mono",
-            title: "uppercase font-black tracking-tighter",
-            confirmButton:
-              "font-mono font-black uppercase tracking-wider border-2 border-[#171717] rounded-none",
-          },
+          customClass: SWAL_CUSTOM,
         });
       })
       .finally(() => setLoading(false));
   }, [user]);
+
+  async function handleCancelOrder(orderId: string) {
+    const result = await Swal.fire({
+      title: "¿Cancelar orden?",
+      text: "Se anularán tus entradas y se restaurará el stock. Solo podés cancelar hasta 48 hs antes del evento.",
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonText: "Sí, cancelar",
+      cancelButtonText: "No, volver",
+      confirmButtonColor: "#dc2626",
+      cancelButtonColor: "#6750e0",
+      background: "#f5f4f0",
+      color: "#171717",
+      customClass: SWAL_CUSTOM,
+    });
+
+    if (!result.isConfirmed) return;
+
+    setCancellingId(orderId);
+    try {
+      const res = await fetch(`/api/backend/orders/${orderId}/cancel`, {
+        method: "PATCH",
+        credentials: "include",
+      });
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.message || "Error al cancelar la orden");
+      }
+
+      setOrders((prev) =>
+        prev.map((o) => o.id === orderId ? { ...o, status: "CANCELLED" as OrderStatus } : o)
+      );
+
+      Swal.fire({
+        title: "CANCELADO",
+        text: "Tu orden fue cancelada exitosamente.",
+        icon: "success",
+        confirmButtonText: "OK",
+        confirmButtonColor: "#6750e0",
+        background: "#f5f4f0",
+        color: "#171717",
+        customClass: SWAL_CUSTOM,
+      });
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "No se pudo cancelar la orden.";
+      Swal.fire({
+        title: "ERROR",
+        text: message,
+        icon: "error",
+        confirmButtonText: "OK",
+        confirmButtonColor: "#6750e0",
+        background: "#f5f4f0",
+        color: "#171717",
+        customClass: SWAL_CUSTOM,
+      });
+    } finally {
+      setCancellingId(null);
+    }
+  }
+
+  async function handleDescargarPDF(orden: Order) {
+    setPdfLoading(orden.id);
+    try {
+      await generarComprobantePDF(orden);
+    } catch (err) {
+      console.error("Error generando PDF:", err);
+      Swal.fire({
+        title: "ERROR",
+        text: "No se pudo generar el comprobante. Intentá de nuevo.",
+        icon: "error",
+        confirmButtonText: "OK",
+        confirmButtonColor: "#6750e0",
+        background: "#f5f4f0",
+        color: "#171717",
+        customClass: SWAL_CUSTOM,
+      });
+    } finally {
+      setPdfLoading(null);
+    }
+  }
 
   const ordenesFiltradas = useMemo(
     () =>
@@ -215,7 +456,6 @@ export default function MisComprasPage() {
     [orders, busqueda]
   );
 
-  
   if (!user) {
     return (
       <div className="min-h-dvh flex items-center justify-center px-4">
@@ -232,11 +472,8 @@ export default function MisComprasPage() {
     );
   }
 
-
   return (
     <div className="p-4 md:p-8 max-w-2xl mx-auto min-h-screen bg-background text-text transition-colors">
-
-   
       <div className="mb-8 border-b-4 border-text pb-4">
         <p className="font-mono text-[11px] font-black uppercase tracking-widest text-text-soft mb-1">
           ↗ Tu historial
@@ -248,6 +485,7 @@ export default function MisComprasPage() {
           Historial de transacciones y comprobantes
         </p>
       </div>
+
       <div className="bg-surface border-2 border-text p-3 shadow-[2px_2px_0px_0px_var(--color-text)] mb-6">
         <input
           type="text"
@@ -257,6 +495,7 @@ export default function MisComprasPage() {
           className="w-full bg-background border-2 border-text p-2.5 font-mono text-xs font-bold uppercase focus:outline-none focus:ring-1 focus:ring-primary"
         />
       </div>
+
       {loading ? (
         <div className="space-y-4 animate-pulse">
           <div className="h-40 bg-surface border-2 border-text w-full" />
@@ -291,7 +530,7 @@ export default function MisComprasPage() {
                     {orden.id.slice(0, 8).toUpperCase()}
                   </span>
                   <span className="text-text-soft text-[11px] font-mono font-bold">
-                    {new Date(orden.createdAt).toLocaleDateString("es-MX", {
+                    {new Date(orden.createdAt).toLocaleDateString("es-AR", {
                       day: "numeric",
                       month: "short",
                       year: "numeric",
@@ -304,6 +543,7 @@ export default function MisComprasPage() {
                   {statusLabel(orden.status)}
                 </span>
               </div>
+
               <div className="p-5">
                 <div className="grid grid-cols-2 gap-2 mb-4">
                   <div className="bg-background border border-text/20 p-2.5">
@@ -311,7 +551,7 @@ export default function MisComprasPage() {
                       Entradas
                     </span>
                     <span className="font-black text-sm font-mono">
-                      {orden.tickets?.length ?? "—"}x
+                      {orden.tickets?.length > 0 ? `${orden.tickets.length}x` : "—"}
                     </span>
                   </div>
                   <div className="bg-background border border-text/20 p-2.5">
@@ -319,36 +559,68 @@ export default function MisComprasPage() {
                       Comisión
                     </span>
                     <span className="font-black text-sm font-mono">
-                      ${orden.platformFee.toLocaleString("es-MX")}
+                      ${orden.platformFee.toLocaleString("es-AR")}
                     </span>
                   </div>
                 </div>
 
-                {/* Total + botón PDF */}
-                <div className="flex items-center justify-between border-t-2 border-dashed border-text/30 pt-4 gap-4">
+                {orden.tickets?.[0]?.ticketType && (
+                  <div className="bg-background border border-text/20 p-2.5 mb-4">
+                    <span className="text-text-soft text-[9px] block uppercase font-mono font-bold mb-0.5">
+                      Tipo · Zona
+                    </span>
+                    <span className="font-bold text-xs font-mono">
+                      {orden.tickets[0].ticketType.name}
+                      {orden.tickets[0].ticketType.zone
+                        ? ` · ${orden.tickets[0].ticketType.zone}`
+                        : ""}
+                    </span>
+                  </div>
+                )}
+
+                <div className="flex items-center justify-between border-t-2 border-dashed border-text/30 pt-4 gap-2 flex-wrap">
                   <div>
                     <span className="text-text-soft text-[10px] block uppercase font-mono font-bold">
                       Total abonado
                     </span>
                     <span className="font-black text-xl font-mono text-text">
-                      ${orden.total.toLocaleString("es-MX")}
+                      ${orden.total.toLocaleString("es-AR")}
                     </span>
                   </div>
 
-                  {/* Solo habilitado si el pago fue exitoso */}
-                  <button
-                    onClick={() => generarComprobantePDF(orden)}
-                    disabled={orden.status !== "PAID"}
-                    className="flex items-center gap-2 bg-primary text-background font-mono font-black text-xs uppercase tracking-wider border-2 border-text px-4 py-2.5 shadow-[2px_2px_0px_0px_var(--color-text)] hover:shadow-none hover:translate-x-0.5 hover:translate-y-0.5 transition-all cursor-pointer whitespace-nowrap disabled:opacity-40 disabled:cursor-not-allowed disabled:shadow-none disabled:translate-x-0 disabled:translate-y-0"
-                  >
-                    ↓ Descargar PDF
-                  </button>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    {orden.status === "PAID" && (
+                      <button
+                        onClick={() => handleCancelOrder(orden.id)}
+                        disabled={cancellingId === orden.id}
+                        className="flex items-center gap-1.5 bg-red-600 text-white font-mono font-black text-xs uppercase tracking-wider border-2 border-text px-3 py-2.5 shadow-[2px_2px_0px_0px_var(--color-text)] hover:shadow-none hover:translate-x-0.5 hover:translate-y-0.5 transition-all cursor-pointer whitespace-nowrap disabled:opacity-40 disabled:cursor-not-allowed disabled:shadow-none disabled:translate-x-0 disabled:translate-y-0"
+                      >
+                        {cancellingId === orden.id ? "..." : "✕ Cancelar"}
+                      </button>
+                    )}
+                    <button
+                      onClick={() => handleDescargarPDF(orden)}
+                      disabled={orden.status !== "PAID" || pdfLoading === orden.id}
+                      className="flex items-center gap-2 bg-primary text-background font-mono font-black text-xs uppercase tracking-wider border-2 border-text px-4 py-2.5 shadow-[2px_2px_0px_0px_var(--color-text)] hover:shadow-none hover:translate-x-0.5 hover:translate-y-0.5 transition-all cursor-pointer whitespace-nowrap disabled:opacity-40 disabled:cursor-not-allowed disabled:shadow-none disabled:translate-x-0 disabled:translate-y-0"
+                    >
+                      {pdfLoading === orden.id ? (
+                        <>
+                          <svg className="animate-spin w-3 h-3" fill="none" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
+                          </svg>
+                          Generando...
+                        </>
+                      ) : (
+                        <>↓ Descargar PDF</>
+                      )}
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
           ))}
 
-          {/* Resumen total */}
           <div className="mt-2 bg-surface border-2 border-text p-4 shadow-[3px_3px_0px_0px_var(--color-text)] flex items-center justify-between">
             <div>
               <span className="text-text-soft text-[10px] block uppercase font-mono font-bold">
@@ -358,7 +630,7 @@ export default function MisComprasPage() {
                 Total: $
                 {ordenesFiltradas
                   .reduce((acc, o) => acc + o.total, 0)
-                  .toLocaleString("es-MX")}
+                  .toLocaleString("es-AR")}
               </span>
             </div>
             <span className="font-mono text-[10px] font-black uppercase text-text-soft border border-text/30 px-2 py-1">

@@ -63,28 +63,54 @@ export default function MisEventosPage() {
 
       {events.length > 0 && (
         <div className="flex flex-col gap-3">
-          {events.map((event) => (
-            <div
-              key={event.id}
-              className="flex items-center justify-between border-4 border-border bg-surface p-4 shadow-[4px_4px_0px_0px_rgba(23,23,23,1)] dark:shadow-[4px_4px_0px_0px_rgba(255,255,255,1)]"
-            >
-              <div className="flex flex-col gap-1">
-                <span className="text-[11px] font-black uppercase tracking-widest text-text-soft">
-                  {event.category}
-                </span>
-                <h2 className="font-black uppercase tracking-tight text-text">{event.title}</h2>
-                <p className="text-sm text-text-soft">
-                  {event.venue} · {new Date(event.date).toLocaleDateString('es-AR', { day: 'numeric', month: 'long', year: 'numeric' })}
-                </p>
-              </div>
-              <Link
-                href="/producer/dashboard"
-                className="shrink-0 border-2 border-border px-3 py-2 text-sm font-black uppercase text-text hover:bg-surface-2 transition-colors"
+          {events.map((event) => {
+            const totalRemaining = event.zones.reduce((acc, z) => acc + z.available, 0);
+            const isSoldOut = event.status === 'SOLDOUT' || (event.zones.length > 0 && totalRemaining === 0);
+            const isCancelled = event.status === 'CANCELLED' || event.status === 'INACTIVE';
+            const isLowStock = !isSoldOut && totalRemaining > 0 && totalRemaining <= 20;
+
+            return (
+              <div
+                key={event.id}
+                className="flex items-start justify-between border-4 border-border bg-surface p-4 shadow-[4px_4px_0px_0px_rgba(23,23,23,1)] dark:shadow-[4px_4px_0px_0px_rgba(255,255,255,1)]"
               >
-                Gestionar
-              </Link>
-            </div>
-          ))}
+                <div className="flex flex-col gap-1.5">
+                  <div className="flex flex-wrap items-center gap-2">
+                    {isSoldOut && (
+                      <span className="text-[10px] font-black uppercase tracking-wider bg-red-600 text-white px-2 py-0.5">
+                        SOLD OUT
+                      </span>
+                    )}
+                    {isLowStock && (
+                      <span className="text-[10px] font-black uppercase tracking-wider bg-primary text-background px-2 py-0.5">
+                        ⚠ Últimas {totalRemaining} entradas
+                      </span>
+                    )}
+                    {isCancelled && (
+                      <span className="text-[10px] font-black uppercase tracking-wider border-2 border-border text-text-soft px-2 py-0.5">
+                        CANCELADO
+                      </span>
+                    )}
+                    {!isSoldOut && !isLowStock && !isCancelled && event.zones.length > 0 && (
+                      <span className="text-[10px] font-black uppercase tracking-wider text-text-soft">
+                        {totalRemaining} entradas disp.
+                      </span>
+                    )}
+                  </div>
+                  <h2 className="font-black uppercase tracking-tight text-text">{event.title}</h2>
+                  <p className="text-sm text-text-soft">
+                    {event.venue} · {new Date(event.date).toLocaleDateString('es-AR', { day: 'numeric', month: 'long', year: 'numeric' })}
+                  </p>
+                </div>
+                <Link
+                  href="/producer/dashboard"
+                  className="shrink-0 border-2 border-border px-3 py-2 text-sm font-black uppercase text-text hover:bg-surface-2 transition-colors ml-4"
+                >
+                  Gestionar
+                </Link>
+              </div>
+            );
+          })}
         </div>
       )}
     </div>

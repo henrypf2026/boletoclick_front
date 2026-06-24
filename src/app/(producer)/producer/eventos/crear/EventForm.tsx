@@ -211,7 +211,7 @@ const handleFechaBlur = (e: React.FocusEvent<HTMLInputElement>) => {
       formData.append("categoryId", evento.categoryId);
 
       const combinedDate = new Date(
-        `${evento.fecha}T${evento.hora}:00.000Z`,
+        `${evento.fecha}T${evento.hora}:00`
       ).toISOString();
       formData.append("eventDate", combinedDate);
       formData.append("status", "ACTIVE");
@@ -341,6 +341,7 @@ const handleFechaBlur = (e: React.FocusEvent<HTMLInputElement>) => {
             required
             min={HOY}
             max={FECHA_MAXIMA}
+            style={{colorScheme: "dark"}}
             className="p-3 border-2 border-border bg-background text-text text-sm"
           />
 
@@ -351,6 +352,7 @@ const handleFechaBlur = (e: React.FocusEvent<HTMLInputElement>) => {
             value={evento.hora}
             onChange={handleEventoChange}
             required
+            
             className="p-3 border-2 border-border bg-background text-text text-sm"
           />
         </div>

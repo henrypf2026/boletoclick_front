@@ -10,7 +10,7 @@ export function ChatMessageBubble({ role, text }: ChatMessageProps) {
     <div className={`flex ${isUser ? "justify-end" : "justify-start"}`}>
       <div
         className={`max-w-[85%] rounded-2xl border-2 border-border px-4 py-3 text-sm leading-relaxed ${
-          isUser ? "bg-primary text-white" : "bg-surface text-text shadow-sm"
+          isUser ? "bg-primary text-background" : "bg-surface text-text shadow-sm"
         }`}
       >
         {!isUser && (
@@ -73,7 +73,7 @@ export function QuickReplies({
           type="button"
           disabled={disabled}
           onClick={() => onSelect(option)}
-          className="rounded-full border-2 border-border bg-surface-2 px-3 py-1.5 text-xs font-bold text-text transition hover:bg-primary hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
+          className="rounded-full border-2 border-border bg-surface-2 px-3 py-1.5 text-xs font-bold text-text transition hover:bg-primary hover:text-background disabled:cursor-not-allowed disabled:opacity-50"
         >
           {option}
         </button>
