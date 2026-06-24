@@ -30,7 +30,7 @@ export default function CountryEventsBanner() {
       <button
         type="button"
         onClick={() => setShowAllEvents(!showAllEvents)}
-        className="shrink-0 rounded-lg border-2 border-border bg-background px-4 py-2 text-xs font-black uppercase tracking-wider text-primary transition hover:bg-primary hover:text-white"
+        className="shrink-0 rounded-lg border-2 border-border bg-background px-4 py-2 text-xs font-black uppercase tracking-wider text-primary transition hover:bg-primary hover:text-background"
       >
         {showAllEvents
           ? `Ver solo eventos de ${countryLabel}`

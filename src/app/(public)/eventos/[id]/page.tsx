@@ -70,6 +70,10 @@ export default function EventoPage() {
     return selectedZone.price * quantity;
   }, [selectedZone, quantity]);
 
+  useEffect(() => {
+    if (!loadingEvent && !event) router.replace('/eventos');
+  }, [loadingEvent, event, router]);
+
   if (loadingEvent) {
     return (
       <div className="min-h-dvh -mx-4 -my-8 px-4 py-10">
@@ -85,10 +89,7 @@ export default function EventoPage() {
     );
   }
 
-  if (!event) {
-    router.replace('/eventos');
-    return null;
-  }
+  if (!event) return null;
 
   const handlePurchase = () => {
     if (isPast) {

@@ -6,9 +6,7 @@ import { useAuth } from "@/context/AuthContext";
 import Swal from "sweetalert2";
 import jsPDF from "jspdf";
 
-
-
-type OrderStatus = "PENDING" | "PAID" | "FAILED" | "REFUNDED";
+type OrderStatus = "PENDING" | "PAID" | "FAILED" | "REFUNDED" | "CANCELLED";
 
 interface TicketType {
   id: string;
@@ -55,6 +53,7 @@ function statusLabel(status: OrderStatus) {
     case "PENDING":   return "PENDIENTE";
     case "FAILED":    return "FALLIDO";
     case "REFUNDED":  return "REEMBOLSADO";
+    case "CANCELLED": return "CANCELADO";
   }
 }
 
@@ -64,15 +63,20 @@ function statusStyle(status: OrderStatus) {
     case "PENDING":   return "text-yellow-600 bg-yellow-400/10 border-yellow-500";
     case "FAILED":    return "text-red-500 bg-red-500/10 border-red-500";
     case "REFUNDED":  return "text-text-soft bg-surface-2 border-text/30";
+    case "CANCELLED": return "text-text-soft bg-surface-2 border-text/30";
   }
 }
 
+const SWAL_CUSTOM = {
+  popup: "border-4 border-[#171717] rounded-none shadow-[6px_6px_0px_0px_#171717] font-mono",
+  title: "uppercase font-black tracking-tighter",
+  confirmButton: "font-mono font-black uppercase tracking-wider border-2 border-[#171717] rounded-none",
+  cancelButton: "font-mono font-black uppercase tracking-wider border-2 border-[#171717] rounded-none",
+};
 
 async function fetchEvent(eventId: string): Promise<EventData | null> {
   try {
-    const token = localStorage.getItem("auth_token");
     const res = await fetch(`/api/backend/events/${eventId}`, {
-      headers: token ? { Authorization: `Bearer ${token}` } : {},
       credentials: "include",
     });
     if (!res.ok) return null;
@@ -101,10 +105,7 @@ function formatPeso(n: number) {
   return "$" + n.toLocaleString("es-AR", { minimumFractionDigits: 2 });
 }
 
-// Generador de PDF
-
 async function generarComprobantePDF(orden: Order) {
-
   let evento: EventData | null = null;
   const primerTicket = orden.tickets?.[0];
   if (primerTicket?.ticketType?.eventId) {
@@ -112,7 +113,7 @@ async function generarComprobantePDF(orden: Order) {
   }
 
   const doc = new jsPDF({ unit: "mm", format: "a4" });
-  const ancho = doc.internal.pageSize.getWidth(); // 210
+  const ancho = doc.internal.pageSize.getWidth();
   const margen = 20;
   let y = margen;
 
@@ -123,10 +124,8 @@ async function generarComprobantePDF(orden: Order) {
   const LGRAY  = "#f2f2f2";
   const WHITE  = "#ffffff";
 
-
   doc.setFillColor(BLACK);
   doc.rect(0, 0, ancho, 30, "F");
-
 
   doc.setFillColor(ORANGE);
   doc.rect(0, 30, ancho, 2, "F");
@@ -152,7 +151,6 @@ async function generarComprobantePDF(orden: Order) {
 
   y = 42;
 
-
   const estadoTexto = statusLabel(orden.status);
   const badgeColor = orden.status === "PAID" ? PURPLE : orden.status === "REFUNDED" ? "#555" : "#cc3333";
   doc.setFillColor(badgeColor);
@@ -162,7 +160,6 @@ async function generarComprobantePDF(orden: Order) {
   doc.setTextColor(WHITE);
   doc.text(`✓ ${estadoTexto}`, margen + 4, y + 0.8);
   y += 12;
-
 
   if (evento) {
     doc.setFillColor(LGRAY);
@@ -184,25 +181,19 @@ async function generarComprobantePDF(orden: Order) {
     doc.setFontSize(8);
     doc.setFont("helvetica", "normal");
     doc.setTextColor(GRAY);
-    const fechaEvento = evento.eventDate
-      ? `📅  ${formatFecha(evento.eventDate)}`
-      : "—";
-    const venue = evento.venue?.name
-      ? `📍  ${evento.venue.name}`
-      : "";
+    const fechaEvento = evento.eventDate ? `📅  ${formatFecha(evento.eventDate)}` : "—";
+    const venue = evento.venue?.name ? `📍  ${evento.venue.name}` : "";
     doc.text(fechaEvento, margen + 7, y + 20);
     if (venue) doc.text(venue, margen + 7, y + 25);
 
     y += 36;
   }
 
-
   doc.setFontSize(8);
   doc.setFont("helvetica", "bold");
   doc.setTextColor(GRAY);
   doc.text("DETALLE DE LA TRANSACCIÓN", margen, y);
   y += 7;
-
 
   const col1 = margen;
   const col2 = ancho / 2;
@@ -245,7 +236,6 @@ async function generarComprobantePDF(orden: Order) {
     doc.setFontSize(7.5);
     doc.setFont("helvetica", "normal");
     doc.setTextColor(BLACK);
-  
     const txId = orden.transactionId.length > 55
       ? orden.transactionId.slice(0, 55) + "..."
       : orden.transactionId;
@@ -253,7 +243,6 @@ async function generarComprobantePDF(orden: Order) {
     y += 16;
   }
 
- 
   if (orden.tickets && orden.tickets.length > 0) {
     y += 2;
     doc.setFontSize(8);
@@ -267,12 +256,11 @@ async function generarComprobantePDF(orden: Order) {
     doc.setFontSize(7);
     doc.setFont("helvetica", "bold");
     doc.setTextColor(WHITE);
-    doc.text("TIPO",  margen + 3, y + 1);
-    doc.text("ZONA",  margen + 60, y + 1);
+    doc.text("TIPO",   margen + 3, y + 1);
+    doc.text("ZONA",   margen + 60, y + 1);
     doc.text("PRECIO", ancho - margen - 25, y + 1);
     y += 8;
 
-   
     orden.tickets.forEach((ticket, i) => {
       const bg = i % 2 === 0 ? WHITE : LGRAY;
       doc.setFillColor(bg);
@@ -295,14 +283,12 @@ async function generarComprobantePDF(orden: Order) {
     y += 4;
   }
 
- 
   doc.setFontSize(8);
   doc.setFont("helvetica", "bold");
   doc.setTextColor(GRAY);
   doc.text("RESUMEN DE PAGO", margen, y);
   y += 8;
 
- 
   const filaResumen = (label: string, valor: string, bold = false) => {
     doc.setFontSize(9);
     doc.setFont("helvetica", bold ? "bold" : "normal");
@@ -321,7 +307,6 @@ async function generarComprobantePDF(orden: Order) {
   doc.line(margen, y, ancho - margen, y);
   y += 6;
 
-  // Total
   doc.setFontSize(13);
   doc.setFont("helvetica", "bold");
   doc.setTextColor(BLACK);
@@ -329,7 +314,6 @@ async function generarComprobantePDF(orden: Order) {
   doc.setTextColor(ORANGE);
   doc.text(formatPeso(orden.total), ancho - margen, y, { align: "right" });
   y += 14;
-
 
   doc.setDrawColor("#dddddd");
   doc.setLineWidth(0.3);
@@ -347,18 +331,16 @@ async function generarComprobantePDF(orden: Order) {
   doc.setTextColor(PURPLE);
   doc.text("boletoclick.com", ancho / 2, y, { align: "center" });
 
- 
   doc.save(`boletoclick-comprobante-${orden.id.slice(0, 8).toUpperCase()}.pdf`);
 }
 
-
-
 export default function MisComprasPage() {
   const { user } = useAuth();
-  const [orders,   setOrders]   = useState<Order[]>([]);
-  const [loading,  setLoading]  = useState(true);
-  const [busqueda, setBusqueda] = useState("");
-  const [pdfLoading, setPdfLoading] = useState<string | null>(null); 
+  const [orders,      setOrders]      = useState<Order[]>([]);
+  const [loading,     setLoading]     = useState(true);
+  const [busqueda,    setBusqueda]    = useState("");
+  const [cancellingId, setCancellingId] = useState<string | null>(null);
+  const [pdfLoading,  setPdfLoading]  = useState<string | null>(null);
 
   useEffect(() => {
     if (!user) return;
@@ -377,27 +359,71 @@ export default function MisComprasPage() {
           confirmButtonColor: "#6750e0",
           background: "#f5f4f0",
           color: "#171717",
-          customClass: {
-            popup:
-              "border-4 border-[#171717] rounded-none shadow-[6px_6px_0px_0px_#171717] font-mono",
-            title: "uppercase font-black tracking-tighter",
-            confirmButton:
-              "font-mono font-black uppercase tracking-wider border-2 border-[#171717] rounded-none",
-          },
+          customClass: SWAL_CUSTOM,
         });
       })
       .finally(() => setLoading(false));
   }, [user]);
 
-  const ordenesFiltradas = useMemo(
-    () =>
-      orders.filter(
-        (o) =>
-          o.id.toLowerCase().includes(busqueda.toLowerCase()) ||
-          statusLabel(o.status).toLowerCase().includes(busqueda.toLowerCase())
-      ),
-    [orders, busqueda]
-  );
+  async function handleCancelOrder(orderId: string) {
+    const result = await Swal.fire({
+      title: "¿Cancelar orden?",
+      text: "Se anularán tus entradas y se restaurará el stock. Solo podés cancelar hasta 48 hs antes del evento.",
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonText: "Sí, cancelar",
+      cancelButtonText: "No, volver",
+      confirmButtonColor: "#dc2626",
+      cancelButtonColor: "#6750e0",
+      background: "#f5f4f0",
+      color: "#171717",
+      customClass: SWAL_CUSTOM,
+    });
+
+    if (!result.isConfirmed) return;
+
+    setCancellingId(orderId);
+    try {
+      const res = await fetch(`/api/backend/orders/${orderId}/cancel`, {
+        method: "PATCH",
+        credentials: "include",
+      });
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.message || "Error al cancelar la orden");
+      }
+
+      setOrders((prev) =>
+        prev.map((o) => o.id === orderId ? { ...o, status: "CANCELLED" as OrderStatus } : o)
+      );
+
+      Swal.fire({
+        title: "CANCELADO",
+        text: "Tu orden fue cancelada exitosamente.",
+        icon: "success",
+        confirmButtonText: "OK",
+        confirmButtonColor: "#6750e0",
+        background: "#f5f4f0",
+        color: "#171717",
+        customClass: SWAL_CUSTOM,
+      });
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "No se pudo cancelar la orden.";
+      Swal.fire({
+        title: "ERROR",
+        text: message,
+        icon: "error",
+        confirmButtonText: "OK",
+        confirmButtonColor: "#6750e0",
+        background: "#f5f4f0",
+        color: "#171717",
+        customClass: SWAL_CUSTOM,
+      });
+    } finally {
+      setCancellingId(null);
+    }
+  }
 
   async function handleDescargarPDF(orden: Order) {
     setPdfLoading(orden.id);
@@ -413,18 +439,22 @@ export default function MisComprasPage() {
         confirmButtonColor: "#6750e0",
         background: "#f5f4f0",
         color: "#171717",
-        customClass: {
-          popup:
-            "border-4 border-[#171717] rounded-none shadow-[6px_6px_0px_0px_#171717] font-mono",
-          title: "uppercase font-black tracking-tighter",
-          confirmButton:
-            "font-mono font-black uppercase tracking-wider border-2 border-[#171717] rounded-none",
-        },
+        customClass: SWAL_CUSTOM,
       });
     } finally {
       setPdfLoading(null);
     }
   }
+
+  const ordenesFiltradas = useMemo(
+    () =>
+      orders.filter(
+        (o) =>
+          o.id.toLowerCase().includes(busqueda.toLowerCase()) ||
+          statusLabel(o.status).toLowerCase().includes(busqueda.toLowerCase())
+      ),
+    [orders, busqueda]
+  );
 
   if (!user) {
     return (
@@ -444,7 +474,6 @@ export default function MisComprasPage() {
 
   return (
     <div className="p-4 md:p-8 max-w-2xl mx-auto min-h-screen bg-background text-text transition-colors">
-
       <div className="mb-8 border-b-4 border-text pb-4">
         <p className="font-mono text-[11px] font-black uppercase tracking-widest text-text-soft mb-1">
           ↗ Tu historial
@@ -457,7 +486,6 @@ export default function MisComprasPage() {
         </p>
       </div>
 
-    
       <div className="bg-surface border-2 border-text p-3 shadow-[2px_2px_0px_0px_var(--color-text)] mb-6">
         <input
           type="text"
@@ -468,7 +496,6 @@ export default function MisComprasPage() {
         />
       </div>
 
-    
       {loading ? (
         <div className="space-y-4 animate-pulse">
           <div className="h-40 bg-surface border-2 border-text w-full" />
@@ -497,7 +524,6 @@ export default function MisComprasPage() {
               key={orden.id}
               className="bg-surface border-2 border-text shadow-[4px_4px_0px_0px_var(--color-text)]"
             >
-            
               <div className="border-b-2 border-text px-5 py-3 flex items-center justify-between gap-2 flex-wrap bg-background/40">
                 <div className="flex items-center gap-2 flex-wrap">
                   <span className="font-mono bg-text text-surface px-2 py-0.5 font-bold text-[10px] whitespace-nowrap">
@@ -552,8 +578,7 @@ export default function MisComprasPage() {
                   </div>
                 )}
 
-                {/* Total + botón PDF */}
-                <div className="flex items-center justify-between border-t-2 border-dashed border-text/30 pt-4 gap-4">
+                <div className="flex items-center justify-between border-t-2 border-dashed border-text/30 pt-4 gap-2 flex-wrap">
                   <div>
                     <span className="text-text-soft text-[10px] block uppercase font-mono font-bold">
                       Total abonado
@@ -563,29 +588,39 @@ export default function MisComprasPage() {
                     </span>
                   </div>
 
-                  <button
-                    onClick={() => handleDescargarPDF(orden)}
-                    disabled={orden.status !== "PAID" || pdfLoading === orden.id}
-                    className="flex items-center gap-2 bg-primary text-background font-mono font-black text-xs uppercase tracking-wider border-2 border-text px-4 py-2.5 shadow-[2px_2px_0px_0px_var(--color-text)] hover:shadow-none hover:translate-x-0.5 hover:translate-y-0.5 transition-all cursor-pointer whitespace-nowrap disabled:opacity-40 disabled:cursor-not-allowed disabled:shadow-none disabled:translate-x-0 disabled:translate-y-0"
-                  >
-                    {pdfLoading === orden.id ? (
-                      <>
-                        <svg className="animate-spin w-3 h-3" fill="none" viewBox="0 0 24 24">
-                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
-                        </svg>
-                        Generando...
-                      </>
-                    ) : (
-                      <>↓ Descargar PDF</>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    {orden.status === "PAID" && (
+                      <button
+                        onClick={() => handleCancelOrder(orden.id)}
+                        disabled={cancellingId === orden.id}
+                        className="flex items-center gap-1.5 bg-red-600 text-white font-mono font-black text-xs uppercase tracking-wider border-2 border-text px-3 py-2.5 shadow-[2px_2px_0px_0px_var(--color-text)] hover:shadow-none hover:translate-x-0.5 hover:translate-y-0.5 transition-all cursor-pointer whitespace-nowrap disabled:opacity-40 disabled:cursor-not-allowed disabled:shadow-none disabled:translate-x-0 disabled:translate-y-0"
+                      >
+                        {cancellingId === orden.id ? "..." : "✕ Cancelar"}
+                      </button>
                     )}
-                  </button>
+                    <button
+                      onClick={() => handleDescargarPDF(orden)}
+                      disabled={orden.status !== "PAID" || pdfLoading === orden.id}
+                      className="flex items-center gap-2 bg-primary text-background font-mono font-black text-xs uppercase tracking-wider border-2 border-text px-4 py-2.5 shadow-[2px_2px_0px_0px_var(--color-text)] hover:shadow-none hover:translate-x-0.5 hover:translate-y-0.5 transition-all cursor-pointer whitespace-nowrap disabled:opacity-40 disabled:cursor-not-allowed disabled:shadow-none disabled:translate-x-0 disabled:translate-y-0"
+                    >
+                      {pdfLoading === orden.id ? (
+                        <>
+                          <svg className="animate-spin w-3 h-3" fill="none" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
+                          </svg>
+                          Generando...
+                        </>
+                      ) : (
+                        <>↓ Descargar PDF</>
+                      )}
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
           ))}
 
-          {/* Resumen total */}
           <div className="mt-2 bg-surface border-2 border-text p-4 shadow-[3px_3px_0px_0px_var(--color-text)] flex items-center justify-between">
             <div>
               <span className="text-text-soft text-[10px] block uppercase font-mono font-bold">
