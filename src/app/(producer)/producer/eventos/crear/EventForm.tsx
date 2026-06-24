@@ -470,7 +470,7 @@ const handleFechaBlur = (e: React.FocusEvent<HTMLInputElement>) => {
               <button
                 type="button"
                 onClick={() => eliminarLocalidad(index)}
-                className="bg-accent text-white p-2 text-xs uppercase font-black w-full md:w-auto"
+                className="bg-red-600 text-white p-2 text-xs uppercase font-black w-full md:w-auto"
               >
                 X
               </button>
