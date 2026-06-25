@@ -7,11 +7,11 @@ interface ApiVenue {
   id: string;
   name: string;
   address?: string;
-  city: string;
   capacity?: number;
   imgUrl?: string | null;
   latitude?: number | string;
   longitude?: number | string;
+  municipality?: { name: string } | null;
 }
 
 interface ApiCategory {
@@ -125,7 +125,7 @@ function mapApiEvent(apiEvent: ApiEvent): Event {
     teamId: inferTeamId(apiEvent.title),
     status,
     venue: venue?.name ?? "Por confirmar",
-    city: venue?.city ?? "",
+    city: venue?.municipality?.name ?? "",
     address: venue?.address ?? undefined,
     capacity: venue?.capacity ?? undefined,
     coordinates: {
