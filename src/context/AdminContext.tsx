@@ -1,6 +1,13 @@
 "use client";
 
-import React, { createContext, useContext, useState, useMemo } from "react";
+import React, {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  useCallback,
+} from "react";
+import { api } from "@/lib/apiClient";
 
 export interface Usuario {
   id: number;
@@ -34,101 +41,73 @@ export interface BalanceProductor {
 
 interface AdminContextType {
   comisionGlobal: number;
-  setComisionGlobal: (fee: number) => void;
+  setComisionGlobal: (fee: number) => Promise<void>;
   usuarios: Usuario[];
   setUsuarios: React.Dispatch<React.SetStateAction<Usuario[]>>;
   eventos: EventoPendiente[];
   setEventos: React.Dispatch<React.SetStateAction<EventoPendiente[]>>;
   balancesProductores: BalanceProductor[];
-  liquidarProductor: (email: string) => void;
+  liquidarProductor: (email: string) => Promise<void>;
   alternarEstadoUsuario: (id: number) => void;
+  cargarDatosFinancieros: () => Promise<void>;
 }
 
 const AdminContext = createContext<AdminContextType | undefined>(undefined);
 
 export function AdminProvider({ children }: { children: React.ReactNode }) {
-  const [comisionGlobal, setComisionGlobal] = useState(12);
+  const [comisionGlobal, setComisionGlobalState] = useState(12);
+  const [usuarios, setUsuarios] = useState<Usuario[]>([]);
+  const [eventos, setEventos] = useState<EventoPendiente[]>([]);
+  const [balancesProductores, setBalancesProductores] = useState<
+    BalanceProductor[]
+  >([]);
 
-  // Mocks iniciales de sesión (frontend-only)
-  const [usuarios, setUsuarios] = useState<Usuario[]>([
-    {
-      id: 1,
-      email: "cosme.fulanito@gmail.com",
-      rol: "USER",
-      estado: "ACTIVO",
-      fechaRegistro: "2026-02-14",
-    },
-    {
-      id: 2,
-      email: "baba.management@empresa.com",
-      rol: "PRODUCER",
-      estado: "ACTIVO",
-      fechaRegistro: "2026-01-20",
-    },
-    {
-      id: 3,
-      email: "lucas.dev@boletoclick.com",
-      rol: "ADMIN",
-      estado: "ACTIVO",
-      fechaRegistro: "2025-11-05",
-    },
-    {
-      id: 4,
-      email: "malicious.hacker@fail.com",
-      rol: "USER",
-      estado: "SUSPENDIDO",
-      fechaRegistro: "2026-05-12",
-      motivoSuspension: "Violación de términos de servicio",
-      suspendidoHasta: "2026-11-12",
-    },
-    {
-      id: 5,
-      email: "tickets.norte@eventos.com",
-      rol: "PRODUCER",
-      estado: "ACTIVO",
-      fechaRegistro: "2026-06-01",
-    },
-  ]);
+  const cargarDatosFinancieros = useCallback(async () => {
+    try {
+      const dataComision = await api.get<{ comisionGlobal: number }>(
+        "/admin/dashboard-metrics/finanzas/comision",
+      );
+      if (dataComision && typeof dataComision.comisionGlobal === "number") {
+        setComisionGlobalState(dataComision.comisionGlobal);
+      }
 
-  const [eventos, setEventos] = useState<EventoPendiente[]>([
-    {
-      id: 101,
-      titulo: "Cachengue Fest Vol. 4",
-      productor: "baba.management@empresa.com",
-      categoria: "Fiestas",
-      precioBase: 8000,
-      aforo: 2500,
-      ubicacion: "Complejo Arena, Pabellón C",
-      fechaCreacion: "2026-06-15",
-      estado: "PENDIENTE",
-    },
-    {
-      id: 102,
-      titulo: "Rock en el Galpón - Ciclo Under",
-      productor: "tickets.norte@eventos.com",
-      categoria: "Recitales",
-      precioBase: 4500,
-      aforo: 300,
-      ubicacion: "El Galpón Cultural - CABA",
-      fechaCreacion: "2026-06-16",
-      estado: "PENDIENTE",
-    },
-    {
-      id: 103,
-      titulo: "Stand Up: Casi Famosos",
-      productor: "comedia.indie@gmail.com",
-      categoria: "Teatro",
-      precioBase: 6000,
-      aforo: 120,
-      ubicacion: "Teatro Picadilly, Sala 2",
-      fechaCreacion: "2026-06-14",
-      estado: "PENDIENTE",
-    },
-  ]);
+      const dataBalances = await api.get<BalanceProductor[]>(
+        "/admin/dashboard-metrics/finanzas/balances",
+      );
+      if (dataBalances && Array.isArray(dataBalances)) {
+        setBalancesProductores(dataBalances);
+      }
+    } catch (error) {
+      console.error(
+        "Error al cargar la información financiera del backend:",
+        error,
+      );
+    }
+  }, []);
 
-  const [liquidadosIds, setLiquidadosIds] = useState<string[]>([]);
+  // 🛠️ CORRECCIÓN: Array de dependencias vacío para fulminar el bucle infinito 429
+  useEffect(() => {
+    cargarDatosFinancieros();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
-  // Acción reactiva: Banear / Reactivar usuario
+  const setComisionGlobal = async (fee: number) => {
+    try {
+      setComisionGlobalState(fee);
+      await api.put("/admin/dashboard-metrics/finanzas/comision", { fee });
+    } catch (error) {
+      console.error("Error al intentar cambiar el fee global:", error);
+    }
+  };
+  const liquidarProductor = async (email: string) => {
+    try {
+      await api.post("/admin/dashboard-metrics/finanzas/liquidar", { email });
+      await cargarDatosFinancieros();
+    } catch (error) {
+      console.error("Error al registrar liquidación:", error);
+    }
+  };
+
   const alternarEstadoUsuario = (id: number) => {
     setUsuarios((prev) =>
       prev.map((u) =>
@@ -137,50 +116,6 @@ export function AdminProvider({ children }: { children: React.ReactNode }) {
           : u,
       ),
     );
-  };
-
-  // Cálculo financiero dinámico en base al input del Fee Global y eventos aprobados
-  const balancesProductores = useMemo(() => {
-    const producersMap: Record<string, number> = {};
-
-    usuarios
-      .filter((u) => u.rol === "PRODUCER")
-      .forEach((p) => {
-        producersMap[p.email] = 0;
-      });
-
-    eventos.forEach((ev) => {
-      if (ev.estado === "APROBADO") {
-        const totalCaja = ev.precioBase * ev.aforo;
-        if (producersMap[ev.productor] !== undefined) {
-          producersMap[ev.productor] += totalCaja;
-        } else {
-          producersMap[ev.productor] = totalCaja;
-        }
-      }
-    });
-
-    return Object.keys(producersMap).map((email) => {
-      const bruta = producersMap[email];
-      const comision = (bruta * comisionGlobal) / 100;
-      const neto = bruta - comision;
-
-      return {
-        email,
-        recaudacionBruta: bruta,
-        comisionPlataforma: comision,
-        netoAPagar: neto,
-        estadoLiquidacion: liquidadosIds.includes(email)
-          ? ("LIQUIDADO" as const)
-          : ("PENDIENTE" as const),
-      };
-    });
-  }, [usuarios, eventos, comisionGlobal, liquidadosIds]);
-
-  const liquidarProductor = (email: string) => {
-    if (!liquidadosIds.includes(email)) {
-      setLiquidadosIds([...liquidadosIds, email]);
-    }
   };
 
   return (
@@ -195,6 +130,7 @@ export function AdminProvider({ children }: { children: React.ReactNode }) {
         balancesProductores,
         liquidarProductor,
         alternarEstadoUsuario,
+        cargarDatosFinancieros,
       }}
     >
       {children}

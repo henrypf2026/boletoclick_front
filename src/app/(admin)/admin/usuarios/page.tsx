@@ -3,6 +3,7 @@
 import React, { useState, useMemo, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAdmin } from "@/context/AdminContext";
+import { api } from "@/lib/apiClient";
 
 type PestanaInterna = "LISTADO" | "ALTA_STAFF";
 type ModoSuspension = "PERMANENTE" | "TEMPORAL";
@@ -15,7 +16,7 @@ const MOTIVOS_RAPIDOS = [
 ];
 
 interface UsuarioBase {
-  id: number;
+  id: string;
   email: string;
   rol: "USER" | "PRODUCER" | "ADMIN";
   estado: "ACTIVO" | "SUSPENDIDO";
@@ -28,6 +29,7 @@ interface UsuarioBase {
 export default function AdminUsuarios() {
   const router = useRouter();
   const { usuarios, setUsuarios } = useAdmin();
+  const [loading, setLoading] = useState(true);
 
   const [pestanaActiva, setPestanaActiva] = useState<PestanaInterna>("LISTADO");
   const [filtroEmail, setFiltroEmail] = useState("");
@@ -42,7 +44,7 @@ export default function AdminUsuarios() {
 
   const [modalSuspension, setModalSuspension] = useState<{
     isOpen: boolean;
-    usuarioId: number | null;
+    usuarioId: string | null;
     email: string;
     motivo: string;
     modo: ModoSuspension;
@@ -65,6 +67,48 @@ export default function AdminUsuarios() {
     setTimeout(() => setNotificacion(null), 3500);
   };
 
+  useEffect(() => {
+    const cargarUsuarios = async () => {
+      try {
+        setLoading(true);
+        const data = await api.get<any>("/users");
+
+        const formateados = (Array.isArray(data) ? data : []).map((u: any) => {
+          // 1. EXTRAEMOS EL ROL REAL DEL BACKEND (viene como u.role)
+          const backendRole = String(u.role || u.rol || "USER").toUpperCase();
+
+          // 2. NORMALIZAMOS EL ROL: Forzamos el formato exacto que usa tu Front para filtrar
+          let rolFormateado = "USER";
+          if (backendRole === "ADMIN" || backendRole === "ADMINISTRADOR")
+            rolFormateado = "ADMIN";
+          else if (backendRole === "PRODUCER" || backendRole === "PRODUCTOR")
+            rolFormateado = "PRODUCER";
+          else if (backendRole === "SCANNER" || backendRole === "VERIFICADOR")
+            rolFormateado = "SCANNER";
+
+          return {
+            id: u.id,
+            email: u.email || "",
+            rol: rolFormateado, // <--- Este campo alimenta tus filtros visuales
+            estado: u.estado || "ACTIVO",
+            fechaRegistro: u.createdAt ? u.createdAt.split("T")[0] : "N/D",
+            motivoSuspension: u.motivoSuspension || null,
+            tipoSuspension: u.tipoSuspension || null,
+            suspendidoHasta: u.suspendidoHasta || null,
+          };
+        });
+
+        setUsuarios(formateados as any);
+      } catch (error) {
+        console.error("Error cargando usuarios desde el back:", error);
+        triggerNotificacion("ERROR AL CONFIGURAR LA BASE DE DATOS DE USUARIOS");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    cargarUsuarios();
+  }, [setUsuarios]);
   useEffect(() => {
     const ahora = new Date();
     let huboCambios = false;
@@ -91,14 +135,14 @@ export default function AdminUsuarios() {
       triggerNotificacion(
         "SISTEMA: CUENTAS TEMPORALES REACTIVADAS AUTOMÁTICAMENTE",
       );
-      if (
-        usuarioInspeccionado &&
-        usuarioInspeccionado.estado === "SUSPENDIDO"
-      ) {
+
+      if (usuarioInspeccionado) {
         const fresco = listaActualizada.find(
-          (u) => u.id === usuarioInspeccionado.id,
+          (u) => String(u.id) === String(usuarioInspeccionado.id),
         );
-        if (fresco) setUsuarioInspeccionado(fresco as UsuarioBase);
+        if (fresco) {
+          setUsuarioInspeccionado(fresco as unknown as UsuarioBase);
+        }
       }
     }
   }, [usuarios, setUsuarios, usuarioInspeccionado]);
@@ -116,38 +160,41 @@ export default function AdminUsuarios() {
     return `QUEDAN ${totalHoras} HORA${totalHoras !== 1 ? "S" : ""}`;
   };
 
-  const handleCrearAdmin = (e: React.FormEvent) => {
+  const handleCrearAdmin = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!nuevoEmail.includes("@") || nuevaPassword.trim().length < 4) return;
 
-    if (
-      usuarios.some((u) => u.email.toLowerCase() === nuevoEmail.toLowerCase())
-    ) {
-      triggerNotificacion(
-        `FALLO: EL EMAIL [${nuevoEmail.toUpperCase()}] YA EXISTE`,
-      );
-      return;
+    try {
+      const nuevoUsuarioBack = await api.post<any>("/users/admin", {
+        email: nuevoEmail.toLowerCase().trim(),
+        password: nuevaPassword,
+      });
+
+      const nuevo = {
+        id: nuevoUsuarioBack.id
+          ? String(nuevoUsuarioBack.id)
+          : String(Date.now()),
+        email: nuevoEmail.toLowerCase().trim(),
+        rol: "ADMIN" as const,
+        estado: "ACTIVO" as const,
+        fechaRegistro: new Date().toISOString().split("T")[0],
+      };
+
+      setUsuarios([...usuarios, nuevo as any]);
+      triggerNotificacion(`ÉXITO: STAFF "${nuevo.email.toUpperCase()}" CREADO`);
+      setNuevoEmail("");
+      setNuevaPassword("");
+      setVerPassword(false);
+      setPestanaActiva("LISTADO");
+    } catch (error) {
+      console.error(error);
+      triggerNotificacion(`FALLO AL INTENTAR CREAR EL ADMINISTRADOR`);
     }
-
-    const nuevo = {
-      id: Date.now(),
-      email: nuevoEmail.toLowerCase().trim(),
-      rol: "ADMIN" as const,
-      estado: "ACTIVO" as const,
-      fechaRegistro: new Date().toISOString().split("T")[0],
-    };
-
-    setUsuarios([...usuarios, nuevo]);
-    triggerNotificacion(`ÉXITO: STAFF "${nuevo.email.toUpperCase()}" CREADO`);
-    setNuevoEmail("");
-    setNuevaPassword("");
-    setVerPassword(false);
-    setPestanaActiva("LISTADO");
   };
 
   const abrirModalSuspension = (
     e: React.MouseEvent,
-    id: number,
+    id: string,
     email: string,
   ) => {
     e.stopPropagation();
@@ -162,7 +209,7 @@ export default function AdminUsuarios() {
     });
   };
 
-  const confirmarSuspension = () => {
+  const confirmarSuspension = async () => {
     if (!modalSuspension.usuarioId || !modalSuspension.motivo.trim()) return;
 
     let fechaHasta: string | undefined = undefined;
@@ -181,67 +228,93 @@ export default function AdminUsuarios() {
       fechaHasta = calculoFecha.toISOString();
     }
 
-    const nuevosUsuarios = usuarios.map((u) =>
-      u.id === modalSuspension.usuarioId
-        ? {
-            ...u,
-            estado: "SUSPENDIDO" as const,
-            motivoSuspension: modalSuspension.motivo.trim().toUpperCase(),
-            tipoSuspension: modalSuspension.modo,
-            suspendidoHasta: fechaHasta,
-          }
-        : u,
-    );
+    try {
+      await api.patch(`/users/${modalSuspension.usuarioId}/suspender`, {
+        motivo: modalSuspension.motivo.trim().toUpperCase(),
+        tipoSuspension: modalSuspension.modo,
+        suspendidoHasta: fechaHasta,
+      });
 
-    setUsuarios(nuevosUsuarios);
-
-    if (
-      usuarioInspeccionado &&
-      usuarioInspeccionado.id === modalSuspension.usuarioId
-    ) {
-      const target = nuevosUsuarios.find(
-        (u) => u.id === modalSuspension.usuarioId,
+      const nuevosUsuarios = usuarios.map((u) =>
+        String(u.id) === String(modalSuspension.usuarioId)
+          ? {
+              ...u,
+              estado: "SUSPENDIDO" as const,
+              motivoSuspension: modalSuspension.motivo.trim().toUpperCase(),
+              tipoSuspension: modalSuspension.modo,
+              suspendidoHasta: fechaHasta,
+            }
+          : u,
       );
-      if (target) setUsuarioInspeccionado(target as UsuarioBase);
+
+      setUsuarios(nuevosUsuarios);
+
+      if (
+        usuarioInspeccionado &&
+        String(usuarioInspeccionado.id) === String(modalSuspension.usuarioId)
+      ) {
+        const target = nuevosUsuarios.find(
+          (u) => String(u.id) === String(modalSuspension.usuarioId),
+        );
+        if (target) {
+          setUsuarioInspeccionado(target as unknown as UsuarioBase);
+        }
+      }
+
+      const txtNotif =
+        modalSuspension.modo === "TEMPORAL"
+          ? `${modalSuspension.cantidadTiempo} ${modalSuspension.unidadTiempo}`
+          : "PERMANENTE";
+
+      triggerNotificacion(
+        `SUSPENSIÓN APLICADA: ${txtNotif} A ${modalSuspension.email.toUpperCase()}`,
+      );
+      setModalSuspension({ ...modalSuspension, isOpen: false });
+    } catch (error) {
+      console.error(error);
+      triggerNotificacion("ERROR AL APLICAR LA SUSPENSIÓN EN EL SERVIDOR");
     }
-
-    const txtNotif =
-      modalSuspension.modo === "TEMPORAL"
-        ? `${modalSuspension.cantidadTiempo} ${modalSuspension.unidadTiempo}`
-        : "PERMANENTE";
-
-    triggerNotificacion(
-      `SUSPENSIÓN APLICADA: ${txtNotif} A ${modalSuspension.email.toUpperCase()}`,
-    );
-    setModalSuspension({ ...modalSuspension, isOpen: false });
   };
 
-  const reactivarCuentaManual = (
+  const reactivarCuentaManual = async (
     e: React.MouseEvent,
-    id: number,
+    id: string,
     email: string,
   ) => {
     e.stopPropagation();
-    const nuevosUsuarios = usuarios.map((u) =>
-      u.id === id
-        ? {
-            ...u,
-            estado: "ACTIVO" as const,
-            motivoSuspension: undefined,
-            tipoSuspension: undefined,
-            suspendidoHasta: undefined,
-          }
-        : u,
-    );
 
-    setUsuarios(nuevosUsuarios);
+    try {
+      await api.patch(`/users/${id}/reactivar`, {});
 
-    if (usuarioInspeccionado && usuarioInspeccionado.id === id) {
-      const target = nuevosUsuarios.find((u) => u.id === id);
-      if (target) setUsuarioInspeccionado(target as UsuarioBase);
+      const nuevosUsuarios = usuarios.map((u) =>
+        String(u.id) === String(id)
+          ? {
+              ...u,
+              estado: "ACTIVO" as const,
+              motivoSuspension: undefined,
+              tipoSuspension: undefined,
+              suspendidoHasta: undefined,
+            }
+          : u,
+      );
+
+      setUsuarios(nuevosUsuarios);
+
+      if (
+        usuarioInspeccionado &&
+        String(usuarioInspeccionado.id) === String(id)
+      ) {
+        const target = nuevosUsuarios.find((u) => String(u.id) === String(id));
+        if (target) {
+          setUsuarioInspeccionado(target as unknown as UsuarioBase);
+        }
+      }
+
+      triggerNotificacion(`ACCESO RESTAURADO: ${email.toUpperCase()}`);
+    } catch (error) {
+      console.error(error);
+      triggerNotificacion("ERROR AL RESTAURAR LA CUENTA EN EL SERVIDOR");
     }
-
-    triggerNotificacion(`ACCESO RESTAURADO: ${email.toUpperCase()}`);
   };
 
   const metrics = useMemo(() => {
@@ -384,80 +457,106 @@ export default function AdminUsuarios() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-text/10 font-bold bg-background">
-                {usuariosFiltrados.map((u) => {
-                  const esAdmin = u.rol === "ADMIN";
-                  return (
-                    <tr
-                      key={u.id}
-                      onClick={() => setUsuarioInspeccionado(u as UsuarioBase)}
-                      className={`transition-all duration-150 hover:bg-text/5 cursor-pointer ${u.estado === "SUSPENDIDO" ? "bg-red-500/5 text-text-soft" : ""} ${usuarioInspeccionado?.id === u.id ? "bg-text/10" : ""}`}
+                {loading ? (
+                  <tr>
+                    <td
+                      colSpan={5}
+                      className="p-8 text-center text-text-soft animate-pulse uppercase font-black"
                     >
-                      <td className="p-3.5">
-                        <div className="flex flex-col">
+                      📡 Sincronizando registros con el servidor...
+                    </td>
+                  </tr>
+                ) : usuariosFiltrados.length === 0 ? (
+                  <tr>
+                    <td
+                      colSpan={5}
+                      className="p-8 text-center text-text-soft uppercase font-black"
+                    >
+                      📭 No se encontraron usuarios registrados
+                    </td>
+                  </tr>
+                ) : (
+                  usuariosFiltrados.map((u) => {
+                    const esAdmin = u.rol === "ADMIN";
+                    return (
+                      <tr
+                        key={u.id}
+                        onClick={() =>
+                          setUsuarioInspeccionado(u as unknown as UsuarioBase)
+                        }
+                        className={`transition-all duration-150 hover:bg-text/5 cursor-pointer ${u.estado === "SUSPENDIDO" ? "bg-red-500/5 text-text-soft" : ""} ${usuarioInspeccionado && String(usuarioInspeccionado.id) === String(u.id) ? "bg-text/10" : ""}`}
+                      >
+                        <td className="p-3.5">
+                          <div className="flex flex-col">
+                            <span
+                              className={`font-black ${u.estado === "SUSPENDIDO" ? "text-text-soft/60" : "text-text"}`}
+                            >
+                              {u.estado === "SUSPENDIDO" ? "🚫 " : ""}
+                              {u.email}
+                            </span>
+                            {u.estado === "SUSPENDIDO" && (
+                              <span className="text-[9px] text-red-500 font-mono tracking-wide uppercase mt-0.5 truncate max-w-xs">
+                                🔍 Ver historial y detalles visuales
+                              </span>
+                            )}
+                          </div>
+                        </td>
+                        <td className="p-3.5 text-text-soft font-medium">
+                          {u.fechaRegistro}
+                        </td>
+                        <td className="p-3.5">
                           <span
-                            className={`font-black ${u.estado === "SUSPENDIDO" ? "text-text-soft/60" : "text-text"}`}
+                            className={`px-2 py-0.5 border text-[9px] font-black uppercase ${esAdmin ? "bg-text text-surface border-text" : "bg-surface border-text/40"}`}
                           >
-                            {u.estado === "SUSPENDIDO" ? "🚫 " : ""}
-                            {u.email}
+                            {u.rol}
                           </span>
-                          {u.estado === "SUSPENDIDO" && (
-                            <span className="text-[9px] text-red-500 font-mono tracking-wide uppercase mt-0.5 truncate max-w-xs">
-                              🔍 Ver historial y detalles visuales
+                        </td>
+                        <td className="p-3.5">
+                          {u.estado === "ACTIVO" ? (
+                            <span className="px-2 py-0.5 text-[9px] font-black border uppercase bg-emerald-500/10 text-emerald-600 border-emerald-500/30">
+                              ACTIVO
+                            </span>
+                          ) : (
+                            <span className="px-2 py-0.5 text-[9px] font-black border uppercase bg-red-500 text-white border-red-600">
+                              SUSPENDIDO
                             </span>
                           )}
-                        </div>
-                      </td>
-                      <td className="p-3.5 text-text-soft font-medium">
-                        {u.fechaRegistro}
-                      </td>
-                      <td className="p-3.5">
-                        <span
-                          className={`px-2 py-0.5 border text-[9px] font-black uppercase ${esAdmin ? "bg-text text-surface border-text" : "bg-surface border-text/40"}`}
-                        >
-                          {u.rol}
-                        </span>
-                      </td>
-                      <td className="p-3.5">
-                        {u.estado === "ACTIVO" ? (
-                          <span className="px-2 py-0.5 text-[9px] font-black border uppercase bg-emerald-500/10 text-emerald-600 border-emerald-500/30">
-                            ACTIVO
-                          </span>
-                        ) : (
-                          <span className="px-2 py-0.5 text-[9px] font-black border uppercase bg-red-500 text-white border-red-600">
-                            SUSPENDIDO
-                          </span>
-                        )}
-                      </td>
-                      <td className="p-3.5 text-right">
-                        {esAdmin ? (
-                          <span className="text-[10px] text-text-soft uppercase italic font-bold">
-                            🔒 Protegido
-                          </span>
-                        ) : u.estado === "ACTIVO" ? (
-                          <button
-                            onClick={(e) =>
-                              abrirModalSuspension(e, u.id, u.email)
-                            }
-                            className="border-2 border-text px-2.5 py-1 text-[10px] font-black uppercase bg-surface text-red-500 shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] hover:bg-text hover:text-surface transition-all cursor-pointer"
-                          >
-                            ✕ Penalizar
-                          </button>
-                        ) : (
-                          <div className="flex justify-end gap-2">
+                        </td>
+                        <td className="p-3.5 text-right">
+                          {esAdmin ? (
+                            <span className="text-[10px] text-text-soft uppercase italic font-bold">
+                              🔒 Protegido
+                            </span>
+                          ) : u.estado === "ACTIVO" ? (
                             <button
                               onClick={(e) =>
-                                reactivarCuentaManual(e, u.id, u.email)
+                                abrirModalSuspension(e, String(u.id), u.email)
                               }
-                              className="border-2 border-text px-2.5 py-1 text-[10px] font-black uppercase bg-text text-surface shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] hover:bg-surface hover:text-text transition-all cursor-pointer"
+                              className="border-2 border-text px-2.5 py-1 text-[10px] font-black uppercase bg-surface text-red-500 shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] hover:bg-text hover:text-surface transition-all cursor-pointer"
                             >
-                              Aprobar Acceso
+                              ✕ Penalizar
                             </button>
-                          </div>
-                        )}
-                      </td>
-                    </tr>
-                  );
-                })}
+                          ) : (
+                            <div className="flex justify-end gap-2">
+                              <button
+                                onClick={(e) =>
+                                  reactivarCuentaManual(
+                                    e,
+                                    String(u.id),
+                                    u.email,
+                                  )
+                                }
+                                className="border-2 border-text px-2.5 py-1 text-[10px] font-black uppercase bg-text text-surface shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] hover:bg-surface hover:text-text transition-all cursor-pointer"
+                              >
+                                Aprobar Acceso
+                              </button>
+                            </div>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
               </tbody>
             </table>
           </div>
@@ -525,13 +624,13 @@ export default function AdminUsuarios() {
       )}
 
       {usuarioInspeccionado && (
-        <div className="fixed inset-0 z-50 bg-text/20 backdrop-blur-xs flex justify-end animate-fadeIn">
+        <div className="fixed inset-0 z-50 bg-text/20 backdrop-blur-sm flex justify-end">
           <div
             className="flex-1"
             onClick={() => setUsuarioInspeccionado(null)}
           />
 
-          <div className="w-full max-w-md bg-surface border-l-4 border-text h-full p-6 shadow-[-10px_0px_0px_0px_rgba(0,0,0,0.1)] flex flex-col justify-between overflow-y-auto animate-slideLeft">
+          <div className="w-full max-w-md bg-surface border-l-4 border-text h-full p-6 shadow-[-10px_0px_0px_0px_rgba(0,0,0,0.1)] flex flex-col justify-between overflow-y-auto">
             <div className="space-y-5">
               <div className="border-b-2 border-text pb-4 relative pr-10">
                 <div>
@@ -545,20 +644,21 @@ export default function AdminUsuarios() {
 
                 <button
                   onClick={() => setUsuarioInspeccionado(null)}
-                  className="absolute right-0 top-0 border-2 border-text font-black text-xs w-7 h-7 flex items-center justify-center bg-background hover:bg-text hover:text-surface transition-all cursor-pointer shadow-[1px_1px_0px_0px_rgba(0,0,0,1)] active:translate-x-0.5 active:translate-y-0.5 active:shadow-none"
+                  className="absolute right-0 top-0 border-2 border-text font-black text-xs h-7 w-7 flex items-center justify-center bg-background hover:bg-text hover:text-surface transition-all cursor-pointer shadow-[1px_1px_0px_0px_rgba(0,0,0,1)]"
                   title="Cerrar panel"
                 >
                   ✕
                 </button>
-              </div>{" "}
+              </div>
+
               <div className="bg-background border-2 border-text p-4 space-y-3">
                 <p className="text-[10px] font-black uppercase text-text-soft border-b border-text/10 pb-1">
                   Metadatos de Registro
                 </p>
                 <div className="grid grid-cols-2 gap-2 text-xs font-bold uppercase">
                   <div>ID de Cuenta:</div>
-                  <div className="text-right font-mono">
-                    {usuarioInspeccionado.id}
+                  <div className="text-right font-mono truncate max-w-45">
+                    {String(usuarioInspeccionado.id)}
                   </div>
                   <div>Jerarquía (Rol):</div>
                   <div className="text-right text-indigo-600 font-black">
@@ -578,6 +678,7 @@ export default function AdminUsuarios() {
                   </div>
                 </div>
               </div>
+
               <div className="bg-background border-2 border-text p-4 space-y-3">
                 <div className="flex justify-between items-center border-b border-text/10 pb-1">
                   <p className="text-[10px] font-black uppercase text-text-soft">
@@ -607,15 +708,6 @@ export default function AdminUsuarios() {
                         MOTIVO: {usuarioInspeccionado.motivoSuspension}
                       </p>
                     </div>
-                    <div className="border border-text/20 p-2 text-[10px] bg-surface/50 space-y-0.5 opacity-60">
-                      <div className="flex justify-between font-bold text-text-soft">
-                        <span>⚠️ INFRACCIÓN #1 (RESUELTA)</span>
-                        <span className="font-mono">HACE 3 MESES</span>
-                      </div>
-                      <p className="font-medium text-text-soft">
-                        MOTIVO: ADVERTENCIA GENERAL POR REPORTES MÚLTIPLES
-                      </p>
-                    </div>
                   </div>
                 ) : (
                   <div className="text-center py-2">
@@ -623,11 +715,12 @@ export default function AdminUsuarios() {
                       ✓ HISTORIAL LIMPIO / 0 REINCIDENCIAS
                     </p>
                     <p className="text-[9px] text-text-soft uppercase mt-0.5">
-                      No se registran antecedentes previos en esta cuenta.
+                      No se registran antecedentes previos.
                     </p>
                   </div>
                 )}
               </div>
+
               {usuarioInspeccionado.estado === "SUSPENDIDO" && (
                 <div className="border-4 border-red-500 bg-red-500/5 p-4 space-y-4 shadow-[4px_4px_0px_0px_rgba(239,68,68,0.2)]">
                   <div className="flex items-center gap-1.5 text-red-600">
@@ -652,7 +745,7 @@ export default function AdminUsuarios() {
                         Tiempo Restante:
                       </span>
                       <span className="font-black text-red-500 block text-sm mt-0.5">
-                        ⏱️{" "}
+                        #{" "}
                         {obtenerTiempoRestante(
                           usuarioInspeccionado.suspendidoHasta,
                         )}
@@ -690,10 +783,11 @@ export default function AdminUsuarios() {
               ) : usuarioInspeccionado.estado === "ACTIVO" ? (
                 <button
                   onClick={(e) => {
+                    const idString = String(usuarioInspeccionado.id);
                     setUsuarioInspeccionado(null);
                     abrirModalSuspension(
                       e,
-                      usuarioInspeccionado.id,
+                      idString,
                       usuarioInspeccionado.email,
                     );
                   }}
@@ -703,13 +797,13 @@ export default function AdminUsuarios() {
                 </button>
               ) : (
                 <button
-                  onClick={(e) => {
+                  onClick={(e) =>
                     reactivarCuentaManual(
                       e,
-                      usuarioInspeccionado.id,
+                      String(usuarioInspeccionado.id),
                       usuarioInspeccionado.email,
-                    );
-                  }}
+                    )
+                  }
                   className="w-full border-2 border-text p-2.5 font-black uppercase bg-text text-surface shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] hover:bg-surface hover:text-text transition-all cursor-pointer"
                 >
                   🔓 Levantar Suspensión Inmediatamente
@@ -721,7 +815,7 @@ export default function AdminUsuarios() {
       )}
 
       {modalSuspension.isOpen && (
-        <div className="fixed inset-0 bg-text/40 backdrop-blur-xs flex items-center justify-center p-4 z-50">
+        <div className="fixed inset-0 bg-text/40 backdrop-blur-sm flex items-center justify-center p-4 z-50">
           <div className="bg-surface border-4 border-text p-6 shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] max-w-md w-full font-mono space-y-4">
             <div className="border-b-2 border-text pb-2">
               <h2 className="font-black text-sm uppercase text-red-500">
@@ -770,15 +864,17 @@ export default function AdminUsuarios() {
                   <input
                     type="number"
                     min={1}
-                    max={365}
                     value={modalSuspension.cantidadTiempo}
                     onChange={(e) =>
                       setModalSuspension({
                         ...modalSuspension,
-                        cantidadTiempo: Math.max(1, Number(e.target.value)),
+                        cantidadTiempo: Math.max(
+                          1,
+                          parseInt(e.target.value) || 1,
+                        ),
                       })
                     }
-                    className="w-20 bg-surface border-2 border-text p-1.5 font-black text-center text-xs focus:outline-none"
+                    className="w-20 bg-surface border-2 border-text p-1 font-black text-center"
                   />
                   <select
                     value={modalSuspension.unidadTiempo}
@@ -788,7 +884,7 @@ export default function AdminUsuarios() {
                         unidadTiempo: e.target.value as UnidadTiempo,
                       })
                     }
-                    className="flex-1 bg-surface border-2 border-text p-1.5 font-black text-xs focus:outline-none uppercase cursor-pointer"
+                    className="flex-1 bg-surface border-2 border-text p-1 font-black uppercase"
                   >
                     <option value="HORAS">Horas</option>
                     <option value="DIAS">Días</option>
@@ -797,14 +893,14 @@ export default function AdminUsuarios() {
               </div>
             )}
 
-            <div className="space-y-2">
-              <label className="block text-[10px] font-black uppercase text-text mb-1">
-                Motivo Imputado
+            <div>
+              <label className="block text-[10px] font-black uppercase text-text mb-1.5">
+                Razón / Motivo Técnico
               </label>
               <textarea
-                required
                 rows={3}
-                placeholder="Indique la causa específica de la penalización..."
+                required
+                placeholder="Escribe el motivo detallado de la suspensión..."
                 value={modalSuspension.motivo}
                 onChange={(e) =>
                   setModalSuspension({
@@ -812,48 +908,47 @@ export default function AdminUsuarios() {
                     motivo: e.target.value,
                   })
                 }
-                className="w-full bg-background border-2 border-text p-2 text-xs font-black uppercase focus:outline-none resize-none"
+                className="w-full bg-background border-2 border-text p-2 font-mono text-xs font-bold uppercase focus:outline-none"
               />
+            </div>
 
-              <div className="space-y-1">
-                <p className="text-[9px] font-bold text-text-soft uppercase tracking-wide">
-                  📋 Plantillas de motivos frecuentes:
-                </p>
-                <div className="flex flex-wrap gap-1">
-                  {MOTIVOS_RAPIDOS.map((motivoPlantilla) => (
-                    <button
-                      key={motivoPlantilla}
-                      type="button"
-                      onClick={() =>
-                        setModalSuspension({
-                          ...modalSuspension,
-                          motivo: motivoPlantilla,
-                        })
-                      }
-                      className="text-[9px] font-black uppercase border border-text/40 bg-background hover:bg-text hover:text-surface px-1.5 py-1 text-left transition-all tracking-tight cursor-pointer"
-                    >
-                      + {motivoPlantilla.split(" / ")[0]}
-                    </button>
-                  ))}
-                </div>
+            <div className="space-y-1">
+              <span className="block text-[9px] font-black text-text-soft uppercase">
+                Plantillas Rápidas:
+              </span>
+              <div className="flex flex-col gap-1">
+                =
+                {MOTIVOS_RAPIDOS.map((motivo) => (
+                  <button
+                    key={motivo}
+                    type="button"
+                    onClick={() =>
+                      setModalSuspension({ ...modalSuspension, motivo })
+                    }
+                    className="text-left border border-text/20 p-1.5 text-[9px] font-bold uppercase bg-background hover:bg-text/5 text-text-soft truncate"
+                  >
+                    + {motivo}
+                  </button>
+                ))}
               </div>
             </div>
 
-            <div className="flex gap-2 justify-end text-xs font-black uppercase pt-2 border-t border-text/10">
+            <div className="grid grid-cols-2 gap-2 pt-2 border-t border-text/10">
               <button
+                type="button"
                 onClick={() =>
                   setModalSuspension({ ...modalSuspension, isOpen: false })
                 }
-                className="px-3 py-2 border-2 border-text bg-background hover:bg-text/5 transition-all cursor-pointer"
+                className="border-2 border-text py-2 font-black text-xs uppercase bg-background hover:bg-text/5 cursor-pointer"
               >
                 Cancelar
               </button>
               <button
+                type="button"
                 onClick={confirmarSuspension}
-                disabled={!modalSuspension.motivo.trim()}
-                className="px-4 py-2 bg-red-500 text-white border-2 border-text shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] disabled:opacity-40 cursor-pointer"
+                className="border-2 border-text py-2 font-black text-xs uppercase bg-red-500 text-white shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] hover:translate-y-0.5 transition-all cursor-pointer"
               >
-                Bloquear Cuenta
+                Aplicar Sanción
               </button>
             </div>
           </div>

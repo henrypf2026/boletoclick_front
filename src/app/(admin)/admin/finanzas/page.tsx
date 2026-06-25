@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useAdmin } from "@/context/AdminContext";
 import {
@@ -22,12 +22,10 @@ import {
   Search,
   Download,
   Loader2,
-  CheckCircle2,
-  Coins,
   ShieldCheck,
   Filter,
   Flame,
-  Terminal,
+  Coins,
 } from "lucide-react";
 
 type RangoTemporal = "HOY" | "7DIAS" | "MES";
@@ -59,6 +57,15 @@ export default function FinanzasPage() {
   const [notificacionFinanciera, setNotificacionFinanciera] = useState<
     string | null
   >(null);
+
+  // Valor local del slider para que la UI responda inmediatamente
+  const [comisionLocal, setComisionLocal] = useState(comisionGlobal);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Sincronizar comisionLocal cuando el contexto cambia (ej: carga inicial)
+  useEffect(() => {
+    setComisionLocal(comisionGlobal);
+  }, [comisionGlobal]);
 
   useEffect(() => {
     setFiltroStatus(activeTab === "LIQUIDACIONES" ? "PENDIENTE" : "ALL");
@@ -95,13 +102,20 @@ export default function FinanzasPage() {
   }, [rangoTime]);
 
   const handleFeeChange = (nuevoValor: number) => {
-    setComisionGlobal(nuevoValor);
+    // 1. Actualizar UI local inmediatamente
+    setComisionLocal(nuevoValor);
     const ahora = new Date();
     const timeStr = `${ahora.getHours().toString().padStart(2, "0")}:${ahora.getMinutes().toString().padStart(2, "0")}`;
     setHistorialFees((prev) => [
       { fecha: timeStr, valor: nuevoValor },
       ...prev.slice(0, 1),
     ]);
+
+    // 2. Esperar 600ms después de que el usuario para de mover el slider
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(async () => {
+      await setComisionGlobal(nuevoValor);
+    }, 600);
   };
 
   const totalCajaRealAprobado = useMemo(() => {
@@ -116,13 +130,14 @@ export default function FinanzasPage() {
     return Math.floor(base * factores[rangoTime]);
   }, [totalCajaRealAprobado, rangoTime]);
 
-  const netoTicketera = (gmvCalculado * comisionGlobal) / 100;
+  // Usar comisionLocal para que los cálculos respondan inmediatamente al slider
+  const netoTicketera = (gmvCalculado * comisionLocal) / 100;
   const netoProductores = gmvCalculado - netoTicketera;
 
   const metricasLiquidacion = useMemo(() => {
     return balancesProductores.reduce(
       (acc, bp) => {
-        const comision = (bp.recaudacionBruta * comisionGlobal) / 100;
+        const comision = (bp.recaudacionBruta * comisionLocal) / 100;
         const neto = bp.recaudacionBruta - comision;
         if (bp.estadoLiquidacion === "PENDIENTE") acc.pendiente += neto;
         else acc.liquidado += neto;
@@ -130,7 +145,7 @@ export default function FinanzasPage() {
       },
       { pendiente: 0, liquidado: 0 },
     );
-  }, [balancesProductores, comisionGlobal]);
+  }, [balancesProductores, comisionLocal]);
 
   const balancesFiltrados = useMemo(() => {
     return balancesProductores.filter((bp) => {
@@ -272,7 +287,7 @@ export default function FinanzasPage() {
 
             <div className="bg-color-surface border-4 border-color-border p-5 shadow-[4px_4px_0px_0px_var(--border)] border-t-8 border-t-color-primary hover:-translate-x-0.5 hover:-translate-y-0.5 hover:shadow-[6px_6px_0px_0px_var(--border)] transition-all">
               <p className="text-color-primary dark:text-color-text text-[10px] font-black uppercase tracking-wider flex items-center gap-1.5">
-                <Percent size={12} /> Fee Retenido ({comisionGlobal}%)
+                <Percent size={12} /> Fee Retenido ({comisionLocal}%)
               </p>
               <p
                 className={`text-2xl font-black text-color-text mt-3 transition-opacity ${loadingMetrics ? "opacity-30" : "opacity-100"}`}
@@ -363,7 +378,7 @@ export default function FinanzasPage() {
                     type="number"
                     min="1"
                     max="30"
-                    value={comisionGlobal}
+                    value={comisionLocal}
                     onChange={(e) => handleFeeChange(Number(e.target.value))}
                     className="w-10 text-center font-mono font-black bg-transparent text-xs focus:outline-none text-color-text"
                   />
@@ -374,7 +389,7 @@ export default function FinanzasPage() {
                 type="range"
                 min="1"
                 max="30"
-                value={comisionGlobal}
+                value={comisionLocal}
                 onChange={(e) => handleFeeChange(Number(e.target.value))}
                 className="w-full accent-accent dark:accent-primary h-2 bg-color-surface-2 border-2 border-color-border cursor-pointer"
               />
@@ -493,7 +508,7 @@ export default function FinanzasPage() {
                       Recaudación Bruta
                     </th>
                     <th className="p-4 text-right tracking-wider border-r border-color-border/30 w-44 bg-color-surface">
-                      Retención ({comisionGlobal}%)
+                      Retención ({comisionLocal}%)
                     </th>
                     <th className="p-4 text-right tracking-wider border-r border-color-border/30 w-48 bg-color-surface-2 text-color-primary dark:text-color-text">
                       Monto Neto Líquido
@@ -507,7 +522,7 @@ export default function FinanzasPage() {
                   {balancesFiltrados.length > 0 ? (
                     balancesFiltrados.map((bp, idx) => {
                       const comisionDinamica =
-                        (bp.recaudacionBruta * comisionGlobal) / 100;
+                        (bp.recaudacionBruta * comisionLocal) / 100;
                       const netoDinamico =
                         bp.recaudacionBruta - comisionDinamica;
                       const estaCargando = procesandoTransferencia === bp.email;
