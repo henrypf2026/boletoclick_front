@@ -58,6 +58,7 @@ export default function EventoPage() {
   };
 
   const isProducer = authenticated && user?.role === 'producer';
+  const isAdmin = authenticated && user?.role === 'admin';
   const isPast = event ? isEventPast(event.date, event.time) : false;
   const isCancelled = event?.status === 'CANCELLED' || event?.status === 'INACTIVE';
   const isSoldOut = event?.status === 'SOLDOUT';
@@ -223,7 +224,7 @@ export default function EventoPage() {
           {/* Comprar entradas / Estados especiales */}
           <div className="border-4 border-border bg-surface p-6 shadow-[4px_4px_0px_0px_rgba(23,23,23,1)] dark:shadow-[4px_4px_0px_0px_rgba(255,255,255,1)] lg:col-span-2">
             <h2 className="mb-5 text-base font-black uppercase tracking-wide text-text">
-              {isCancelled || isPast || isProducer || isSoldOut ? 'Entradas' : 'Comprar entradas'}
+              {isCancelled || isPast || isProducer || isAdmin || isSoldOut ? 'Entradas' : 'Comprar entradas'}
             </h2>
 
             {isCancelled ? (
@@ -235,6 +236,30 @@ export default function EventoPage() {
               <div className="border-2 border-border bg-surface-2 p-4 text-sm text-text-soft">
                 <p className="font-black uppercase tracking-wide text-text mb-1">Evento finalizado</p>
                 Este evento ya se realizó. ¡Gracias a quienes participaron!
+              </div>
+            ) : isAdmin ? (
+              <div className="flex flex-col gap-4">
+                <div className="border-2 border-border bg-surface-2 p-4">
+                  <p className="text-sm font-bold uppercase tracking-wide text-text">
+                    Zonas disponibles
+                  </p>
+                  {event.zones.length === 0 ? (
+                    <p className="mt-2 text-sm text-text-soft">Sin zonas disponibles</p>
+                  ) : (
+                    <ul className="mt-2 flex flex-col gap-2">
+                      {event.zones.map((zone) => (
+                        <li key={zone.id} className="flex items-center justify-between text-sm">
+                          <span className="text-text-soft">{zone.zone} · {zone.name}</span>
+                          <span className="font-black text-text">{formatPrice(zone.price)}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+                <div className="border-2 border-border bg-surface-2 p-4 text-sm text-text-soft">
+                  <p className="font-black uppercase tracking-wide text-text mb-1">Cuenta administrador</p>
+                  Solo podés visualizar eventos. Para comprar entradas, utilizá una cuenta de usuario.
+                </div>
               </div>
             ) : isProducer ? (
               <div className="flex flex-col gap-4">

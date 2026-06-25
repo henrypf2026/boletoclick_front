@@ -15,7 +15,9 @@ export default function CenterNav() {
   const contextLink = authenticated
     ? user?.role === 'producer'
       ? { href: '/producer/mis-eventos', label: 'Mis Eventos' }
-      : { href: '/mis-tickets', label: 'Mis Tickets' }
+      : user?.role === 'admin'
+        ? { href: '/admin/venues', label: 'Venues' }
+        : { href: '/mis-tickets', label: 'Mis Tickets' }
     : null;
 
   const links = contextLink ? [...baseLinks, contextLink] : baseLinks;

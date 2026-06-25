@@ -246,15 +246,15 @@ export default function AdminModeracion() {
         <div>
           <button
             onClick={() => router.push("/dashboard-admin")}
-            className="text-xs font-black uppercase text-text-soft hover:text-text mb-2 block transition-colors cursor-pointer"
+            className="text-sm font-black uppercase text-text-soft hover:text-text mb-2 block transition-colors cursor-pointer"
           >
             &larr; Volver a Consola
           </button>
           <h1 className="text-2xl md:text-3xl text-text">
             Catálogo de Eventos
           </h1>
-          <p className="text-text-soft text-xs uppercase font-bold tracking-wide mt-1 flex items-center gap-1.5">
-            <Sparkles size={12} className="text-primary" />
+          <p className="text-text-soft text-sm uppercase font-bold tracking-wide mt-1 flex items-center gap-1.5">
+            <Sparkles size={13} className="text-primary" />
             Publicación automática activa — vigilá y dá de baja lo que no
             corresponda
           </p>
@@ -303,8 +303,8 @@ export default function AdminModeracion() {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3 bg-surface-2 p-3 border-2 border-border shadow-[2px_2px_0px_0px_var(--border)]">
-            <div className="flex items-center bg-surface border-2 border-border px-2 py-1.5 text-xs gap-2">
-              <Search size={14} className="text-text-soft" />
+            <div className="flex items-center bg-surface border-2 border-border px-3 py-2 text-sm gap-2">
+              <Search size={15} className="text-text-soft shrink-0" />
               <input
                 type="text"
                 placeholder="Buscar evento o lugar..."
@@ -314,12 +314,12 @@ export default function AdminModeracion() {
               />
             </div>
 
-            <div className="flex items-center bg-surface border-2 border-border px-2 py-1 text-xs gap-1">
-              <SlidersHorizontal size={14} className="text-text-soft" />
+            <div className="flex items-center bg-surface border-2 border-border px-3 py-2 text-sm gap-2">
+              <SlidersHorizontal size={15} className="text-text-soft shrink-0" />
               <select
                 value={filtroProductor}
                 onChange={(e) => setFiltroProductor(e.target.value)}
-                className="bg-transparent font-bold focus:outline-none w-full text-text cursor-pointer"
+                className="bg-surface text-text font-bold focus:outline-none w-full cursor-pointer"
               >
                 <option value="ALL">Todos los Productores</option>
                 {listaProductores
@@ -332,12 +332,12 @@ export default function AdminModeracion() {
               </select>
             </div>
 
-            <div className="flex items-center bg-surface border-2 border-border px-2 py-1 text-xs gap-1">
-              <span className="font-black text-text-soft">⚡</span>
+            <div className="flex items-center bg-surface border-2 border-border px-3 py-2 text-sm gap-2">
+              <span className="font-black text-text-soft shrink-0">⚡</span>
               <select
                 value={filtroEstado}
                 onChange={(e) => setFiltroEstado(e.target.value)}
-                className="bg-transparent font-bold focus:outline-none w-full text-text cursor-pointer"
+                className="bg-surface text-text font-bold focus:outline-none w-full cursor-pointer"
               >
                 <option value="ALL">Cualquier Estado</option>
                 <option value="APROBADO">Activos</option>
@@ -349,7 +349,7 @@ export default function AdminModeracion() {
           <div className="flex items-center justify-between border-b-2 border-border pb-2">
             <button
               onClick={toggleSeleccionarTodo}
-              className="flex items-center gap-2 text-[10px] font-black uppercase text-text-soft hover:text-text transition-colors cursor-pointer"
+              className="flex items-center gap-2 text-xs font-black uppercase text-text-soft hover:text-text transition-colors cursor-pointer"
             >
               {esTodoSeleccionado ? (
                 <CheckSquare size={14} className="text-primary" />
@@ -358,7 +358,7 @@ export default function AdminModeracion() {
               )}
               {esTodoSeleccionado ? "Desmarcar todos" : "Marcar todos"}
             </button>
-            <span className="text-[10px] font-bold text-text-soft uppercase">
+            <span className="text-xs font-bold text-text-soft uppercase">
               {eventosFiltrados.length} evento(s)
             </span>
           </div>
@@ -403,11 +403,11 @@ export default function AdminModeracion() {
                         onClick={() => setSelectedEvento(ev)}
                       >
                         <div className="flex items-center gap-2 flex-wrap">
-                          <span className="text-[9px] bg-surface-2 text-text font-black px-2 py-0.5 border border-border uppercase">
+                          <span className="text-[10px] bg-surface-2 text-text font-black px-2 py-0.5 border border-border uppercase">
                             {ev.categoria}
                           </span>
                           <span
-                            className={`text-[9px] font-black px-2 py-0.5 border-2 uppercase ${
+                            className={`text-[10px] font-black px-2 py-0.5 border-2 uppercase ${
                               isActivo
                                 ? "bg-success/15 text-success border-success/50"
                                 : "bg-accent/15 text-accent border-accent/50"
@@ -416,7 +416,7 @@ export default function AdminModeracion() {
                             {ev.estado}
                           </span>
                           {ev.aforo >= 5000 && (
-                            <span className="bg-accent text-background font-black text-[8px] px-1.5 py-0.5 border border-border">
+                            <span className="bg-accent text-background font-black text-[10px] px-1.5 py-0.5 border border-border">
                               🚨 MASIVO
                             </span>
                           )}
@@ -424,7 +424,7 @@ export default function AdminModeracion() {
                         <h3 className="font-black text-base uppercase tracking-tight text-text line-clamp-2">
                           {ev.titulo}
                         </h3>
-                        <p className="text-[10px] text-text-soft font-bold">
+                        <p className="text-xs text-text-soft font-bold">
                           Productor:{" "}
                           <span className="text-text underline">
                             {ev.productor}
@@ -432,10 +432,10 @@ export default function AdminModeracion() {
                         </p>
                       </div>
 
-                      <div className="grid grid-cols-2 gap-2 text-[10px] font-bold text-text-soft uppercase">
+                      <div className="grid grid-cols-2 gap-2 text-xs font-bold text-text-soft uppercase">
                         <div className="bg-surface-2 p-2 border border-border/10">
                           <span className="flex items-center gap-1">
-                            <MapPin size={10} /> Lugar:
+                            <MapPin size={11} /> Lugar:
                           </span>
                           <span className="text-text font-black block truncate">
                             {ev.ubicacion}
@@ -443,7 +443,7 @@ export default function AdminModeracion() {
                         </div>
                         <div className="bg-surface-2 p-2 border border-border/10">
                           <span className="flex items-center gap-1">
-                            <Users size={10} /> Aforo:
+                            <Users size={11} /> Aforo:
                           </span>
                           <span className="text-success font-black block">
                             {ev.aforo.toLocaleString()}
@@ -459,7 +459,7 @@ export default function AdminModeracion() {
                             isActivo ? "RECHAZADO" : "APROBADO",
                           )
                         }
-                        className={`w-full flex items-center justify-center gap-2 py-2 border-2 border-border text-[10px] font-black uppercase shadow-[2px_2px_0px_0px_var(--border)] cursor-pointer transition-all ${
+                        className={`w-full flex items-center justify-center gap-2 py-2 border-2 border-border text-xs font-black uppercase shadow-[2px_2px_0px_0px_var(--border)] cursor-pointer transition-all ${
                           isActivo
                             ? "bg-surface text-accent hover:bg-accent hover:text-background"
                             : "bg-text text-background hover:bg-primary hover:text-background"
@@ -496,7 +496,7 @@ export default function AdminModeracion() {
             exit={{ opacity: 0, y: 40 }}
             className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 bg-surface border-4 border-border p-4 shadow-[6px_6px_0px_0px_var(--border)] flex flex-col sm:flex-row items-center gap-4 w-[90%] max-w-xl"
           >
-            <div className="text-xs uppercase font-black text-center sm:text-left">
+            <div className="text-sm uppercase font-black text-center sm:text-left">
               ⚡ <span className="text-primary">{seleccionados.length}</span>{" "}
               {seleccionados.length === 1
                 ? "evento seleccionado"
@@ -505,15 +505,15 @@ export default function AdminModeracion() {
             <div className="flex gap-2 w-full sm:w-auto sm:ml-auto">
               <button
                 onClick={() => cambiarEstadoEnLote("RECHAZADO")}
-                className="flex-1 sm:flex-none flex items-center justify-center gap-1 px-3 py-1.5 border-2 border-border text-[10px] font-black uppercase bg-surface text-accent hover:bg-accent hover:text-background transition-all cursor-pointer shadow-[2px_2px_0px_0px_var(--border)]"
+                className="flex-1 sm:flex-none flex items-center justify-center gap-1 px-3 py-1.5 border-2 border-border text-xs font-black uppercase bg-surface text-accent hover:bg-accent hover:text-background transition-all cursor-pointer shadow-[2px_2px_0px_0px_var(--border)]"
               >
-                <Ban size={12} /> Bajar Lote
+                <Ban size={13} /> Bajar Lote
               </button>
               <button
                 onClick={() => cambiarEstadoEnLote("APROBADO")}
-                className="flex-1 sm:flex-none flex items-center justify-center gap-1 px-3 py-1.5 border-2 border-border text-[10px] font-black uppercase bg-text text-background hover:bg-primary hover:text-background transition-all cursor-pointer shadow-[2px_2px_0px_0px_var(--border)]"
+                className="flex-1 sm:flex-none flex items-center justify-center gap-1 px-3 py-1.5 border-2 border-border text-xs font-black uppercase bg-text text-background hover:bg-primary hover:text-background transition-all cursor-pointer shadow-[2px_2px_0px_0px_var(--border)]"
               >
-                <RotateCcw size={12} /> Reactivar Lote
+                <RotateCcw size={13} /> Reactivar Lote
               </button>
             </div>
           </motion.div>
@@ -564,7 +564,7 @@ export default function AdminModeracion() {
                   <h3 className="font-black text-2xl uppercase tracking-tight text-text mt-1 leading-tight">
                     {selectedEvento.titulo}
                   </h3>
-                  <p className="text-[10px] text-text-soft font-bold mt-1.5">
+                  <p className="text-xs text-text-soft font-bold mt-1.5">
                     ID de Control Técnico:{" "}
                     <span className="text-text font-mono">
                       #{selectedEvento.id.slice(0, 8).toUpperCase()}
@@ -575,8 +575,8 @@ export default function AdminModeracion() {
                 <div className="space-y-2 pt-2">
                   <div className="flex items-center gap-3 bg-bg p-2.5 border-2 border-border shadow-[2px_2px_0px_0px_var(--border)]">
                     <MapPin size={16} className="text-primary shrink-0" />
-                    <div className="text-[11px] font-bold uppercase text-text truncate">
-                      <span className="text-text-soft block text-[9px]">
+                    <div className="text-xs font-bold uppercase text-text truncate">
+                      <span className="text-text-soft block text-[10px]">
                         Ubicación del Show:
                       </span>
                       {selectedEvento.ubicacion}
@@ -585,8 +585,8 @@ export default function AdminModeracion() {
 
                   <div className="flex items-center gap-3 bg-bg p-2.5 border-2 border-border shadow-[2px_2px_0px_0px_var(--border)]">
                     <Users size={16} className="text-accent shrink-0" />
-                    <div className="text-[11px] font-bold uppercase text-text">
-                      <span className="text-text-soft block text-[9px]">
+                    <div className="text-xs font-bold uppercase text-text">
+                      <span className="text-text-soft block text-[10px]">
                         Capacidad de Público (Aforo):
                       </span>
                       {selectedEvento.aforo.toLocaleString()} Personas
@@ -595,10 +595,10 @@ export default function AdminModeracion() {
                 </div>
 
                 <div className="bg-surface-2 border-2 border-border p-4 space-y-3 mt-4">
-                  <h5 className="text-[10px] font-black uppercase tracking-wider border-b border-border/30 pb-1 text-text">
+                  <h5 className="text-xs font-black uppercase tracking-wider border-b border-border/30 pb-1 text-text">
                     📊 Taquilla Estimada
                   </h5>
-                  <div className="space-y-1.5 text-xs font-bold">
+                  <div className="space-y-1.5 text-sm font-bold">
                     <div className="flex justify-between">
                       <span className="text-text-soft">
                         Precio Unitario Neto:
@@ -627,7 +627,7 @@ export default function AdminModeracion() {
               </div>
 
               <div className="border-t-2 border-border pt-4 mt-auto space-y-2">
-                <div className="flex justify-between items-center text-[10px] font-bold mb-2">
+                <div className="flex justify-between items-center text-xs font-bold mb-2">
                   <span className="text-text-soft uppercase">
                     Estado en cartelera:
                   </span>

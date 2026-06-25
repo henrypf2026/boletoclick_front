@@ -195,9 +195,38 @@ export default function FinanzasPage() {
   return (
     <div className="p-4 md:p-8 max-w-7xl mx-auto min-h-screen bg-color-bg text-color-text font-mono relative pb-20 selection:bg-color-text selection:text-color-background">
       {notificacionFinanciera && (
-        <div className="fixed bottom-6 right-6 z-50 bg-color-text text-color-background border-4 border-color-border px-5 py-3 text-xs font-black uppercase shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] flex items-center gap-3 transition-all duration-300">
-          <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
-          <span>{notificacionFinanciera}</span>
+        <div
+          style={{
+            position: "fixed",
+            bottom: "24px",
+            right: "24px",
+            zIndex: 50,
+            backgroundColor: "var(--primary)",
+            color: "var(--background)",
+            border: "4px solid var(--border)",
+            boxShadow: "6px 6px 0px 0px var(--border)",
+            padding: "12px 20px",
+            fontFamily: "monospace",
+            fontWeight: 900,
+            fontSize: "12px",
+            textTransform: "uppercase",
+            letterSpacing: "0.06em",
+            display: "flex",
+            alignItems: "center",
+            gap: "10px",
+            maxWidth: "380px",
+          }}
+        >
+          <span
+            style={{
+              width: 8,
+              height: 8,
+              borderRadius: "50%",
+              backgroundColor: "var(--background)",
+              flexShrink: 0,
+            }}
+          />
+          {notificacionFinanciera}
         </div>
       )}
 
@@ -225,7 +254,7 @@ export default function FinanzasPage() {
           onClick={() => setActiveTab("METRICAS")}
           className={`flex-1 py-2.5 text-center text-xs font-black uppercase tracking-wider cursor-pointer transition-all ${
             activeTab === "METRICAS"
-              ? "bg-color-primary text-color-background border-2 border-color-border shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]"
+              ? "bg-color-primary text-color-background border-2 border-color-border shadow-[2px_2px_0px_0px_var(--border)]"
               : "text-color-text-soft hover:text-color-text"
           }`}
         >
@@ -235,12 +264,12 @@ export default function FinanzasPage() {
           onClick={() => setActiveTab("LIQUIDACIONES")}
           className={`flex-1 py-2.5 text-center text-xs font-black uppercase tracking-wider cursor-pointer transition-all flex items-center justify-center gap-2 ${
             activeTab === "LIQUIDACIONES"
-              ? "bg-color-accent text-color-background border-2 border-color-border shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]"
+              ? "bg-color-accent text-color-background border-2 border-color-border shadow-[2px_2px_0px_0px_var(--border)]"
               : "text-color-text-soft hover:text-color-text"
           }`}
         >
           💸 Liquidar Fondos
-          <span className="bg-color-text text-color-background px-1.5 py-0.5 text-[9px] font-black transition-all">
+          <span className="bg-color-text text-color-background px-1.5 py-0.5 text-xs font-black transition-all">
             {
               balancesProductores.filter(
                 (b) => b.estadoLiquidacion === "PENDIENTE",
@@ -274,7 +303,7 @@ export default function FinanzasPage() {
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div className="bg-color-surface border-4 border-color-border p-5 shadow-[4px_4px_0px_0px_var(--border)] border-t-8 border-t-color-text hover:-translate-x-0.5 hover:-translate-y-0.5 hover:shadow-[6px_6px_0px_0px_var(--border)] transition-all">
-              <p className="text-color-text-soft text-[10px] font-black uppercase tracking-wider flex items-center gap-1.5">
+              <p className="text-color-text-soft text-xs font-black uppercase tracking-wider flex items-center gap-1.5">
                 <Activity size={12} className="text-color-primary" /> Volumen
                 Bruto Recaudado
               </p>
@@ -286,7 +315,7 @@ export default function FinanzasPage() {
             </div>
 
             <div className="bg-color-surface border-4 border-color-border p-5 shadow-[4px_4px_0px_0px_var(--border)] border-t-8 border-t-color-primary hover:-translate-x-0.5 hover:-translate-y-0.5 hover:shadow-[6px_6px_0px_0px_var(--border)] transition-all">
-              <p className="text-color-primary dark:text-color-text text-[10px] font-black uppercase tracking-wider flex items-center gap-1.5">
+              <p className="text-color-primary dark:text-color-text text-xs font-black uppercase tracking-wider flex items-center gap-1.5">
                 <Percent size={12} /> Fee Retenido ({comisionLocal}%)
               </p>
               <p
@@ -297,7 +326,7 @@ export default function FinanzasPage() {
             </div>
 
             <div className="bg-color-surface border-4 border-color-border p-5 shadow-[4px_4px_0px_0px_var(--border)] border-t-8 border-t-color-accent hover:-translate-x-0.5 hover:-translate-y-0.5 hover:shadow-[6px_6px_0px_0px_var(--border)] transition-all">
-              <p className="text-color-accent text-[10px] font-black uppercase tracking-wider flex items-center gap-1.5">
+              <p className="text-color-accent text-xs font-black uppercase tracking-wider flex items-center gap-1.5">
                 <Wallet size={12} /> Neto Destinado a Productores
               </p>
               <p
@@ -334,19 +363,40 @@ export default function FinanzasPage() {
                       axisLine={{ stroke: "var(--border)", strokeWidth: 2 }}
                     />
                     <Tooltip
-                      cursor={{ fill: "var(--color-surface-2)", opacity: 0.4 }}
+                      cursor={{ fill: "var(--surface-2)", opacity: 0.6 }}
                       content={({ active, payload }) => {
                         if (active && payload?.length) {
                           return (
-                            <div className="bg-color-text text-color-background border-2 border-color-border p-2 font-mono text-[11px] font-black uppercase">
-                              <p className="opacity-70">
+                            <div
+                              style={{
+                                backgroundColor: "var(--surface)",
+                                border: "3px solid var(--border)",
+                                boxShadow: "4px 4px 0px 0px var(--border)",
+                                padding: "10px 14px",
+                                fontFamily: "monospace",
+                                minWidth: "120px",
+                              }}
+                            >
+                              <p
+                                style={{
+                                  fontSize: "10px",
+                                  fontWeight: 700,
+                                  color: "var(--text-soft)",
+                                  textTransform: "uppercase",
+                                  letterSpacing: "0.08em",
+                                  marginBottom: "4px",
+                                }}
+                              >
                                 {payload[0].payload.name}
                               </p>
-                              <p className="font-black mt-0.5 text-color-accent">
-                                $
-                                {Number(payload[0].value).toLocaleString(
-                                  "es-AR",
-                                )}
+                              <p
+                                style={{
+                                  fontSize: "15px",
+                                  fontWeight: 900,
+                                  color: "var(--text)",
+                                }}
+                              >
+                                ${Number(payload[0].value).toLocaleString("es-AR")}
                               </p>
                             </div>
                           );
@@ -357,8 +407,9 @@ export default function FinanzasPage() {
                     <Bar
                       dataKey="monto"
                       fill="var(--primary)"
-                      stroke="var(--border)"
-                      strokeWidth={2}
+                      stroke="var(--background)"
+                      strokeWidth={1.5}
+                      radius={[1, 1, 0, 0]}
                     />
                   </BarChart>
                 </ResponsiveContainer>
@@ -393,14 +444,14 @@ export default function FinanzasPage() {
                 onChange={(e) => handleFeeChange(Number(e.target.value))}
                 className="w-full accent-accent dark:accent-primary h-2 bg-color-surface-2 border-2 border-color-border cursor-pointer"
               />
-              <div className="text-[10px] text-color-text-soft uppercase space-y-1.5 pt-2 font-bold border-t border-color-border/10">
-                <p className="font-black text-color-text text-[9px] flex items-center gap-1 opacity-70">
+              <div className="text-xs text-color-text-soft uppercase space-y-1.5 pt-2 font-bold border-t border-color-border/10">
+                <p className="font-black text-color-text text-xs flex items-center gap-1">
                   <RefreshCw size={10} /> HISTORIAL RECIENTE:
                 </p>
                 {historialFees.map((h, i) => (
                   <p
                     key={i}
-                    className="font-mono bg-color-surface-2 px-2 py-1 border border-color-border/30 flex justify-between"
+                    className="font-mono bg-color-surface-2 px-2 py-1.5 border border-color-border/30 flex justify-between text-xs"
                   >
                     <span>⏱️ [{h.fecha}]</span> <span>{h.valor}%</span>
                   </p>
@@ -415,7 +466,7 @@ export default function FinanzasPage() {
         <div className="space-y-6 animate-fade-in">
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div className="border-4 border-color-border bg-color-surface p-4 shadow-[4px_4px_0px_0px_var(--border)] border-l-8 border-l-amber-500">
-              <span className="text-[10px] text-color-text-soft uppercase font-black block tracking-wider">
+              <span className="text-xs text-color-text-soft uppercase font-black block tracking-wider">
                 Pasivos en Espera
               </span>
               <span className="text-xl font-black text-color-text block mt-1">
@@ -423,7 +474,7 @@ export default function FinanzasPage() {
               </span>
             </div>
             <div className="border-4 border-color-border bg-color-surface p-4 shadow-[4px_4px_0px_0px_var(--border)] border-l-8 border-l-emerald-500">
-              <span className="text-[10px] text-color-text-soft uppercase font-black block tracking-wider">
+              <span className="text-xs text-color-text-soft uppercase font-black block tracking-wider">
                 Historial Despachado
               </span>
               <span className="text-xl font-black text-color-text block mt-1">
@@ -432,7 +483,7 @@ export default function FinanzasPage() {
             </div>
             <button
               onClick={exportarReporteFinanciero}
-              className="border-4 border-color-border bg-color-text text-color-background p-4 shadow-[4px_4px_0px_0px_rgba(0,0,0,0.15)] hover:-translate-x-0.5 hover:-translate-y-0.5 hover:shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] hover:bg-color-accent hover:text-color-background transition-all font-black text-xs uppercase flex items-center justify-center gap-2 cursor-pointer"
+              className="border-4 border-color-border bg-color-text text-color-background p-4 shadow-[4px_4px_0px_0px_rgba(0,0,0,0.15)] hover:-translate-x-0.5 hover:-translate-y-0.5 hover:shadow-[6px_6px_0px_0px_var(--border)] hover:bg-color-accent hover:text-color-background transition-all font-black text-xs uppercase flex items-center justify-center gap-2 cursor-pointer"
             >
               <Download size={14} /> Exportar Reporte (.CSV)
             </button>
@@ -445,14 +496,14 @@ export default function FinanzasPage() {
               <div>
                 <div className="flex items-center gap-2">
                   <span
-                    className={`px-2 py-0.5 text-[9px] font-black uppercase border-2 border-color-border ${statusColorBadge}`}
+                    className={`px-2 py-0.5 text-xs font-black uppercase border-2 border-color-border ${statusColorBadge}`}
                   >
                     {filtroStatus === "ALL"
                       ? "Reporte Pleno"
                       : `Saldos: ${filtroStatus}`}
                   </span>
                 </div>
-                <p className="text-[10px] text-color-text-soft uppercase font-bold mt-1">
+                <p className="text-xs text-color-text-soft uppercase font-bold mt-1">
                   Desglose auditable por cuenta e impuestos retenidos
                 </p>
               </div>
@@ -469,12 +520,12 @@ export default function FinanzasPage() {
                   />
                 </div>
 
-                <div className="flex border-2 border-color-border text-[10px] font-black bg-color-surface-2 p-0.5 shadow-[2px_2px_0px_0px_var(--border)]">
+                <div className="flex border-2 border-color-border font-black bg-color-surface-2 p-0.5 shadow-[2px_2px_0px_0px_var(--border)]">
                   {(["ALL", "PENDIENTE", "LIQUIDADO"] as const).map((st) => (
                     <button
                       key={st}
                       onClick={() => setFiltroStatus(st)}
-                      className={`px-3 py-1.5 cursor-pointer uppercase font-black text-[9px] transition-all flex items-center gap-1 ${
+                      className={`px-3 py-1.5 cursor-pointer uppercase font-black text-xs transition-all flex items-center gap-1 ${
                         filtroStatus === st
                           ? "bg-color-text text-color-background font-extrabold"
                           : "bg-color-surface text-color-text hover:bg-color-surface-2"
@@ -500,7 +551,7 @@ export default function FinanzasPage() {
             <div className="overflow-x-auto border-2 border-color-border bg-color-surface-2/10">
               <table className="w-full border-collapse text-xs min-w-180">
                 <thead>
-                  <tr className="bg-color-surface-2 text-color-text font-black uppercase text-[10px] border-b-2 border-color-border">
+                  <tr className="bg-color-surface-2 text-color-text font-black uppercase text-xs border-b-2 border-color-border">
                     <th className="p-4 text-left tracking-wider border-r border-color-border/30 bg-color-surface">
                       Productor Responsable
                     </th>
@@ -546,7 +597,7 @@ export default function FinanzasPage() {
                           </td>
                           <td className="p-4 text-center">
                             {bp.estadoLiquidacion === "LIQUIDADO" ? (
-                              <div className="inline-flex items-center gap-1 text-[9px] font-black bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 px-2.5 py-1 uppercase tracking-wider">
+                              <div className="inline-flex items-center gap-1 text-xs font-black bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 px-2.5 py-1 uppercase tracking-wider">
                                 <ShieldCheck size={11} /> Despachado
                               </div>
                             ) : (
@@ -562,12 +613,12 @@ export default function FinanzasPage() {
                                   estaCargando ||
                                   procesandoTransferencia !== null
                                 }
-                                className={`font-black text-[9px] px-4 py-2 border-2 border-color-border shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] cursor-pointer transition-all uppercase inline-flex items-center justify-center gap-1.5 ${
+                                className={`font-black text-xs px-4 py-2 border-2 border-color-border shadow-[2px_2px_0px_0px_var(--border)] cursor-pointer transition-all uppercase inline-flex items-center justify-center gap-1.5 ${
                                   bp.recaudacionBruta === 0 ||
                                   estaCargando ||
                                   procesandoTransferencia !== null
                                     ? "opacity-30 cursor-not-allowed bg-color-surface shadow-none text-color-text-soft"
-                                    : "bg-color-accent text-color-background dark:bg-color-primary dark:text-color-background hover:-translate-x-0.5 hover:-translate-y-0.5 hover:shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] active:translate-x-0 active:translate-y-0 active:shadow-none"
+                                    : "bg-color-accent text-color-background dark:bg-color-primary dark:text-color-background hover:-translate-x-0.5 hover:-translate-y-0.5 hover:shadow-[4px_4px_0px_0px_var(--border)] active:translate-x-0 active:translate-y-0 active:shadow-none"
                                 }`}
                               >
                                 {estaCargando ? (
@@ -585,7 +636,7 @@ export default function FinanzasPage() {
                     <tr>
                       <td
                         colSpan={5}
-                        className="text-center py-12 text-color-text-soft text-[10px] uppercase font-black tracking-widest border-2 border-dashed border-color-border/20"
+                        className="text-center py-12 text-color-text-soft text-xs uppercase font-black tracking-widest border-2 border-dashed border-color-border/20"
                       >
                         Ningún registro coincide con el segmento.
                       </td>
