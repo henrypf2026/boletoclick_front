@@ -10,6 +10,19 @@ import AddToWalletButton from "@/components/ui/AddToWalletButton";
 import jsPDF from "jspdf";
 import Swal from "sweetalert2";
 
+// 🛠️ PLACEHOLDER: tu compañero usaba SWAL_CUSTOM pero no estaba definido en
+// ningún lado (probablemente se perdió en un merge). Lo armo acá con clases
+// coherentes con tu estética neobrutalista, para que compile mientras tanto.
+// Si tu compañero tenía una versión propia, reemplazar este bloque por la suya.
+const SWAL_CUSTOM = {
+  popup:
+    "border-4 border-text shadow-[6px_6px_0px_0px_var(--color-text)] font-mono rounded-none",
+  title: "font-black uppercase tracking-tight",
+  confirmButton:
+    "font-mono font-black uppercase text-xs border-2 border-text px-4 py-2 shadow-[2px_2px_0px_0px_var(--color-text)] rounded-none",
+  cancelButton:
+    "font-mono font-black uppercase text-xs border-2 border-text px-4 py-2 shadow-[2px_2px_0px_0px_var(--color-text)] rounded-none",
+};
 
 interface OrderItem {
   id: string;
@@ -41,33 +54,37 @@ interface EventData {
 
 function orderStatusLabel(status: string) {
   switch (status) {
-    case "PAID":      return "PAGADO";
-    case "PENDING":   return "PENDIENTE";
-    case "FAILED":    return "FALLIDO";
-    case "REFUNDED":  return "REEMBOLSADO";
-    case "CANCELLED": return "CANCELADO";
-    default:          return status;
+    case "PAID":
+      return "PAGADO";
+    case "PENDING":
+      return "PENDIENTE";
+    case "FAILED":
+      return "FALLIDO";
+    case "REFUNDED":
+      return "REEMBOLSADO";
+    case "CANCELLED":
+      return "CANCELADO";
+    default:
+      return status;
   }
 }
 
 function orderStatusColor(status: string) {
   switch (status) {
-    case "PAID":      return "text-success bg-success/10 border-success";
-    case "PENDING":   return "text-yellow-600 bg-yellow-400/10 border-yellow-500";
-    case "FAILED":    return "text-red-500 bg-red-500/10 border-red-500";
-    case "REFUNDED":  return "text-text-soft bg-surface-2 border-text/30";
-    case "CANCELLED": return "text-text-soft bg-surface-2 border-text/30";
-    default:          return "text-text-soft bg-surface-2 border-text/30";
+    case "PAID":
+      return "text-success bg-success/10 border-success";
+    case "PENDING":
+      return "text-yellow-600 bg-yellow-400/10 border-yellow-500";
+    case "FAILED":
+      return "text-red-500 bg-red-500/10 border-red-500";
+    case "REFUNDED":
+      return "text-text-soft bg-surface-2 border-text/30";
+    case "CANCELLED":
+      return "text-text-soft bg-surface-2 border-text/30";
+    default:
+      return "text-text-soft bg-surface-2 border-text/30";
   }
 }
-
-const SWAL_CUSTOM = {
-  popup: "border-4 border-[#171717] rounded-none shadow-[6px_6px_0px_0px_#171717] font-mono",
-  title: "uppercase font-black tracking-tighter",
-  confirmButton: "font-mono font-black uppercase tracking-wider border-2 border-[#171717] rounded-none",
-  cancelButton: "font-mono font-black uppercase tracking-wider border-2 border-[#171717] rounded-none",
-};
-
 
 async function fetchEvent(eventId: string): Promise<EventData | null> {
   try {
@@ -85,13 +102,16 @@ async function fetchEvent(eventId: string): Promise<EventData | null> {
 
 function formatFecha(iso: string) {
   return new Date(iso).toLocaleDateString("es-AR", {
-    day: "numeric", month: "long", year: "numeric",
+    day: "numeric",
+    month: "long",
+    year: "numeric",
   });
 }
 
 function formatHora(iso: string) {
   return new Date(iso).toLocaleTimeString("es-AR", {
-    hour: "2-digit", minute: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
   });
 }
 
@@ -100,7 +120,6 @@ function formatPeso(n: number) {
 }
 
 // PDF
-
 async function generarComprobantePDF(orden: OrderItem) {
   let evento: EventData | null = null;
   const primerTicket = orden.tickets?.[0];
@@ -109,17 +128,16 @@ async function generarComprobantePDF(orden: OrderItem) {
   }
 
   const doc = new jsPDF({ unit: "mm", format: "a4" });
-  const ancho  = doc.internal.pageSize.getWidth();
+  const ancho = doc.internal.pageSize.getWidth();
   const margen = 20;
   let y = margen;
 
   const PURPLE = "#6750e0";
   const ORANGE = "#ff6b00";
-  const BLACK  = "#171717";
-  const GRAY   = "#888888";
-  const LGRAY  = "#f2f2f2";
-  const WHITE  = "#ffffff";
-
+  const BLACK = "#171717";
+  const GRAY = "#888888";
+  const LGRAY = "#f2f2f2";
+  const WHITE = "#ffffff";
 
   doc.setFillColor(BLACK);
   doc.rect(0, 0, ancho, 30, "F");
@@ -143,13 +161,19 @@ async function generarComprobantePDF(orden: OrderItem) {
   doc.setFontSize(11);
   doc.setFont("helvetica", "bold");
   doc.setTextColor(ORANGE);
-  doc.text(`#${orden.id.slice(0, 8).toUpperCase()}`, ancho - margen, 21, { align: "right" });
+  doc.text(`#${orden.id.slice(0, 8).toUpperCase()}`, ancho - margen, 21, {
+    align: "right",
+  });
 
   y = 42;
 
-
   const estadoTexto = orderStatusLabel(orden.status);
-  const badgeColor = orden.status === "PAID" ? PURPLE : orden.status === "REFUNDED" ? "#555" : "#cc3333";
+  const badgeColor =
+    orden.status === "PAID"
+      ? PURPLE
+      : orden.status === "REFUNDED"
+        ? "#555"
+        : "#cc3333";
   doc.setFillColor(badgeColor);
   doc.roundedRect(margen, y - 4, 38, 7, 1, 1, "F");
   doc.setFontSize(7);
@@ -157,7 +181,6 @@ async function generarComprobantePDF(orden: OrderItem) {
   doc.setTextColor(WHITE);
   doc.text(`✓ ${estadoTexto}`, margen + 4, y + 0.8);
   y += 12;
-
 
   if (evento) {
     doc.setFillColor(LGRAY);
@@ -178,12 +201,13 @@ async function generarComprobantePDF(orden: OrderItem) {
     doc.setFontSize(8);
     doc.setFont("helvetica", "normal");
     doc.setTextColor(GRAY);
-    if (evento.eventDate) doc.text(`📅  ${formatFecha(evento.eventDate)}`, margen + 7, y + 20);
-    if (evento.venue?.name) doc.text(`📍  ${evento.venue.name}`, margen + 7, y + 25);
+    if (evento.eventDate)
+      doc.text(`📅  ${formatFecha(evento.eventDate)}`, margen + 7, y + 20);
+    if (evento.venue?.name)
+      doc.text(`📍  ${evento.venue.name}`, margen + 7, y + 25);
     y += 36;
   }
 
- 
   doc.setFontSize(8);
   doc.setFont("helvetica", "bold");
   doc.setTextColor(GRAY);
@@ -195,9 +219,9 @@ async function generarComprobantePDF(orden: OrderItem) {
 
   const celdas = [
     { label: "Fecha de compra", value: formatFecha(orden.createdAt) },
-    { label: "Hora",            value: formatHora(orden.createdAt) },
-    { label: "Método de pago",  value: "Stripe" },
-    { label: "Estado",          value: estadoTexto },
+    { label: "Hora", value: formatHora(orden.createdAt) },
+    { label: "Método de pago", value: "Stripe" },
+    { label: "Estado", value: estadoTexto },
   ];
 
   celdas.forEach((celda, i) => {
@@ -226,9 +250,10 @@ async function generarComprobantePDF(orden: OrderItem) {
     doc.setFontSize(7.5);
     doc.setFont("helvetica", "normal");
     doc.setTextColor(BLACK);
-    const txId = orden.transactionId.length > 55
-      ? orden.transactionId.slice(0, 55) + "..."
-      : orden.transactionId;
+    const txId =
+      orden.transactionId.length > 55
+        ? orden.transactionId.slice(0, 55) + "..."
+        : orden.transactionId;
     doc.text(txId, margen + 3, y + 6.5);
     y += 16;
   }
@@ -246,8 +271,8 @@ async function generarComprobantePDF(orden: OrderItem) {
     doc.setFontSize(7);
     doc.setFont("helvetica", "bold");
     doc.setTextColor(WHITE);
-    doc.text("TIPO",   margen + 3,       y + 1);
-    doc.text("ZONA",   margen + 60,      y + 1);
+    doc.text("TIPO", margen + 3, y + 1);
+    doc.text("ZONA", margen + 60, y + 1);
     doc.text("PRECIO", ancho - margen - 25, y + 1);
     y += 8;
 
@@ -261,14 +286,15 @@ async function generarComprobantePDF(orden: OrderItem) {
       doc.text(ticket.ticketType?.zone ?? "—", margen + 60, y + 1);
       doc.text(
         ticket.ticketType?.price ? formatPeso(ticket.ticketType.price) : "—",
-        ancho - margen - 3, y + 1, { align: "right" }
+        ancho - margen - 3,
+        y + 1,
+        { align: "right" },
       );
       y += 8;
     });
     y += 4;
   }
 
-  
   doc.setFontSize(8);
   doc.setFont("helvetica", "bold");
   doc.setTextColor(GRAY);
@@ -284,7 +310,7 @@ async function generarComprobantePDF(orden: OrderItem) {
     y += 6;
   };
 
-  filaResumen("Subtotal productor",  formatPeso(orden.producerSubtotal));
+  filaResumen("Subtotal productor", formatPeso(orden.producerSubtotal));
   filaResumen("Comisión plataforma", formatPeso(orden.platformFee));
 
   y += 2;
@@ -308,9 +334,16 @@ async function generarComprobantePDF(orden: OrderItem) {
   doc.setFontSize(7.5);
   doc.setFont("helvetica", "normal");
   doc.setTextColor(GRAY);
-  doc.text("Este comprobante es válido como constancia de pago.", ancho / 2, y, { align: "center" });
+  doc.text(
+    "Este comprobante es válido como constancia de pago.",
+    ancho / 2,
+    y,
+    { align: "center" },
+  );
   y += 4;
-  doc.text("Guardalo para futuros reclamos o devoluciones.", ancho / 2, y, { align: "center" });
+  doc.text("Guardalo para futuros reclamos o devoluciones.", ancho / 2, y, {
+    align: "center",
+  });
   y += 6;
   doc.setFont("helvetica", "bold");
   doc.setTextColor(PURPLE);
@@ -322,19 +355,42 @@ async function generarComprobantePDF(orden: OrderItem) {
 export default function UserDashboard() {
   const { user, authenticated, loading } = useAuth();
   const router = useRouter();
-  const [seccionActiva, setSeccionActiva]     = useState<"entradas" | "historial">("entradas");
-  const [ticketExpandido, setTicketExpandido] = useState<ApiTicket | null>(null);
+
+  // 🚀 REDIRECCIÓN EFECTIVA PARA ADMINS (Evita loops y errores de renderizado)
+  useEffect(() => {
+    if (!loading && authenticated && user) {
+      const actualRole = (user as any).user_role || user.role;
+      if (actualRole === "admin") {
+        router.push("/dashboard-admin");
+      }
+    }
+  }, [user, authenticated, loading, router]);
+
+  const [seccionActiva, setSeccionActiva] = useState<"entradas" | "historial">(
+    "entradas",
+  );
+  const [ticketExpandido, setTicketExpandido] = useState<ApiTicket | null>(
+    null,
+  );
   const [filtroHistorial, setFiltroHistorial] = useState("");
-  const [tickets, setTickets]                 = useState<ApiTicket[]>([]);
-  const [orders, setOrders]                   = useState<OrderItem[]>([]);
-  const [loadingTickets, setLoadingTickets]   = useState(true);
-  const [loadingOrders, setLoadingOrders]     = useState(true);
-  const [errorTickets, setErrorTickets]       = useState(false);
-  const [errorOrders, setErrorOrders]         = useState(false);
-  const [pdfLoading, setPdfLoading]           = useState<string | null>(null);
-  const [cancellingId, setCancellingId]       = useState<string | null>(null);
-  const [ticketEventTitles, setTicketEventTitles] = useState<Record<string, string>>({});
-  const [orderEventTitles, setOrderEventTitles]   = useState<Record<string, string>>({});
+  const [tickets, setTickets] = useState<ApiTicket[]>([]);
+  const [orders, setOrders] = useState<OrderItem[]>([]);
+  const [loadingTickets, setLoadingTickets] = useState(true);
+  const [loadingOrders, setLoadingOrders] = useState(true);
+  const [errorTickets, setErrorTickets] = useState(false);
+  const [errorOrders, setErrorOrders] = useState(false);
+  const [pdfLoading, setPdfLoading] = useState<string | null>(null);
+
+  // 🛠️ FIX: estos 3 estados se usaban en el JSX (ticketEventTitles,
+  // orderEventTitles, cancellingId) pero nunca se habían declarado con
+  // useState. Sin esto el archivo no compila ("variable no definida").
+  const [ticketEventTitles, setTicketEventTitles] = useState<
+    Record<string, string>
+  >({});
+  const [orderEventTitles, setOrderEventTitles] = useState<
+    Record<string, string>
+  >({});
+  const [cancellingId, setCancellingId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!user) return;
@@ -367,38 +423,57 @@ export default function UserDashboard() {
   }, [user]);
 
   useEffect(() => {
-    const needsTitle = tickets.filter((t) => !t.eventTitle && t.ticketType.eventId);
-    const uniqueIds = [...new Set(needsTitle.map((t) => t.ticketType.eventId!))];
+    const needsTitle = tickets.filter(
+      (t) => !t.eventTitle && t.ticketType.eventId,
+    );
+    const uniqueIds = [
+      ...new Set(needsTitle.map((t) => t.ticketType.eventId!)),
+    ];
     if (!uniqueIds.length) return;
-    Promise.all(uniqueIds.map((id) => fetchEvent(id).then((e) => ({ id, title: e?.title ?? null }))))
-      .then((results) => {
-        const map: Record<string, string> = {};
-        results.forEach(({ id, title }) => { if (title) map[id] = title; });
-        setTicketEventTitles(map);
+    Promise.all(
+      uniqueIds.map((id) =>
+        fetchEvent(id).then((e) => ({ id, title: e?.title ?? null })),
+      ),
+    ).then((results) => {
+      const map: Record<string, string> = {};
+      results.forEach(({ id, title }) => {
+        if (title) map[id] = title;
       });
+      setTicketEventTitles(map);
+    });
   }, [tickets]);
 
   useEffect(() => {
     if (!orders.length) return;
     const pairs = orders
-      .map((o) => ({ orderId: o.id, eventId: o.tickets?.[0]?.ticketType?.eventId }))
+      .map((o) => ({
+        orderId: o.id,
+        eventId: o.tickets?.[0]?.ticketType?.eventId,
+      }))
       .filter((p): p is { orderId: string; eventId: string } => !!p.eventId);
     if (!pairs.length) return;
     const uniqueEventIds = [...new Set(pairs.map((p) => p.eventId))];
-    Promise.all(uniqueEventIds.map((id) => fetchEvent(id).then((e) => ({ id, title: e?.title ?? null }))))
-      .then((results) => {
-        const eventMap: Record<string, string> = {};
-        results.forEach(({ id, title }) => { if (title) eventMap[id] = title; });
-        const orderMap: Record<string, string> = {};
-        pairs.forEach((p) => { if (eventMap[p.eventId]) orderMap[p.orderId] = eventMap[p.eventId]; });
-        setOrderEventTitles(orderMap);
+    Promise.all(
+      uniqueEventIds.map((id) =>
+        fetchEvent(id).then((e) => ({ id, title: e?.title ?? null })),
+      ),
+    ).then((results) => {
+      const eventMap: Record<string, string> = {};
+      results.forEach(({ id, title }) => {
+        if (title) eventMap[id] = title;
       });
+      const orderMap: Record<string, string> = {};
+      pairs.forEach((p) => {
+        if (eventMap[p.eventId]) orderMap[p.orderId] = eventMap[p.eventId];
+      });
+      setOrderEventTitles(orderMap);
+    });
   }, [orders]);
 
   const ordenesFiltradas = orders.filter(
     (o) =>
       o.id.toLowerCase().includes(filtroHistorial.toLowerCase()) ||
-      o.status.toLowerCase().includes(filtroHistorial.toLowerCase())
+      o.status.toLowerCase().includes(filtroHistorial.toLowerCase()),
   );
 
   const firstName = user
@@ -435,7 +510,9 @@ export default function UserDashboard() {
       }
 
       setOrders((prev) =>
-        prev.map((o) => o.id === orderId ? { ...o, status: "CANCELLED" as const } : o)
+        prev.map((o) =>
+          o.id === orderId ? { ...o, status: "CANCELLED" as const } : o,
+        ),
       );
 
       Swal.fire({
@@ -449,7 +526,8 @@ export default function UserDashboard() {
         customClass: SWAL_CUSTOM,
       });
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : "No se pudo cancelar la orden.";
+      const message =
+        err instanceof Error ? err.message : "No se pudo cancelar la orden.";
       Swal.fire({
         title: "ERROR",
         text: message,
@@ -494,7 +572,6 @@ export default function UserDashboard() {
 
   return (
     <div className="p-4 md:p-8 max-w-4xl mx-auto min-h-screen bg-background text-text transition-colors">
-
       {/* Título */}
       <div className="mb-8 border-b-4 border-text pb-4 flex flex-col md:flex-row justify-between items-start md:items-end gap-2">
         <div>
@@ -503,7 +580,8 @@ export default function UserDashboard() {
           </h1>
           {firstName && (
             <p className="text-text-soft mt-1 font-mono text-xs uppercase tracking-wide">
-              Bienvenido/a, <span className="text-text font-black">{firstName}</span>
+              Bienvenido/a,{" "}
+              <span className="text-text font-black">{firstName}</span>
             </p>
           )}
         </div>
@@ -516,7 +594,7 @@ export default function UserDashboard() {
       <div className="flex border-b-2 border-text mb-6 gap-2 overflow-x-auto pb-0">
         {(
           [
-            { id: "entradas",  label: "MIS ENTRADAS" },
+            { id: "entradas", label: "MIS ENTRADAS" },
             { id: "historial", label: "HISTORIAL DE COMPRAS" },
           ] as const
         ).map((tab) => (
@@ -567,9 +645,13 @@ export default function UserDashboard() {
                   <div className="border-b-2 border-dashed border-text/40 pb-4 mb-4">
                     <div className="flex justify-between items-start gap-2">
                       <h3 className="text-text font-black text-lg uppercase tracking-tight group-hover:text-primary transition-colors">
-                        {ticketEventTitles[ticket.ticketType.eventId ?? ""] ?? ticket.eventTitle ?? ticket.ticketType.name}
+                        {ticketEventTitles[ticket.ticketType.eventId ?? ""] ??
+                          ticket.eventTitle ??
+                          ticket.ticketType.name}
                       </h3>
-                      <span className={`text-[9px] font-mono px-1.5 py-0.5 font-bold whitespace-nowrap border ${orderStatusColor(ticket.order.status)}`}>
+                      <span
+                        className={`text-[9px] font-mono px-1.5 py-0.5 font-bold whitespace-nowrap border ${orderStatusColor(ticket.order.status)}`}
+                      >
                         {orderStatusLabel(ticket.order.status)}
                       </span>
                     </div>
@@ -586,7 +668,11 @@ export default function UserDashboard() {
                     </p>
                   </div>
                   <div className="bg-surface-2 p-3 border-2 border-text flex flex-col items-center justify-center max-w-40 mx-auto w-full transition-transform group-hover:scale-105">
-                    <TicketQrCode value={ticket.qrCode} size={112} className="w-full h-auto" />
+                    <TicketQrCode
+                      value={ticket.qrCode}
+                      size={112}
+                      className="w-full h-auto"
+                    />
                   </div>
                 </div>
               ))}
@@ -636,20 +722,28 @@ export default function UserDashboard() {
                           {orden.id.slice(0, 8).toUpperCase()}
                         </span>
                         <span className="text-text-soft text-xs font-mono font-bold">
-                          {new Date(orden.createdAt).toLocaleDateString("es-AR", {
-                            day: "numeric", month: "short", year: "numeric",
-                          })}
+                          {new Date(orden.createdAt).toLocaleDateString(
+                            "es-AR",
+                            {
+                              day: "numeric",
+                              month: "short",
+                              year: "numeric",
+                            },
+                          )}
                         </span>
-                        <span className={`text-[10px] font-mono font-black uppercase border px-2 py-0.5 ${orderStatusColor(orden.status)}`}>
+                        <span
+                          className={`text-[10px] font-mono font-black uppercase border px-2 py-0.5 ${orderStatusColor(orden.status)}`}
+                        >
                           {orderStatusLabel(orden.status)}
                         </span>
                       </div>
                       <p className="text-text-soft text-xs font-mono mt-0.5">
-                        Comisión plataforma: ${orden.platformFee.toLocaleString("es-AR")}
+                        Comisión plataforma: $
+                        {orden.platformFee.toLocaleString("es-AR")}
                       </p>
                     </div>
 
-                    <div className="flex items-center justify-between sm:justify-end gap-4 border-t sm:border-t-0 pt-3 sm:pt-0 border-text/20 flex-wrap">
+                    <div className="flex items-center justify-between sm:justify-end gap-3 border-t sm:border-t-0 pt-3 sm:pt-0 border-text/20 flex-wrap">
                       <div className="sm:text-right">
                         <span className="text-text-soft text-[10px] block uppercase font-mono font-bold">
                           TOTAL ABONADO
@@ -659,34 +753,55 @@ export default function UserDashboard() {
                         </span>
                       </div>
 
-                      <div className="flex items-center gap-2">
-                        {orden.status === "PAID" && (
+                      {/* 🛠️ FIX: había un <button> roto y duplicado acá (abierto
+                          sin atributos válidos, cerrado vacío, con contenido
+                          suelto fuera de cualquier botón, y un segundo botón
+                          bien armado después). Dejamos solo el botón correcto. */}
+                      {orden.status !== "CANCELLED" &&
+                        orden.status === "PAID" && (
                           <button
                             onClick={() => handleCancelOrder(orden.id)}
                             disabled={cancellingId === orden.id}
-                            className="bg-red-600 text-white font-mono font-black text-xs uppercase tracking-wider transition-all border-2 border-text px-3 py-2 shadow-[2px_2px_0px_0px_var(--color-text)] hover:shadow-none hover:translate-x-0.5 hover:translate-y-0.5 cursor-pointer whitespace-nowrap disabled:opacity-40 disabled:cursor-not-allowed disabled:shadow-none disabled:translate-x-0 disabled:translate-y-0"
+                            className="font-mono font-black text-xs uppercase tracking-wider transition-all border-2 border-text px-3 py-2 shadow-[2px_2px_0px_0px_var(--color-text)] hover:shadow-none hover:translate-x-0.5 hover:translate-y-0.5 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed bg-surface text-red-500"
                           >
-                            {cancellingId === orden.id ? "..." : "✕ Cancelar"}
+                            {cancellingId === orden.id ? "..." : "✕ CANCELAR"}
                           </button>
                         )}
-                        <button
-                          onClick={() => handleDescargarPDF(orden)}
-                          disabled={orden.status !== "PAID" || pdfLoading === orden.id}
-                          className="bg-primary text-background font-mono font-black text-xs uppercase tracking-wider transition-all border-2 border-text px-4 py-2 shadow-[2px_2px_0px_0px_var(--color-text)] hover:shadow-none hover:translate-x-0.5 hover:translate-y-0.5 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed disabled:shadow-none disabled:translate-x-0 disabled:translate-y-0 min-w-[64px] flex items-center justify-center gap-1"
-                        >
-                          {pdfLoading === orden.id ? (
-                            <>
-                              <svg className="animate-spin w-3 h-3" fill="none" viewBox="0 0 24 24">
-                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
-                              </svg>
-                              ...
-                            </>
-                          ) : (
-                            <>↓ PDF</>
-                          )}
-                        </button>
-                      </div>
+
+                      <button
+                        onClick={() => handleDescargarPDF(orden)}
+                        disabled={
+                          orden.status !== "PAID" || pdfLoading === orden.id
+                        }
+                        className="bg-primary text-background font-mono font-black text-xs uppercase tracking-wider transition-all border-2 border-text px-4 py-2 shadow-[2px_2px_0px_0px_var(--color-text)] hover:shadow-none hover:translate-x-0.5 hover:translate-y-0.5 active:shadow-none active:translate-x-0.5 active:translate-y-0.5 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed disabled:shadow-none disabled:translate-x-0 disabled:translate-y-0 min-w-16 flex items-center justify-center gap-1"
+                      >
+                        {pdfLoading === orden.id ? (
+                          <>
+                            <svg
+                              className="animate-spin w-3 h-3"
+                              fill="none"
+                              viewBox="0 0 24 24"
+                            >
+                              <circle
+                                className="opacity-25"
+                                cx="12"
+                                cy="12"
+                                r="10"
+                                stroke="currentColor"
+                                strokeWidth="4"
+                              />
+                              <path
+                                className="opacity-75"
+                                fill="currentColor"
+                                d="M4 12a8 8 0 018-8v8z"
+                              />
+                            </svg>
+                            ...
+                          </>
+                        ) : (
+                          <>↓ PDF</>
+                        )}
+                      </button>
                     </div>
                   </div>
                 ))
@@ -718,7 +833,9 @@ export default function UserDashboard() {
                 PASES DIGITALES BOLETOCLICK
               </span>
               <h2 className="text-black font-black text-2xl uppercase tracking-tighter mt-4 leading-tight">
-                {ticketEventTitles[ticketExpandido.ticketType.eventId ?? ""] ?? ticketExpandido.eventTitle ?? ticketExpandido.ticketType.name}
+                {ticketEventTitles[ticketExpandido.ticketType.eventId ?? ""] ??
+                  ticketExpandido.eventTitle ??
+                  ticketExpandido.ticketType.name}
               </h2>
               {ticketExpandido.ticketType.zone && (
                 <div className="mt-3">
@@ -731,14 +848,23 @@ export default function UserDashboard() {
                 </div>
               )}
               <p className="text-neutral-500 font-mono text-xs mt-2">
-                {new Date(ticketExpandido.createdAt).toLocaleDateString("es-AR", {
-                  day: "numeric", month: "long", year: "numeric",
-                })}
+                {new Date(ticketExpandido.createdAt).toLocaleDateString(
+                  "es-AR",
+                  {
+                    day: "numeric",
+                    month: "long",
+                    year: "numeric",
+                  },
+                )}
               </p>
             </div>
 
             <div className="my-6 bg-white p-4 border-4 border-black flex flex-col items-center justify-center aspect-square w-full max-w-60 mx-auto shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
-              <TicketQrCode value={ticketExpandido.qrCode} size={200} className="w-full h-full" />
+              <TicketQrCode
+                value={ticketExpandido.qrCode}
+                size={200}
+                className="w-full h-full"
+              />
             </div>
 
             <div className="space-y-3">

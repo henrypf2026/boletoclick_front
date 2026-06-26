@@ -1,112 +1,120 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { useAdmin } from "@/context/AdminContext";
+import { motion, AnimatePresence } from "framer-motion";
+import { toast, Toaster } from "sonner";
+import { api } from "@/lib/apiClient";
 import {
   X,
-  Eye,
-  SlidersHorizontal,
-  Search,
-  Calendar,
   MapPin,
   Users,
   CheckSquare,
   Square,
-  Trash2,
-  ShieldCheck,
+  Ban,
+  RotateCcw,
+  Search,
+  SlidersHorizontal,
+  Sparkles,
 } from "lucide-react";
 
-type TabModeracion = "PENDIENTES" | "CATALOGO";
+type EventoEstado = "APROBADO" | "RECHAZADO";
+
+interface EventoAdmin {
+  id: string;
+  titulo: string;
+  productor: string;
+  categoria: string;
+  ubicacion: string;
+  aforo: number;
+  precioBase: number;
+  estado: EventoEstado;
+  createdAt: string;
+}
 
 export default function AdminModeracion() {
   const router = useRouter();
-  const { eventos, setEventos } = useAdmin();
 
-  const [activeTab, setActiveTab] = useState<TabModeracion>("PENDIENTES");
-  const [notificacion, setNotificacion] = useState<string | null>(null);
+  const [eventos, setEventos] = useState<EventoAdmin[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
 
   const [filtroProductor, setFiltroProductor] = useState<string>("ALL");
   const [filtroEstado, setFiltroEstado] = useState<string>("ALL");
   const [busquedaTexto, setBusquedaTexto] = useState<string>("");
 
-  const [selectedEvento, setSelectedEvento] = useState<any | null>(null);
+  const [selectedEvento, setSelectedEvento] = useState<EventoAdmin | null>(
+    null,
+  );
+  const [seleccionados, setSeleccionados] = useState<string[]>([]);
 
-  const [seleccionados, setSeleccionados] = useState<number[]>([]);
+  const fetchEventosAdmin = async () => {
+    try {
+      setLoading(true);
 
-  const triggerNotificacion = (mensaje: string) => {
-    setNotificacion(mensaje);
-    setTimeout(() => setNotificacion(null), 3500);
-  };
+      // Trae TODOS los eventos (ya no hay "pendientes" en el flujo normal,
+      // los eventos se publican solos y el admin solo puede bajarlos después)
+      const data = await api.get<any[]>("/events/admin/all");
 
-  const resolverModeracion = (
-    id: number,
-    titulo: string,
-    nuevoEstado: "APROBADO" | "RECHAZADO",
-  ) => {
-    setEventos(
-      eventos.map((ev) => (ev.id === id ? { ...ev, estado: nuevoEstado } : ev)),
-    );
-    triggerNotificacion(
-      `EVENTO ${nuevoEstado} EXITOSAMENTE: "${titulo.toUpperCase()}"`,
-    );
+      const mapeados: EventoAdmin[] = (Array.isArray(data) ? data : []).map(
+        (ev: any) => {
+          const estadoFormateado: EventoEstado =
+            ev.status === "REJECTED" ? "RECHAZADO" : "APROBADO";
 
-    if (selectedEvento && selectedEvento.id === id) {
-      setSelectedEvento((prev: any) => ({ ...prev, estado: nuevoEstado }));
+          const primerTicketType = ev.ticketTypes?.[0];
+
+          return {
+            id: ev.id,
+            titulo: ev.title || "Sin Título",
+            productor:
+              ev.producer?.companyName || ev.producer?.name || "Productor",
+            categoria: ev.category?.name || "General",
+            ubicacion: ev.venue?.name || ev.venue?.address || "No especificada",
+            aforo: Number(ev.venue?.capacity || 0),
+            precioBase: Number(primerTicketType?.price || 0),
+            estado: estadoFormateado,
+            createdAt: ev.createdAt,
+          };
+        },
+      );
+
+      setEventos(mapeados);
+    } catch (error) {
+      console.error(error);
+      toast.error("No se pudo cargar el catálogo de eventos");
+    } finally {
+      setLoading(false);
     }
-
-    setSeleccionados((prev) => prev.filter((item) => item !== id));
   };
 
-  const resolverModeracionEnLote = (nuevoEstado: "APROBADO" | "RECHAZADO") => {
-    if (seleccionados.length === 0) return;
+  useEffect(() => {
+    fetchEventosAdmin();
+  }, []);
 
-    setEventos(
-      eventos.map((ev) =>
-        seleccionados.includes(ev.id) ? { ...ev, estado: nuevoEstado } : ev,
-      ),
-    );
+  const eventosFiltrados = useMemo(() => {
+    return eventos
+      .filter((ev) => {
+        const cumpleProductor =
+          filtroProductor === "ALL" || ev.productor === filtroProductor;
+        const cumpleEstado =
+          filtroEstado === "ALL" || ev.estado === filtroEstado;
+        const cumpleTexto =
+          ev.titulo.toLowerCase().includes(busquedaTexto.toLowerCase()) ||
+          ev.ubicacion.toLowerCase().includes(busquedaTexto.toLowerCase());
 
-    triggerNotificacion(
-      `SE PROCESARON ${seleccionados.length} EVENTOS EN LOTE COMO: ${nuevoEstado}`,
-    );
-    setSeleccionados([]);
-  };
-
-  const toggleSeleccion = (id: number) => {
-    setSeleccionados((prev) =>
-      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id],
-    );
-  };
-
-  const listaProductores = useMemo(() => {
-    const productores = eventos.map((ev) => ev.productor);
-    return ["ALL", ...Array.from(new Set(productores))];
-  }, [eventos]);
-
-  const conteoPendientes = useMemo(() => {
-    return eventos.filter((e) => e.estado === "PENDIENTE").length;
-  }, [eventos]);
-
-  const eventosCatalogados = useMemo(() => {
-    return eventos.filter((ev) => {
-      if (ev.estado === "PENDIENTE") return false;
-
-      const cumpleProductor =
-        filtroProductor === "ALL" || ev.productor === filtroProductor;
-      const cumpleEstado = filtroEstado === "ALL" || ev.estado === filtroEstado;
-      const cumpleTexto =
-        ev.titulo.toLowerCase().includes(busquedaTexto.toLowerCase()) ||
-        ev.ubicacion.toLowerCase().includes(busquedaTexto.toLowerCase());
-
-      return cumpleProductor && cumpleEstado && cumpleTexto;
-    });
+        return cumpleProductor && cumpleEstado && cumpleTexto;
+      })
+      .sort(
+        (a, b) =>
+          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+      );
   }, [eventos, filtroProductor, filtroEstado, busquedaTexto]);
 
   const metricas = useMemo(() => {
     const activos = eventos.filter((e) => e.estado === "APROBADO");
+    const rechazados = eventos.filter((e) => e.estado === "RECHAZADO");
     return {
-      totalShows: activos.length,
+      totalActivos: activos.length,
+      totalRechazados: rechazados.length,
       aforoAcumulado: activos.reduce((acc, ev) => acc + ev.aforo, 0),
       cajaPotencial: activos.reduce(
         (acc, ev) => acc + ev.precioBase * ev.aforo,
@@ -115,583 +123,552 @@ export default function AdminModeracion() {
     };
   }, [eventos]);
 
-  const esTodoSeleccionado =
-    eventosCatalogados.length > 0 &&
-    eventosCatalogados.every((ev) => seleccionados.includes(ev.id));
-  const toggleSeleccionarTodoCatalogo = () => {
+  const listaProductores = useMemo(() => {
+    const productores = eventos.map((ev) => ev.productor);
+    return ["ALL", ...Array.from(new Set(productores))];
+  }, [eventos]);
+
+  const toggleSeleccion = (id: string) => {
+    setSeleccionados((prev) =>
+      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id],
+    );
+  };
+
+  const esTodoSeleccionado = useMemo(() => {
+    if (eventosFiltrados.length === 0) return false;
+    return eventosFiltrados.every((ev) => seleccionados.includes(ev.id));
+  }, [eventosFiltrados, seleccionados]);
+
+  const toggleSeleccionarTodo = () => {
     if (esTodoSeleccionado) {
       setSeleccionados((prev) =>
-        prev.filter((id) => !eventosCatalogados.some((ev) => ev.id === id)),
+        prev.filter((id) => !eventosFiltrados.some((ev) => ev.id === id)),
       );
     } else {
-      const idsCatalogados = eventosCatalogados.map((ev) => ev.id);
+      const idsObjetivo = eventosFiltrados.map((ev) => ev.id);
       setSeleccionados((prev) =>
-        Array.from(new Set([...prev, ...idsCatalogados])),
+        Array.from(new Set([...prev, ...idsObjetivo])),
       );
     }
   };
 
-  return (
-    <div className="min-h-screen bg-color-bg text-color-text font-mono p-4 md:p-8 max-w-7xl mx-auto space-y-8 selection:bg-color-accent selection:text-color-background relative overflow-x-hidden pb-24">
-      {notificacion && (
-        <div className="fixed bottom-6 right-6 z-50 bg-color-text text-color-background border-4 border-color-border px-4 py-3 text-xs font-black uppercase shadow-[4px_4px_0px_0px_var(--border)] animate-fade-in-up">
-          ⚡ {notificacion}
-        </div>
-      )}
+  const cambiarEstadoEvento = async (
+    id: string,
+    titulo: string,
+    nuevoEstado: EventoEstado,
+  ) => {
+    const statusBack = nuevoEstado === "APROBADO" ? "APPROVED" : "REJECTED";
 
-      <div className="border-b-4 border-color-border pb-4 flex flex-col sm:flex-row justify-between items-start sm:items-end gap-2">
+    try {
+      await api.patch(`/events/${id}/status`, { status: statusBack });
+
+      setEventos((prev) =>
+        prev.map((ev) => (ev.id === id ? { ...ev, estado: nuevoEstado } : ev)),
+      );
+
+      if (nuevoEstado === "RECHAZADO") {
+        toast.error(`Bajado de cartelera: "${titulo}"`);
+      } else {
+        toast.success(`Reactivado: "${titulo}"`);
+      }
+
+      if (selectedEvento && selectedEvento.id === id) {
+        setSelectedEvento((prev) =>
+          prev ? { ...prev, estado: nuevoEstado } : null,
+        );
+      }
+      setSeleccionados((prev) => prev.filter((item) => item !== id));
+    } catch (error) {
+      console.error(error);
+      toast.error("Falló la operación en el servidor");
+    }
+  };
+
+  const cambiarEstadoEnLote = async (nuevoEstado: EventoEstado) => {
+    if (seleccionados.length === 0) return;
+
+    const statusBack = nuevoEstado === "APROBADO" ? "APPROVED" : "REJECTED";
+    const idsExitosos: string[] = [];
+    const idsFallidos: string[] = [];
+
+    // Secuencial, no Promise.all: evita el 429 (Too Many Requests) si hay
+    // varios eventos seleccionados a la vez.
+    for (const id of seleccionados) {
+      try {
+        await api.patch(`/events/${id}/status`, { status: statusBack });
+        idsExitosos.push(id);
+      } catch (err) {
+        console.error(`Falló el evento ${id}:`, err);
+        idsFallidos.push(id);
+      }
+    }
+
+    if (idsExitosos.length > 0) {
+      setEventos((prev) =>
+        prev.map((ev) =>
+          idsExitosos.includes(ev.id) ? { ...ev, estado: nuevoEstado } : ev,
+        ),
+      );
+    }
+
+    if (idsFallidos.length === 0) {
+      toast.success(
+        `${idsExitosos.length} evento(s) actualizados a ${nuevoEstado}`,
+      );
+    } else {
+      toast.warning(
+        `${idsExitosos.length} OK, ${idsFallidos.length} fallaron. Reintentá los restantes.`,
+      );
+    }
+
+    setSeleccionados(idsFallidos);
+  };
+
+  return (
+    <div className="min-h-screen bg-bg text-text font-mono p-4 md:p-8 max-w-7xl mx-auto space-y-8 relative overflow-x-hidden pb-24">
+      <Toaster
+        position="bottom-right"
+        toastOptions={{
+          style: {
+            background: "var(--color-text)",
+            color: "var(--color-background)",
+            border: "3px solid var(--color-border)",
+            borderRadius: 0,
+            boxShadow: "4px 4px 0px 0px var(--color-border)",
+            fontFamily: "var(--font-sans)",
+            fontWeight: 700,
+            fontSize: "0.8rem",
+          },
+        }}
+      />
+
+      <div className="border-b-4 border-border pb-4 flex flex-col sm:flex-row justify-between items-start sm:items-end gap-2">
         <div>
           <button
             onClick={() => router.push("/dashboard-admin")}
-            className="text-xs font-black uppercase text-color-text-soft hover:text-color-text mb-2 block transition-colors cursor-pointer"
+            className="text-sm font-black uppercase text-text-soft hover:text-text mb-2 block transition-colors cursor-pointer"
           >
-            ← Volver a Consola
+            &larr; Volver a Consola
           </button>
-          <h1 className="text-2xl md:text-3xl text-color-text">
-            Moderación de Eventos
+          <h1 className="text-2xl md:text-3xl text-text">
+            Catálogo de Eventos
           </h1>
-          <p className="text-color-text-soft text-xs uppercase font-bold tracking-wide mt-1">
-            Curaduría del catálogo público, control de aforo y estados de
-            publicación
+          <p className="text-text-soft text-sm uppercase font-bold tracking-wide mt-1 flex items-center gap-1.5">
+            <Sparkles size={13} className="text-primary" />
+            Publicación automática activa — vigilá y dá de baja lo que no
+            corresponda
           </p>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div className="border-4 border-color-border bg-color-surface-2 p-4 shadow-[4px_4px_0px_0px_var(--border)]">
-          <span className="text-[10px] text-color-text-soft uppercase font-black block tracking-wider">
-            Total Catálogo Activo
-          </span>
-          <span className="text-xl md:text-2xl font-black text-color-text">
-            {metricas.totalShows} Shows
-          </span>
+      {loading ? (
+        <div className="border-4 border-border bg-surface p-12 text-center text-xs font-black uppercase tracking-widest animate-pulse">
+          ⏳ Sincronizando con Servidor Central...
         </div>
-        <div className="border-4 border-color-border bg-color-surface-2 p-4 shadow-[4px_4px_0px_0px_var(--border)]">
-          <span className="text-[10px] text-color-text-soft uppercase font-black block tracking-wider">
-            Aforo Total Custodiado
-          </span>
-          <span className="text-xl md:text-2xl font-black text-color-primary dark:text-color-text">
-            {metricas.aforoAcumulado.toLocaleString()} Pax
-          </span>
-        </div>
-        <div className="border-4 border-color-border bg-color-surface-2 p-4 shadow-[4px_4px_0px_0px_var(--border)]">
-          <span className="text-[10px] text-color-text-soft uppercase font-black block tracking-wider">
-            Volumen de Caja Potencial
-          </span>
-          <span className="text-xl md:text-2xl font-black text-color-success">
-            ${metricas.cajaPotencial.toLocaleString()}
-          </span>
-        </div>
-      </div>
-
-      <div className="flex border-4 border-color-border bg-color-surface-2 p-1 max-w-md shadow-[4px_4px_0px_0px_var(--border)]">
-        <button
-          onClick={() => {
-            setActiveTab("PENDIENTES");
-            setSeleccionados([]);
-          }}
-          className={`flex-1 py-2 text-center text-xs font-black uppercase tracking-wider cursor-pointer transition-all ${
-            activeTab === "PENDIENTES"
-              ? "bg-color-primary text-color-bg dark:text-color-background shadow-[2px_2px_0px_0px_var(--border)] border-2 border-color-border"
-              : "text-color-text-soft hover:text-color-text font-bold"
-          }`}
-        >
-          📥 Por Autorizar ({conteoPendientes})
-        </button>
-        <button
-          onClick={() => {
-            setActiveTab("CATALOGO");
-            setSeleccionados([]);
-          }}
-          className={`flex-1 py-2 text-center text-xs font-black uppercase tracking-wider cursor-pointer transition-all ${
-            activeTab === "CATALOGO"
-              ? "bg-color-primary text-color-bg dark:text-color-background shadow-[2px_2px_0px_0px_var(--border)] border-2 border-color-border"
-              : "text-color-text-soft hover:text-color-text font-bold"
-          }`}
-        >
-          🗂️ Catálogo Activo
-        </button>
-      </div>
-
-      <div
-        className="bg-color-surface border-4 border-color-border p-6 shadow-[4px_4px_0px_0px_var(--border)] space-y-4"
-        data-show={activeTab === "PENDIENTES"}
-      >
-        <div className="border-b-2 border-color-border pb-3 flex justify-between items-center">
-          <h2 className="text-sm font-black uppercase tracking-wider text-color-text">
-            Solicitudes de Publicación Recientes
-          </h2>
-          {eventos.filter((ev) => ev.estado === "PENDIENTE").length > 0 && (
-            <button
-              onClick={() => {
-                const pendientesIds = eventos
-                  .filter((ev) => ev.estado === "PENDIENTE")
-                  .map((ev) => ev.id);
-                setSeleccionados(
-                  seleccionados.length === pendientesIds.length
-                    ? []
-                    : pendientesIds,
-                );
-              }}
-              className="text-[10px] font-black uppercase border-2 border-color-border bg-color-surface-2 px-2 py-1 shadow-[2px_2px_0px_0px_var(--border)] cursor-pointer"
-            >
-              {seleccionados.length ===
-              eventos.filter((ev) => ev.estado === "PENDIENTE").length
-                ? "Desmarcar Todos"
-                : "Marcar Todos"}
-            </button>
-          )}
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {eventos.filter((ev) => ev.estado === "PENDIENTE").length > 0 ? (
-            eventos
-              .filter((ev) => ev.estado === "PENDIENTE")
-              .map((ev) => {
-                const isSelected = seleccionados.includes(ev.id);
-                return (
-                  <div
-                    key={ev.id}
-                    className={`border-4 border-color-border p-5 bg-color-bg shadow-[4px_4px_0px_0px_var(--border)] flex flex-col justify-between space-y-4 relative transition-all ${isSelected ? "translate-x-1 translate-y-1 shadow-[2px_2px_0px_0px_var(--border)] border-color-primary" : ""}`}
-                  >
-                    <button
-                      onClick={() => toggleSeleccion(ev.id)}
-                      className="absolute top-4 right-4 text-color-text hover:text-color-primary transition-colors cursor-pointer"
-                    >
-                      {isSelected ? (
-                        <CheckSquare size={18} className="text-color-primary" />
-                      ) : (
-                        <Square size={18} />
-                      )}
-                    </button>
-
-                    <div className="space-y-2 pr-6">
-                      <div className="flex items-center gap-2">
-                        <span className="text-[9px] bg-color-surface-2 text-color-text font-black px-2 py-0.5 border border-color-border uppercase">
-                          {ev.categoria}
-                        </span>
-                        {ev.aforo >= 5000 && (
-                          <span className="bg-color-accent text-color-background font-black text-[8px] px-1.5 py-0.5 border border-color-border animate-pulse">
-                            🚨 MASIVO
-                          </span>
-                        )}
-                      </div>
-                      <h3 className="font-black text-base uppercase tracking-tight text-color-text line-clamp-2">
-                        {ev.titulo}
-                      </h3>
-                      <p className="text-[10px] text-color-text-soft font-bold">
-                        Productor:{" "}
-                        <span className="text-color-text underline">
-                          {ev.productor}
-                        </span>
-                      </p>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-2 text-[10px] font-bold text-color-text-soft uppercase">
-                      <div className="bg-color-surface-2 p-2 border border-color-border/10">
-                        📍 Lugar:{" "}
-                        <span className="text-color-text font-black block truncate">
-                          {ev.ubicacion}
-                        </span>
-                      </div>
-                      <div className="bg-color-surface-2 p-2 border border-color-border/10">
-                        💰 Valor Base:{" "}
-                        <span className="text-color-success font-black block">
-                          ${ev.precioBase.toLocaleString()}
-                        </span>
-                      </div>
-                    </div>
-
-                    <div className="flex gap-2 pt-2 border-t border-color-border/10">
-                      <button
-                        onClick={() =>
-                          resolverModeracion(ev.id, ev.titulo, "RECHAZADO")
-                        }
-                        className="flex-1 py-1.5 border-2 border-color-border text-[10px] font-black text-color-accent bg-color-surface hover:bg-color-accent hover:text-color-background active:translate-x-px active:translate-y-px active:shadow-none transition-all cursor-pointer uppercase shadow-[2px_2px_0px_0px_var(--border)]"
-                      >
-                        ✕ Rechazar
-                      </button>
-                      <button
-                        onClick={() =>
-                          resolverModeracion(ev.id, ev.titulo, "APROBADO")
-                        }
-                        className="flex-1 py-1.5 border-2 border-color-border text-[10px] font-black bg-color-text text-color-bg dark:text-color-background hover:bg-color-primary hover:text-color-bg active:translate-x-px active:translate-y-px active:shadow-none transition-all cursor-pointer uppercase shadow-[2px_2px_0px_0px_var(--border)]"
-                      >
-                        ✓ Autorizar
-                      </button>
-                    </div>
-                  </div>
-                );
-              })
-          ) : (
-            <div className="col-span-full text-center py-12 text-color-text-soft text-xs font-black uppercase">
-              🎉 No hay eventos pendientes de moderación en este momento.
+      ) : (
+        <>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+            <div className="border-4 border-border bg-surface-2 p-4 shadow-[4px_4px_0px_0px_var(--border)]">
+              <span className="text-[10px] text-text-soft uppercase font-black block tracking-wider">
+                Activos
+              </span>
+              <span className="text-xl md:text-2xl font-black text-success">
+                {metricas.totalActivos}
+              </span>
             </div>
-          )}
-        </div>
-      </div>
-
-      <div
-        className="bg-color-surface border-4 border-color-border p-6 shadow-[4px_4px_0px_0px_var(--border)] space-y-6"
-        data-show={activeTab === "CATALOGO"}
-      >
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 bg-color-surface-2 p-3 border-2 border-color-border shadow-[2px_2px_0px_0px_var(--border)]">
-          <div className="flex items-center bg-color-surface border-2 border-color-border px-2 py-1.5 text-xs gap-2">
-            <Search size={14} className="text-color-text-soft" />
-            <input
-              type="text"
-              placeholder="Buscar evento o lugar..."
-              value={busquedaTexto}
-              onChange={(e) => setBusquedaTexto(e.target.value)}
-              className="bg-transparent font-bold focus:outline-none w-full text-color-text placeholder:text-color-text-soft/40"
-            />
-          </div>
-
-          <div className="flex items-center bg-color-surface border-2 border-color-border px-2 py-1 text-xs gap-1">
-            <SlidersHorizontal size={14} className="text-color-text-soft" />
-            <select
-              value={filtroProductor}
-              onChange={(e) => setFiltroProductor(e.target.value)}
-              className="bg-transparent font-bold focus:outline-none w-full text-color-text cursor-pointer"
-            >
-              <option value="ALL" className="bg-color-surface">
-                Todos los Productores
-              </option>
-              {listaProductores
-                .filter((p) => p !== "ALL")
-                .map((prod) => (
-                  <option key={prod} value={prod} className="bg-color-surface">
-                    {prod}
-                  </option>
-                ))}
-            </select>
-          </div>
-
-          <div className="flex items-center bg-color-surface border-2 border-color-border px-2 py-1 text-xs gap-1">
-            <span className="font-black text-color-text-soft">⚡</span>
-            <select
-              value={filtroEstado}
-              onChange={(e) => setFiltroEstado(e.target.value)}
-              className="bg-transparent font-bold focus:outline-none w-full text-color-text cursor-pointer"
-            >
-              <option value="ALL" className="bg-color-surface">
-                Cualquier Estado
-              </option>
-              <option value="APROBADO" className="bg-color-surface">
-                Aprobados
-              </option>
-              <option value="RECHAZADO" className="bg-color-surface">
+            <div className="border-4 border-border bg-surface-2 p-4 shadow-[4px_4px_0px_0px_var(--border)]">
+              <span className="text-[10px] text-text-soft uppercase font-black block tracking-wider">
                 Rechazados
-              </option>
-            </select>
+              </span>
+              <span className="text-xl md:text-2xl font-black text-accent">
+                {metricas.totalRechazados}
+              </span>
+            </div>
+            <div className="border-4 border-border bg-surface-2 p-4 shadow-[4px_4px_0px_0px_var(--border)]">
+              <span className="text-[10px] text-text-soft uppercase font-black block tracking-wider">
+                Aforo Custodiado
+              </span>
+              <span className="text-xl md:text-2xl font-black text-primary">
+                {metricas.aforoAcumulado.toLocaleString()}
+              </span>
+            </div>
+            <div className="border-4 border-border bg-surface-2 p-4 shadow-[4px_4px_0px_0px_var(--border)]">
+              <span className="text-[10px] text-text-soft uppercase font-black block tracking-wider">
+                Caja Potencial
+              </span>
+              <span className="text-xl md:text-2xl font-black text-success">
+                ${metricas.cajaPotencial.toLocaleString()}
+              </span>
+            </div>
           </div>
-        </div>
 
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse text-xs min-w-160">
-            <thead>
-              <tr className="bg-color-text text-color-background font-black text-[10px] uppercase tracking-wider border-b-2 border-color-border">
-                <th className="p-3 w-10 text-center">
-                  <button
-                    onClick={toggleSeleccionarTodoCatalogo}
-                    className="cursor-pointer text-color-background hover:text-color-primary transition-colors"
-                  >
-                    {esTodoSeleccionado ? (
-                      <CheckSquare size={15} />
-                    ) : (
-                      <Square size={15} />
-                    )}
-                  </button>
-                </th>
-                <th className="p-3">Título / Productor</th>
-                <th className="p-3">Ubicación / Capacidad</th>
-                <th className="p-3 text-right">Precio</th>
-                <th className="p-3 text-center">Estado</th>
-                <th className="p-3 text-right">Acciones</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y-2 divide-color-border/10 bg-color-bg font-bold font-mono">
-              {eventosCatalogados.length > 0 ? (
-                eventosCatalogados.map((ev) => {
-                  const isAprobado = ev.estado === "APROBADO";
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 bg-surface-2 p-3 border-2 border-border shadow-[2px_2px_0px_0px_var(--border)]">
+            <div className="flex items-center bg-surface border-2 border-border px-3 py-2 text-sm gap-2">
+              <Search size={15} className="text-text-soft shrink-0" />
+              <input
+                type="text"
+                placeholder="Buscar evento o lugar..."
+                value={busquedaTexto}
+                onChange={(e) => setBusquedaTexto(e.target.value)}
+                className="bg-transparent font-bold focus:outline-none w-full text-text placeholder:text-text-soft/40"
+              />
+            </div>
+
+            <div className="flex items-center bg-surface border-2 border-border px-3 py-2 text-sm gap-2">
+              <SlidersHorizontal size={15} className="text-text-soft shrink-0" />
+              <select
+                value={filtroProductor}
+                onChange={(e) => setFiltroProductor(e.target.value)}
+                className="bg-surface text-text font-bold focus:outline-none w-full cursor-pointer"
+              >
+                <option value="ALL">Todos los Productores</option>
+                {listaProductores
+                  .filter((p) => p !== "ALL")
+                  .map((prod) => (
+                    <option key={prod} value={prod}>
+                      {prod}
+                    </option>
+                  ))}
+              </select>
+            </div>
+
+            <div className="flex items-center bg-surface border-2 border-border px-3 py-2 text-sm gap-2">
+              <span className="font-black text-text-soft shrink-0">⚡</span>
+              <select
+                value={filtroEstado}
+                onChange={(e) => setFiltroEstado(e.target.value)}
+                className="bg-surface text-text font-bold focus:outline-none w-full cursor-pointer"
+              >
+                <option value="ALL">Cualquier Estado</option>
+                <option value="APROBADO">Activos</option>
+                <option value="RECHAZADO">Rechazados</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="flex items-center justify-between border-b-2 border-border pb-2">
+            <button
+              onClick={toggleSeleccionarTodo}
+              className="flex items-center gap-2 text-xs font-black uppercase text-text-soft hover:text-text transition-colors cursor-pointer"
+            >
+              {esTodoSeleccionado ? (
+                <CheckSquare size={14} className="text-primary" />
+              ) : (
+                <Square size={14} />
+              )}
+              {esTodoSeleccionado ? "Desmarcar todos" : "Marcar todos"}
+            </button>
+            <span className="text-xs font-bold text-text-soft uppercase">
+              {eventosFiltrados.length} evento(s)
+            </span>
+          </div>
+
+          <motion.div
+            layout
+            className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5"
+          >
+            <AnimatePresence mode="popLayout">
+              {eventosFiltrados.length > 0 ? (
+                eventosFiltrados.map((ev, idx) => {
+                  const isActivo = ev.estado === "APROBADO";
                   const isChecked = seleccionados.includes(ev.id);
+
                   return (
-                    <tr
+                    <motion.div
                       key={ev.id}
-                      className={`hover:bg-color-surface-2/40 transition-colors ${!isAprobado ? "opacity-60 bg-color-surface-2/10" : ""} ${isChecked ? "bg-color-primary/5" : ""}`}
+                      layout
+                      initial={{ opacity: 0, y: 16 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, scale: 0.95 }}
+                      transition={{ delay: idx * 0.04, duration: 0.25 }}
+                      className={`border-4 border-border p-5 bg-surface shadow-[4px_4px_0px_0px_var(--border)] flex flex-col justify-between space-y-4 relative transition-shadow ${
+                        isChecked
+                          ? "ring-2 ring-primary ring-offset-2 ring-offset-bg"
+                          : ""
+                      } ${!isActivo ? "opacity-70" : ""}`}
                     >
-                      <td className="p-3 text-center">
-                        <button
-                          onClick={() => toggleSeleccion(ev.id)}
-                          className="cursor-pointer text-color-text hover:text-color-primary"
-                        >
-                          {isChecked ? (
-                            <CheckSquare
-                              size={14}
-                              className="text-color-primary"
-                            />
-                          ) : (
-                            <Square size={14} />
-                          )}
-                        </button>
-                      </td>
-                      <td className="p-3">
-                        <div className="flex items-center gap-2">
-                          <p className="font-black uppercase text-color-text text-xs">
-                            {ev.titulo}
-                          </p>
+                      <button
+                        onClick={() => toggleSeleccion(ev.id)}
+                        className="absolute top-4 right-4 text-text hover:text-primary transition-colors cursor-pointer z-10"
+                      >
+                        {isChecked ? (
+                          <CheckSquare size={18} className="text-primary" />
+                        ) : (
+                          <Square size={18} />
+                        )}
+                      </button>
+
+                      <div
+                        className="space-y-2 pr-6 cursor-pointer"
+                        onClick={() => setSelectedEvento(ev)}
+                      >
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-[10px] bg-surface-2 text-text font-black px-2 py-0.5 border border-border uppercase">
+                            {ev.categoria}
+                          </span>
+                          <span
+                            className={`text-[10px] font-black px-2 py-0.5 border-2 uppercase ${
+                              isActivo
+                                ? "bg-success/15 text-success border-success/50"
+                                : "bg-accent/15 text-accent border-accent/50"
+                            }`}
+                          >
+                            {ev.estado}
+                          </span>
                           {ev.aforo >= 5000 && (
-                            <span className="bg-color-accent text-color-background font-black text-[8px] px-1.5 py-0.5 border border-color-border animate-pulse">
+                            <span className="bg-accent text-background font-black text-[10px] px-1.5 py-0.5 border border-border">
                               🚨 MASIVO
                             </span>
                           )}
                         </div>
-                        <span className="text-[10px] text-color-text-soft lowercase font-bold">
-                          {ev.productor}
-                        </span>
-                      </td>
-                      <td className="p-3">
-                        <p className="text-color-text uppercase font-bold text-[10px] truncate max-w-48">
-                          {ev.ubicacion}
+                        <h3 className="font-black text-base uppercase tracking-tight text-text line-clamp-2">
+                          {ev.titulo}
+                        </h3>
+                        <p className="text-xs text-text-soft font-bold">
+                          Productor:{" "}
+                          <span className="text-text underline">
+                            {ev.productor}
+                          </span>
                         </p>
-                        <span className="text-[9px] text-color-text-soft">
-                          Aforo: {ev.aforo.toLocaleString()} personas
-                        </span>
-                      </td>
-                      <td className="p-3 text-right text-color-text font-black">
-                        ${ev.precioBase.toLocaleString()}
-                      </td>
-                      <td className="p-3 text-center">
-                        <span
-                          className={`px-2 py-0.5 text-[9px] font-black border uppercase inline-block ${
-                            isAprobado
-                              ? "bg-color-primary/10 text-color-primary border-color-primary/30 dark:text-color-text"
-                              : "bg-color-accent/10 text-color-accent border-color-accent/30 dark:text-color-text"
-                          }`}
-                        >
-                          {ev.estado}
-                        </span>
-                      </td>
-                      <td className="p-3 text-right">
-                        <div className="flex items-center justify-end gap-2">
-                          <button
-                            onClick={() => setSelectedEvento(ev)}
-                            className="p-1.5 border-2 border-color-border bg-color-surface hover:bg-color-surface-2 transition-all cursor-pointer shadow-[1px_1px_0px_0px_var(--border)] text-color-text"
-                            title="Ver Desglose"
-                          >
-                            <Eye size={13} />
-                          </button>
-                          <button
-                            onClick={() =>
-                              resolverModeracion(
-                                ev.id,
-                                ev.titulo,
-                                isAprobado ? "RECHAZADO" : "APROBADO",
-                              )
-                            }
-                            className={`px-2 py-1 border-2 border-color-border text-[9px] font-black uppercase shadow-[1px_1px_0px_0px_var(--border)] cursor-pointer transition-all ${
-                              isAprobado
-                                ? "bg-color-surface text-color-accent hover:bg-color-accent hover:text-color-background"
-                                : "bg-color-text text-color-background hover:bg-color-primary hover:text-color-background"
-                            }`}
-                          >
-                            {isAprobado ? "Bajar" : "Alta"}
-                          </button>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-2 text-xs font-bold text-text-soft uppercase">
+                        <div className="bg-surface-2 p-2 border border-border/10">
+                          <span className="flex items-center gap-1">
+                            <MapPin size={11} /> Lugar:
+                          </span>
+                          <span className="text-text font-black block truncate">
+                            {ev.ubicacion}
+                          </span>
                         </div>
-                      </td>
-                    </tr>
+                        <div className="bg-surface-2 p-2 border border-border/10">
+                          <span className="flex items-center gap-1">
+                            <Users size={11} /> Aforo:
+                          </span>
+                          <span className="text-success font-black block">
+                            {ev.aforo.toLocaleString()}
+                          </span>
+                        </div>
+                      </div>
+
+                      <button
+                        onClick={() =>
+                          cambiarEstadoEvento(
+                            ev.id,
+                            ev.titulo,
+                            isActivo ? "RECHAZADO" : "APROBADO",
+                          )
+                        }
+                        className={`w-full flex items-center justify-center gap-2 py-2 border-2 border-border text-xs font-black uppercase shadow-[2px_2px_0px_0px_var(--border)] cursor-pointer transition-all ${
+                          isActivo
+                            ? "bg-surface text-accent hover:bg-accent hover:text-background"
+                            : "bg-text text-background hover:bg-primary hover:text-background"
+                        }`}
+                      >
+                        {isActivo ? (
+                          <>
+                            <Ban size={13} /> Bajar de Cartelera
+                          </>
+                        ) : (
+                          <>
+                            <RotateCcw size={13} /> Reactivar
+                          </>
+                        )}
+                      </button>
+                    </motion.div>
                   );
                 })
               ) : (
-                <tr>
-                  <td
-                    colSpan={6}
-                    className="text-center py-10 text-color-text-soft text-[10px] uppercase font-black"
-                  >
-                    No se encontraron eventos cargados en este rango.
-                  </td>
-                </tr>
+                <div className="col-span-full text-center py-16 text-text-soft text-xs font-black uppercase border-4 border-dashed border-border/30">
+                  No se encontraron eventos con estos filtros.
+                </div>
               )}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      {seleccionados.length > 0 && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 bg-color-surface border-4 border-color-border p-4 shadow-[6px_6px_0px_0px_var(--border)] flex flex-col sm:flex-row items-center gap-4 animate-fade-in-up w-[90%] max-w-xl">
-          <div className="text-xs uppercase font-black text-center sm:text-left">
-            ⚡{" "}
-            <span className="text-color-primary">{seleccionados.length}</span>{" "}
-            {seleccionados.length === 1
-              ? "evento seleccionado"
-              : "eventos seleccionados"}
-          </div>
-          <div className="flex gap-2 w-full sm:w-auto sm:ml-auto">
-            <button
-              onClick={() => resolverModeracionEnLote("RECHAZADO")}
-              className="flex-1 sm:flex-none flex items-center justify-center gap-1 px-3 py-1.5 border-2 border-color-border text-[10px] font-black uppercase bg-color-surface text-color-accent hover:bg-color-accent hover:text-color-background transition-all cursor-pointer shadow-[2px_2px_0px_0px_var(--border)]"
-            >
-              <Trash2 size={12} /> Rechazar Lote
-            </button>
-            <button
-              onClick={() => resolverModeracionEnLote("APROBADO")}
-              className="flex-1 sm:flex-none flex items-center justify-center gap-1 px-3 py-1.5 border-2 border-color-border text-[10px] font-black uppercase bg-color-text text-color-bg dark:text-color-background hover:bg-color-primary hover:text-color-bg transition-all cursor-pointer shadow-[2px_2px_0px_0px_var(--border)]"
-            >
-              <ShieldCheck size={12} /> Autorizar Lote
-            </button>
-          </div>
-        </div>
-      )}
-
-      {selectedEvento && (
-        <>
-          <div
-            onClick={() => setSelectedEvento(null)}
-            className="fixed inset-0 bg-black/60 backdrop-blur-xs z-50 transition-opacity"
-          />
-          <div className="fixed top-0 right-0 h-full w-full sm:w-115 bg-color-surface border-l-4 border-color-border z-50 p-6 shadow-[-8px_0px_0px_0px_var(--border)] flex flex-col justify-between font-mono animate-slide-in-right">
-            <div className="space-y-4">
-              <div className="flex justify-between items-center border-b-2 border-color-border pb-3">
-                <span className="text-[10px] font-black uppercase bg-color-text text-color-background px-2 py-0.5 border border-color-border">
-                  Detalles del Catálogo
-                </span>
-                <button
-                  onClick={() => setSelectedEvento(null)}
-                  className="p-1 border-2 border-color-border bg-color-surface-2 hover:bg-color-accent hover:text-color-background transition-colors cursor-pointer"
-                >
-                  <X size={16} />
-                </button>
-              </div>
-
-              <div>
-                <div className="flex items-center gap-2">
-                  <span className="text-[9px] font-black text-color-primary uppercase tracking-wider">
-                    {selectedEvento.categoria}
-                  </span>
-                  {selectedEvento.aforo >= 5000 && (
-                    <span className="bg-color-accent text-color-background text-[8px] font-black px-1 border border-color-border">
-                      MASIVO
-                    </span>
-                  )}
-                </div>
-                <h3 className="font-black text-xl uppercase tracking-tight text-color-text mt-0.5">
-                  {selectedEvento.titulo}
-                </h3>
-                <p className="text-[10px] text-color-text-soft font-bold mt-1">
-                  ID de Control Técnico:{" "}
-                  <span className="text-color-text font-mono">
-                    #EV-00{selectedEvento.id}
-                  </span>
-                </p>
-              </div>
-
-              <div className="space-y-2 pt-2">
-                <div className="flex items-center gap-3 bg-color-bg p-2.5 border-2 border-color-border shadow-[2px_2px_0px_0px_var(--border)]">
-                  <MapPin size={16} className="text-color-primary shrink-0" />
-                  <div className="text-[11px] font-bold uppercase text-color-text truncate">
-                    <span className="text-color-text-soft block text-[9px]">
-                      Ubicación del Show:
-                    </span>
-                    {selectedEvento.ubicacion}
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-3 bg-color-bg p-2.5 border-2 border-color-border shadow-[2px_2px_0px_0px_var(--border)]">
-                  <Users size={16} className="text-color-accent shrink-0" />
-                  <div className="text-[11px] font-bold uppercase text-color-text">
-                    <span className="text-color-text-soft block text-[9px]">
-                      Capacidad de Público (Aforo):
-                    </span>
-                    {selectedEvento.aforo.toLocaleString()} Personas
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-3 bg-color-bg p-2.5 border-2 border-color-border shadow-[2px_2px_0px_0px_var(--border)]">
-                  <Calendar
-                    size={16}
-                    className="text-color-text-soft shrink-0"
-                  />
-                  <div className="text-[11px] font-bold uppercase text-color-text">
-                    <span className="text-color-text-soft block text-[9px]">
-                      Productor Responsable:
-                    </span>
-                    <span className="lowercase underline font-medium">
-                      {selectedEvento.productor}
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              <div className="bg-color-surface-2 border-2 border-color-border p-4 space-y-3 mt-4">
-                <h5 className="text-[10px] font-black uppercase tracking-wider border-b border-color-border/30 pb-1 text-color-text">
-                  📊 Taquilla Estimada
-                </h5>
-                <div className="space-y-1.5 text-xs font-bold">
-                  <div className="flex justify-between">
-                    <span className="text-color-text-soft">
-                      Precio Unitario Neto:
-                    </span>
-                    <span className="text-color-text">
-                      ${selectedEvento.precioBase.toLocaleString()}
-                    </span>
-                  </div>
-                  <div className="flex justify-between text-color-accent dark:text-color-text-soft">
-                    <span>Aforo Total Planificado:</span>
-                    <span>{selectedEvento.aforo.toLocaleString()} tickets</span>
-                  </div>
-                  <div className="border-t border-dashed border-color-border/40 pt-1.5 flex justify-between font-black text-color-primary dark:text-color-text uppercase">
-                    <span>Caja Bruta Máxima:</span>
-                    <span>
-                      $
-                      {(
-                        selectedEvento.precioBase * selectedEvento.aforo
-                      ).toLocaleString()}
-                    </span>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="border-t-2 border-color-border pt-4 mt-auto space-y-2">
-              <div className="flex justify-between items-center text-[10px] font-bold mb-2">
-                <span className="text-color-text-soft uppercase">
-                  Estado en cartelera:
-                </span>
-                <span
-                  className={`px-2 py-0.5 border font-black uppercase ${
-                    selectedEvento.estado === "APROBADO"
-                      ? "bg-color-primary/20 text-color-primary border-color-primary/30 dark:text-color-text"
-                      : "bg-color-accent text-color-background border-color-border"
-                  }`}
-                >
-                  {selectedEvento.estado}
-                </span>
-              </div>
-
-              <button
-                onClick={() =>
-                  resolverModeracion(
-                    selectedEvento.id,
-                    selectedEvento.titulo,
-                    selectedEvento.estado === "APROBADO"
-                      ? "RECHAZADO"
-                      : "APROBADO",
-                  )
-                }
-                className={`w-full py-2.5 border-2 border-color-border font-black text-xs uppercase tracking-wider transition-all cursor-pointer shadow-[3px_3px_0px_0px_var(--border)] active:translate-x-0.5 active:translate-y-0.5 active:shadow-none ${
-                  selectedEvento.estado === "APROBADO"
-                    ? "bg-color-surface text-color-accent hover:bg-color-accent hover:text-color-background"
-                    : "bg-color-text text-color-background hover:bg-color-primary hover:text-color-background"
-                }`}
-              >
-                {selectedEvento.estado === "APROBADO"
-                  ? "⚠️ Dar de Baja del Sistema"
-                  : "✓ Volver a Dar de Alta"}
-              </button>
-            </div>
-          </div>
+            </AnimatePresence>
+          </motion.div>
         </>
       )}
+
+      <AnimatePresence>
+        {seleccionados.length > 0 && (
+          <motion.div
+            initial={{ opacity: 0, y: 40 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 40 }}
+            className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 bg-surface border-4 border-border p-4 shadow-[6px_6px_0px_0px_var(--border)] flex flex-col sm:flex-row items-center gap-4 w-[90%] max-w-xl"
+          >
+            <div className="text-sm uppercase font-black text-center sm:text-left">
+              ⚡ <span className="text-primary">{seleccionados.length}</span>{" "}
+              {seleccionados.length === 1
+                ? "evento seleccionado"
+                : "eventos seleccionados"}
+            </div>
+            <div className="flex gap-2 w-full sm:w-auto sm:ml-auto">
+              <button
+                onClick={() => cambiarEstadoEnLote("RECHAZADO")}
+                className="flex-1 sm:flex-none flex items-center justify-center gap-1 px-3 py-1.5 border-2 border-border text-xs font-black uppercase bg-surface text-accent hover:bg-accent hover:text-background transition-all cursor-pointer shadow-[2px_2px_0px_0px_var(--border)]"
+              >
+                <Ban size={13} /> Bajar Lote
+              </button>
+              <button
+                onClick={() => cambiarEstadoEnLote("APROBADO")}
+                className="flex-1 sm:flex-none flex items-center justify-center gap-1 px-3 py-1.5 border-2 border-border text-xs font-black uppercase bg-text text-background hover:bg-primary hover:text-background transition-all cursor-pointer shadow-[2px_2px_0px_0px_var(--border)]"
+              >
+                <RotateCcw size={13} /> Reactivar Lote
+              </button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {selectedEvento && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setSelectedEvento(null)}
+              className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50"
+            />
+            <motion.div
+              initial={{ x: "100%" }}
+              animate={{ x: 0 }}
+              exit={{ x: "100%" }}
+              transition={{ type: "tween", duration: 0.25 }}
+              className="fixed top-0 right-0 h-full w-full sm:w-115 bg-surface border-l-4 border-border z-50 p-6 shadow-[-8px_0px_0px_0px_var(--border)] flex flex-col justify-between font-mono overflow-y-auto"
+            >
+              <div className="space-y-4">
+                <div className="flex justify-between items-center border-b-2 border-border pb-3">
+                  <span className="text-[10px] font-black uppercase bg-text text-background px-2 py-0.5 border border-border">
+                    Detalles del Catálogo
+                  </span>
+                  <button
+                    onClick={() => setSelectedEvento(null)}
+                    className="p-1 border-2 border-border bg-surface-2 hover:bg-accent hover:text-background transition-colors cursor-pointer"
+                  >
+                    <X size={16} />
+                  </button>
+                </div>
+
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] font-black text-primary uppercase tracking-wider">
+                      {selectedEvento.categoria}
+                    </span>
+                    {selectedEvento.aforo >= 5000 && (
+                      <span className="bg-accent text-background text-[8px] font-black px-1 border border-border">
+                        MASIVO
+                      </span>
+                    )}
+                  </div>
+                  <h3 className="font-black text-2xl uppercase tracking-tight text-text mt-1 leading-tight">
+                    {selectedEvento.titulo}
+                  </h3>
+                  <p className="text-xs text-text-soft font-bold mt-1.5">
+                    ID de Control Técnico:{" "}
+                    <span className="text-text font-mono">
+                      #{selectedEvento.id.slice(0, 8).toUpperCase()}
+                    </span>
+                  </p>
+                </div>
+
+                <div className="space-y-2 pt-2">
+                  <div className="flex items-center gap-3 bg-bg p-2.5 border-2 border-border shadow-[2px_2px_0px_0px_var(--border)]">
+                    <MapPin size={16} className="text-primary shrink-0" />
+                    <div className="text-xs font-bold uppercase text-text truncate">
+                      <span className="text-text-soft block text-[10px]">
+                        Ubicación del Show:
+                      </span>
+                      {selectedEvento.ubicacion}
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-3 bg-bg p-2.5 border-2 border-border shadow-[2px_2px_0px_0px_var(--border)]">
+                    <Users size={16} className="text-accent shrink-0" />
+                    <div className="text-xs font-bold uppercase text-text">
+                      <span className="text-text-soft block text-[10px]">
+                        Capacidad de Público (Aforo):
+                      </span>
+                      {selectedEvento.aforo.toLocaleString()} Personas
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-surface-2 border-2 border-border p-4 space-y-3 mt-4">
+                  <h5 className="text-xs font-black uppercase tracking-wider border-b border-border/30 pb-1 text-text">
+                    📊 Taquilla Estimada
+                  </h5>
+                  <div className="space-y-1.5 text-sm font-bold">
+                    <div className="flex justify-between">
+                      <span className="text-text-soft">
+                        Precio Unitario Neto:
+                      </span>
+                      <span className="text-text">
+                        ${selectedEvento.precioBase.toLocaleString()}
+                      </span>
+                    </div>
+                    <div className="flex justify-between text-text-soft">
+                      <span>Aforo Total Planificado:</span>
+                      <span>
+                        {selectedEvento.aforo.toLocaleString()} tickets
+                      </span>
+                    </div>
+                    <div className="border-t border-dashed border-border/40 pt-1.5 flex justify-between font-black text-primary uppercase">
+                      <span>Caja Bruta Máxima:</span>
+                      <span>
+                        $
+                        {(
+                          selectedEvento.precioBase * selectedEvento.aforo
+                        ).toLocaleString()}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="border-t-2 border-border pt-4 mt-auto space-y-2">
+                <div className="flex justify-between items-center text-xs font-bold mb-2">
+                  <span className="text-text-soft uppercase">
+                    Estado en cartelera:
+                  </span>
+                  <span
+                    className={`px-2 py-0.5 border-2 font-black uppercase ${
+                      selectedEvento.estado === "APROBADO"
+                        ? "bg-success/15 text-success border-success/50"
+                        : "bg-accent/15 text-accent border-accent/50"
+                    }`}
+                  >
+                    {selectedEvento.estado}
+                  </span>
+                </div>
+
+                <button
+                  onClick={() =>
+                    cambiarEstadoEvento(
+                      selectedEvento.id,
+                      selectedEvento.titulo,
+                      selectedEvento.estado === "APROBADO"
+                        ? "RECHAZADO"
+                        : "APROBADO",
+                    )
+                  }
+                  className="w-full flex items-center justify-center gap-2 py-2.5 border-2 border-border font-black text-xs uppercase bg-text text-background hover:bg-primary hover:text-background transition-all cursor-pointer"
+                >
+                  {selectedEvento.estado === "APROBADO" ? (
+                    <>
+                      <Ban size={14} /> Bajar de Cartelera
+                    </>
+                  ) : (
+                    <>
+                      <RotateCcw size={14} /> Reactivar
+                    </>
+                  )}
+                </button>
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

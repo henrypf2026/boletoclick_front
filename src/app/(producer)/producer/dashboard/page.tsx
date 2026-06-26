@@ -52,18 +52,11 @@ export default function DashboardProducer() {
   const [loading, setLoading] = useState<boolean>(true);
   const [errorApi, setErrorApi] = useState<string | null>(null);
 
-  const [eventoSeleccionado, setEventoSeleccionado] = useState<Evento | null>(
-    null,
-  );
-  const [seccionActiva, setSeccionActiva] = useState<"ajustes" | "stats" | "scanner">(
-    "ajustes",
-  );
+  const [eventoSeleccionado, setEventoSeleccionado] = useState<Evento | null>(null);
+  const [seccionActiva, setSeccionActiva] = useState<"ajustes" | "stats" | "scanner">("ajustes");
   const [eventStats, setEventStats] = useState<EventStats | null>(null);
   const [loadingStats, setLoadingStats] = useState(false);
-  const [statusScanner, setStatusScanner] = useState<
-    "idle" | "success" | "error"
-  >("idle");
-
+  const [statusScanner, setStatusScanner] = useState<"idle" | "success" | "error">("idle");
   const [ultimosAccesos, setUltimosAccesos] = useState<Acceso[]>([]);
 
   const [formTitle, setFormTitle] = useState("");
@@ -88,8 +81,8 @@ export default function DashboardProducer() {
           credentials: "include",
         });
         if (!response.ok) throw new Error(`Error al obtener eventos: ${response.status}`);
-       const data = await response.json();
-       setEventos(data.filter((ev: Evento) => ev.status !== "INACTIVE"));
+        const data = await response.json();
+        setEventos(data.filter((ev: Evento) => ev.status !== "INACTIVE"));
         setErrorApi(null);
       } catch (err: any) {
         console.error("🚨 Error capturado en Dashboard:", err.message);
@@ -125,18 +118,15 @@ export default function DashboardProducer() {
 
     setFormTitle(ev.title);
     setFormDescription(ev.description || "");
-    setFormDate(ev.eventDate ? ev.eventDate.split("T")[0] : "");
 
     const date = new Date(ev.eventDate);
+    setFormDate(ev.eventDate ? ev.eventDate.split("T")[0] : "");
+    setFormTime(
+      ev.eventDate
+        ? `${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`
+        : ""
+    );
 
-        setFormDate(ev.eventDate ? ev.eventDate.split("T")[0] : "");
-
-        setFormTime(
-          ev.eventDate
-            ? `${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`
-            : ""
-        );
-    
     setFormLocation(ev.venueId || "");
     setFormCategory(ev.categoryId || "");
     setFormTicketTypes(ev.ticketTypes ? ev.ticketTypes.map((t) => ({ ...t })) : []);
@@ -197,7 +187,6 @@ export default function DashboardProducer() {
     }
 
     setLoadingAccion(true);
-
     try {
       const payloadDto = {
         title: formTitle,
@@ -223,7 +212,6 @@ export default function DashboardProducer() {
       });
 
       if (!response.ok) throw new Error(`Error del servidor al actualizar: ${response.status}`);
-
       const eventoActualizadoServidor = await response.json();
 
       setEventos(eventos.map((ev) =>
@@ -246,10 +234,90 @@ export default function DashboardProducer() {
         },
       });
     } catch (error: any) {
-      console.error("🚨 Error al guardar cambios en DB:", error);
       Swal.fire({
         title: "ERROR",
         text: error.message || "No se pudieron guardar los cambios en el servidor.",
+        icon: "error",
+        confirmButtonText: "OK",
+        confirmButtonColor: "#6750e0",
+        background: "#f5f4f0",
+        color: "#171717",
+        customClass: {
+          popup: "border-4 border-[#171717] rounded-none shadow-[6px_6px_0px_0px_#171717] font-mono",
+          title: "uppercase font-black tracking-tighter",
+          confirmButton: "font-mono font-black uppercase tracking-wider border-2 border-[#171717] rounded-none",
+        },
+      });
+    } finally {
+      setLoadingAccion(false);
+    }
+  };
+///Funcion para cambiar el estado del evento de DRAFT y ACTIVE
+  const cambiarStatus = async () => {
+    if (!eventoSeleccionado) return;
+
+    const esBorrador = eventoSeleccionado.status === "DRAFT";
+    const nuevoStatus = esBorrador ? "ACTIVE" : "DRAFT";
+
+    const { isConfirmed } = await Swal.fire({
+      title: esBorrador ? "¿PONER AL AIRE?" : "¿VOLVER A BORRADOR?",
+      text: esBorrador
+        ? `"${eventoSeleccionado.title}" será visible para el público y aceptará ventas.`
+        : `"${eventoSeleccionado.title}" dejará de ser visible para el público.`,
+      icon: "question",
+      showCancelButton: true,
+      confirmButtonText: esBorrador ? " SÍ, PUBLICAR" : " NO PUBLICAR",
+      cancelButtonText: "CANCELAR",
+      confirmButtonColor: esBorrador ? "#22c55e" : "#eab308",
+      cancelButtonColor: "#6750e0",
+      background: "#f5f4f0",
+      color: "#171717",
+      customClass: {
+        popup: "border-4 border-[#171717] rounded-none shadow-[6px_6px_0px_0px_#171717] font-mono",
+        title: "uppercase font-black tracking-tighter",
+        confirmButton: "font-mono font-black uppercase tracking-wider border-2 border-[#171717] rounded-none",
+        cancelButton: "font-mono font-black uppercase tracking-wider border-2 border-[#171717] rounded-none",
+      },
+    });
+
+    if (!isConfirmed) return;
+
+    setLoadingAccion(true);
+    try {
+      const response = await fetch(`/api/backend/events/${eventoSeleccionado.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ status: nuevoStatus }),
+      });
+
+      if (!response.ok) throw new Error(`Error del servidor: ${response.status}`);
+
+      setEventos(eventos.map((ev) =>
+        ev.id === eventoSeleccionado.id ? { ...ev, status: nuevoStatus } : ev
+      ));
+      setEventoSeleccionado({ ...eventoSeleccionado, status: nuevoStatus });
+
+      Swal.fire({
+        title: esBorrador ? "¡AL AIRE! 📡" : "VUELTO A BORRADOR 📝",
+        text: esBorrador
+          ? "El evento ya es visible para el público."
+          : "El evento ya NO esta disponible para el público .",
+        icon: "success",
+        confirmButtonText: "OK",
+        confirmButtonColor: "#6750e0",
+        background: "#f5f4f0",
+        color: "#171717",
+        customClass: {
+          popup: "border-4 border-[#171717] rounded-none shadow-[6px_6px_0px_0px_#171717] font-mono",
+          title: "uppercase font-black tracking-tighter",
+          confirmButton: "font-mono font-black uppercase tracking-wider border-2 border-[#171717] rounded-none",
+        },
+      });
+    } catch (error: any) {
+      Swal.fire({
+        title: "ERROR",
+        text: error.message || "No se pudo cambiar el estado del evento.",
         icon: "error",
         confirmButtonText: "OK",
         confirmButtonColor: "#6750e0",
@@ -321,7 +389,6 @@ export default function DashboardProducer() {
         throw new Error(`Error del servidor: ${response.status}`);
       }
 
-      // Solo si el backend confirmó OK, sacamos el evento de la lista
       setEventos((prev) => prev.filter((ev) => ev.id !== idABorrar));
       setEventoSeleccionado(null);
 
@@ -340,7 +407,6 @@ export default function DashboardProducer() {
         },
       });
     } catch (error: any) {
-      console.error("🚨 Error en la petición de borrado:", error);
       Swal.fire({
         title: "ERROR",
         text: error.message || "No se pudo completar la baja.",
@@ -359,8 +425,6 @@ export default function DashboardProducer() {
       setLoadingAccion(false);
     }
   };
-
-  
 
   const capacidadTotalPantalla = useMemo(() => {
     return formTicketTypes.reduce((acc, curr) => acc + (Number(curr.stock) || 0), 0);
@@ -404,6 +468,7 @@ export default function DashboardProducer() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+        {/* Lista de eventos */}
         <div className="lg:col-span-4 space-y-4">
           <h2 className="text-xl uppercase font-black tracking-tight border-b-2 border-text pb-2">
             Mis Shows ({eventos.length})
@@ -441,12 +506,14 @@ export default function DashboardProducer() {
                       <div>
                         <span
                           className={`font-mono text-[10px] font-black px-1.5 py-0.5 border uppercase ${
-                            esEste
-                              ? "bg-surface text-text border-surface"
+                            ev.status === "ACTIVE"
+                              ? "bg-green-400/20 text-green-700 border-green-500"
+                              : ev.status === "DRAFT"
+                              ? "bg-yellow-400/20 text-yellow-700 border-yellow-500"
                               : "bg-success/10 text-success border-success/30"
                           }`}
                         >
-                          {ev.status}
+                          {ev.status === "ACTIVE" ? "📡 AL AIRE" : ev.status === "DRAFT" ? "📝 BORRADOR" : ev.status}
                         </span>
                         <h3 className="uppercase font-black text-sm mt-1.5 line-clamp-2">
                           {ev.title}
@@ -465,6 +532,7 @@ export default function DashboardProducer() {
           </div>
         </div>
 
+        {/* Panel derecho */}
         <div className="lg:col-span-8 space-y-6">
           <div className="flex gap-2">
             <button
@@ -474,8 +542,8 @@ export default function DashboardProducer() {
                 !eventoSeleccionado
                   ? "opacity-30"
                   : seccionActiva === "ajustes"
-                    ? "bg-text text-surface"
-                    : "bg-surface"
+                  ? "bg-text text-surface"
+                  : "bg-surface"
               }`}
             >
               🛠️ Ajustes Avanzados
@@ -487,13 +555,12 @@ export default function DashboardProducer() {
                 !eventoSeleccionado
                   ? "opacity-30"
                   : seccionActiva === "stats"
-                    ? "bg-text text-surface"
-                    : "bg-surface"
+                  ? "bg-text text-surface"
+                  : "bg-surface"
               }`}
             >
               📊 Estadísticas
             </button>
-
             <button
               onClick={() => router.push("/producer/scanner")}
               className="px-4 py-2 bg-surface text-text font-mono text-xs font-black uppercase border-2 border-text hover:shadow-[2px_2px_0px_0px_var(--color-text)] hover:translate-x-0.5 hover:translate-y-0.5 transition-all"
@@ -508,6 +575,7 @@ export default function DashboardProducer() {
             </div>
           ) : (
             <div>
+              {/* SECCIÓN AJUSTES */}
               {seccionActiva === "ajustes" && (
                 <div className="bg-surface border-2 border-text p-6 space-y-5 shadow-[4px_4px_0px_0px_var(--color-text)]">
                   <div className="flex justify-between items-center border-b-2 border-text pb-1">
@@ -519,9 +587,7 @@ export default function DashboardProducer() {
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-1">
-                      <label className="text-[10px] font-mono font-bold uppercase text-text-soft">
-                        Título Comercial
-                      </label>
+                      <label className="text-[10px] font-mono font-bold uppercase text-text-soft">Título Comercial</label>
                       <input
                         type="text"
                         value={formTitle}
@@ -530,9 +596,7 @@ export default function DashboardProducer() {
                       />
                     </div>
                     <div className="space-y-1">
-                      <label className="text-[10px] font-mono font-bold uppercase text-text-soft">
-                        Categoría del Show
-                      </label>
+                      <label className="text-[10px] font-mono font-bold uppercase text-text-soft">Categoría del Show</label>
                       <select
                         value={formCategory}
                         onChange={(e) => setFormCategory(e.target.value)}
@@ -548,35 +612,29 @@ export default function DashboardProducer() {
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-1">
-                      <label className="text-[10px] font-mono font-bold uppercase text-text-soft">
-                        Fecha del Evento
-                      </label>
+                      <label className="text-[10px] font-mono font-bold uppercase text-text-soft">Fecha del Evento</label>
                       <input
                         type="date"
                         value={formDate}
                         onChange={(e) => setFormDate(e.target.value)}
-                         style={{ colorScheme: "dark" }}
+                        style={{ colorScheme: "dark" }}
                         className="w-full border-2 border-text p-2 bg-background font-mono text-xs shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] focus:outline-none"
                       />
                     </div>
                     <div className="space-y-1">
-                      <label className="text-[10px] font-mono font-bold uppercase text-text-soft">
-                        Hora del Evento
-                      </label>
+                      <label className="text-[10px] font-mono font-bold uppercase text-text-soft">Hora del Evento</label>
                       <input
                         type="time"
                         value={formTime}
                         onChange={(e) => setFormTime(e.target.value)}
-                         style={{ colorScheme: "dark" }}
+                        style={{ colorScheme: "dark" }}
                         className="w-full border-2 border-text p-2 bg-background font-mono text-xs shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] focus:outline-none"
                       />
                     </div>
                   </div>
 
                   <div className="space-y-1">
-                    <label className="text-[10px] font-mono font-bold uppercase text-text-soft">
-                      Locación / Estadio
-                    </label>
+                    <label className="text-[10px] font-mono font-bold uppercase text-text-soft">Locación / Estadio</label>
                     <select
                       value={formLocation}
                       onChange={(e) => setFormLocation(e.target.value)}
@@ -590,9 +648,7 @@ export default function DashboardProducer() {
                   </div>
 
                   <div className="space-y-1">
-                    <label className="text-[10px] font-mono font-bold uppercase text-text-soft">
-                      Descripción de Cartelera
-                    </label>
+                    <label className="text-[10px] font-mono font-bold uppercase text-text-soft">Descripción de Cartelera</label>
                     <textarea
                       rows={3}
                       value={formDescription}
@@ -615,9 +671,7 @@ export default function DashboardProducer() {
                             className={`p-4 border-2 border-text shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] ${tieneVentas ? "bg-secondary/5" : "bg-background"}`}
                           >
                             <div className="flex justify-between items-center mb-2">
-                              <span className="text-xs font-mono font-black uppercase text-text">
-                                {ticket.name}
-                              </span>
+                              <span className="text-xs font-mono font-black uppercase text-text">{ticket.name}</span>
                               {tieneVentas && (
                                 <span className="text-[10px] font-mono bg-accent text-white font-black px-2 py-0.5 uppercase tracking-tighter">
                                   ⚠️ BLOQUEO ACTIVO: {entradasVendidas} VENDIDAS
@@ -662,14 +716,34 @@ export default function DashboardProducer() {
                     </div>
                   </div>
 
+                  {/* Botones de acción */}
                   <div className="pt-4 flex flex-col sm:flex-row gap-3">
                     <button
                       onClick={guardarCambios}
                       disabled={loadingAccion}
                       className="flex-1 bg-primary text-background border-2 border-text py-2.5 font-mono text-xs font-black uppercase shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] hover:translate-x-0.5 hover:translate-y-0.5 transition-all active:shadow-none"
                     >
-                      {loadingAccion ? "[ ACTUALIZANDO... ]" : "💾 GUARDAR AJUSTES AVANZADOS"}
+                      {loadingAccion ? "[ ACTUALIZANDO... ]" : "💾 GUARDAR AJUSTES"}
                     </button>
+
+                    {(eventoSeleccionado.status === "DRAFT" || eventoSeleccionado.status === "ACTIVE") && (
+                      <button
+                        onClick={cambiarStatus}
+                        disabled={loadingAccion}
+                        className={`px-4 py-2.5 border-2 border-text font-mono text-xs font-black uppercase shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] hover:translate-x-0.5 hover:translate-y-0.5 transition-all active:shadow-none disabled:opacity-50 ${
+                          eventoSeleccionado.status === "DRAFT"
+                            ? "bg-green-400 text-black"
+                            : "bg-yellow-400 text-black"
+                        }`}
+                      >
+                        {loadingAccion
+                          ? "[ PROCESANDO... ]"
+                          : eventoSeleccionado.status === "DRAFT"
+                          ? "📡 PUBLICAR"
+                          : "📝 DESPUBLICAR"}
+                      </button>
+                    )}
+
                     <button
                       onClick={eliminarEvento}
                       disabled={loadingAccion}
@@ -681,6 +755,7 @@ export default function DashboardProducer() {
                 </div>
               )}
 
+              {/* SECCIÓN STATS */}
               {seccionActiva === "stats" && (
                 <div className="bg-surface border-2 border-text p-6 space-y-6 shadow-[4px_4px_0px_0px_var(--color-text)]">
                   <h3 className="text-lg font-black uppercase border-b-2 border-text pb-2">
@@ -735,23 +810,19 @@ export default function DashboardProducer() {
                         <div>
                           <h4 className="text-xs font-mono font-black uppercase text-text-soft mb-2">Desglose por zona</h4>
                           <div className="space-y-2">
-                            {eventoSeleccionado?.ticketTypes?.map((tt, i) => {
-                              const zoneSold = totalInitial > 0 ? Math.max(0, eventStats.total - totalStock) : 0;
-                              const zonePct = (Number(tt.stock) === 0 && totalInitial > 0) ? 100 : 0;
-                              return (
-                                <div key={i} className="flex items-center justify-between border-2 border-text p-3 bg-background">
-                                  <div>
-                                    <span className="text-xs font-black uppercase text-text">{tt.zone || tt.name}</span>
-                                    <span className="block text-[10px] font-mono text-text-soft">${Number(tt.price).toLocaleString('es-AR')}</span>
-                                  </div>
-                                  <div className="text-right">
-                                    <span className={`text-sm font-black ${Number(tt.stock) === 0 ? "text-red-500" : "text-text"}`}>
-                                      {Number(tt.stock) === 0 ? "AGOTADO" : `${tt.stock} disp.`}
-                                    </span>
-                                  </div>
+                            {eventoSeleccionado?.ticketTypes?.map((tt, i) => (
+                              <div key={i} className="flex items-center justify-between border-2 border-text p-3 bg-background">
+                                <div>
+                                  <span className="text-xs font-black uppercase text-text">{tt.zone || tt.name}</span>
+                                  <span className="block text-[10px] font-mono text-text-soft">${Number(tt.price).toLocaleString("es-AR")}</span>
                                 </div>
-                              );
-                            })}
+                                <div className="text-right">
+                                  <span className={`text-sm font-black ${Number(tt.stock) === 0 ? "text-red-500" : "text-text"}`}>
+                                    {Number(tt.stock) === 0 ? "AGOTADO" : `${tt.stock} disp.`}
+                                  </span>
+                                </div>
+                              </div>
+                            ))}
                           </div>
                         </div>
 
@@ -774,6 +845,7 @@ export default function DashboardProducer() {
                 </div>
               )}
 
+              {/* SECCIÓN SCANNER */}
               {seccionActiva === "scanner" && (
                 <div className="bg-surface border-2 border-text p-6 space-y-4 shadow-[4px_4px_0px_0px_var(--color-text)]">
                   <h3 className="text-lg font-black uppercase">Módulo de Control de Accesos</h3>

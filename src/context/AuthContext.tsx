@@ -5,6 +5,12 @@ import { clearToken, getUserFromToken, saveToken, type User } from "@/lib/auth";
 import { authService, type RegisterDto } from "@/services/authService";
 import { supabase } from "@/lib/supabaseClient";
 
+// Función auxiliar exportable para obtener el token JWT de la sesión activa de Supabase
+export const getAuthToken = async (): Promise<string | null> => {
+  const { data } = await supabase.auth.getSession();
+  return data.session?.access_token || null;
+};
+
 interface AuthContextValue {
   user: User | null;
   loading: boolean;
@@ -35,20 +41,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     password: string;
   }) => {
     const { user: account } = await authService.login({ email, password });
-    saveToken(account.role);
+
+    const actualRole = (account as any).user_role || account.role;
+    account.role = actualRole;
+
+    saveToken(actualRole);
     setUser(account);
     return account;
   };
-
   const register = async (data: RegisterDto) => {
     const { user: account } = await authService.register(data);
-    saveToken(account.role);
+
+    const roleToSave = (account as any).user_role || account.role;
+    saveToken(roleToSave);
+
     setUser(account);
     return account;
   };
-
   const logout = async () => {
-    try { await authService.logout(); } catch { /* ignora si el back falla */ }
+    try {
+      await authService.logout();
+    } catch {
+      console.error("Error during logout");
+    }
     await supabase.auth.signOut();
     clearToken();
     setUser(null);

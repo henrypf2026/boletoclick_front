@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import Swal from "sweetalert2";
 
 interface TicketType {
@@ -15,18 +16,36 @@ interface ApiItem {
   name: string;
 }
 
+// Venue con capacity para validar stock
+interface Venue extends ApiItem {
+  capacity: number;
+}
 
 //limite de fechas
-const HOY = new Date().toISOString().split("T")[0];
-const maxDate = new Date();
-maxDate.setFullYear(maxDate.getFullYear() + 1);
-const FECHA_MAXIMA = maxDate.toISOString().split("T")[0];
+const HOY = (() => {
+  const hoy = new Date();
+  const yyyy = hoy.getFullYear();
+  const mm = String(hoy.getMonth() + 1).padStart(2, "0");
+  const dd = String(hoy.getDate()).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd}`;
+})();
+
+const FECHA_MAXIMA = (() => {
+  const max = new Date();
+  max.setFullYear(max.getFullYear() + 1);
+  const yyyy = max.getFullYear();
+  const mm = String(max.getMonth() + 1).padStart(2, "0");
+  const dd = String(max.getDate()).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd}`;
+})();
 
 //limite de imagen
 const MAX_IMAGE_SIZE_MB = 2;
 const FORMATOS_VALIDOS = ["image/jpeg", "image/png", "image/gif", "image/webp"];
 
 export default function EventForm() {
+  const router = useRouter();
+
   const [evento, setEvento] = useState({
     title: "",
     description: "",
@@ -36,17 +55,16 @@ export default function EventForm() {
     categoryId: "",
   });
 
+  const [eventStatus, setEventStatus] = useState<"DRAFT" | "ACTIVE">("DRAFT");
+
   const [categorias, setCategorias] = useState<ApiItem[]>([]);
-  const [locaciones, setLocaciones] = useState<ApiItem[]>([]);
+  const [locaciones, setLocaciones] = useState<Venue[]>([]);
   const [archivoImagen, setArchivoImagen] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-
 
   const [ticketTypes, setTicketTypes] = useState<TicketType[]>([
     { name: "General", price: 0, stock: 100, zone: "Planta Baja" },
   ]);
-
-
 
   const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState<{
@@ -64,11 +82,19 @@ export default function EventForm() {
 
         if (resCat && resCat.ok) {
           const dataCat = await resCat.json();
-          setCategorias(dataCat);
+          // Orden alfabético de categorías
+          const categoriasOrdenadas = [...dataCat].sort((a: ApiItem, b: ApiItem) =>
+            a.name.localeCompare(b.name, "es")
+          );
+          setCategorias(categoriasOrdenadas);
         }
         if (resVen && resVen.ok) {
           const dataVen = await resVen.json();
-          setLocaciones(dataVen);
+          // Orden alfabético de venues
+          const venuesOrdenados = [...dataVen].sort((a: Venue, b: Venue) =>
+            a.name.localeCompare(b.name, "es")
+          );
+          setLocaciones(venuesOrdenados);
         }
       } catch (err) {
         console.error("Error al cargar datos del servidor:", err);
@@ -86,32 +112,45 @@ export default function EventForm() {
     setEvento({ ...evento, [e.target.name]: e.target.value });
   };
 
-//fecha de validacion 
- const handleFechaChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-  setEvento({ ...evento, fecha: e.target.value }); 
-};
-
-const handleFechaBlur = (e: React.FocusEvent<HTMLInputElement>) => {
-  const fechaSeleccionada = e.target.value;
-  if (!fechaSeleccionada) return;
-
-  if (fechaSeleccionada > FECHA_MAXIMA || fechaSeleccionada < HOY) {
-    Swal.fire({
-      icon: "warning",
-      title: "Fecha inválida",
-      text: `La fecha del evento debe estar entre hoy y ${FECHA_MAXIMA}.`,
-      confirmButtonColor: "#171717",
-    });
-    setEvento({ ...evento, fecha: "" }); 
-  }
-};
+  // fecha de validacion
+  const handleFechaChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setEvento({ ...evento, fecha: e.target.value });
+  };
 
 
-//imagen con validacion
-   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+
+  const handleFechaBlur = (e: React.FocusEvent<HTMLInputElement>) => {
+    const fechaSeleccionada = e.target.value;
+    if (!fechaSeleccionada) return;
+
+    if (fechaSeleccionada > FECHA_MAXIMA ) {
+      Swal.fire({
+        icon: "warning",
+        title: "Fecha inválida",
+        text: `La fecha del evento debe estar entre hoy y ${FECHA_MAXIMA}.`,
+        confirmButtonColor: "#171717",
+      });
+      setEvento({ ...evento, fecha: "" });
+      return;
+    }
+
+    // Advertencia si el evento es hoy
+    if (fechaSeleccionada === HOY) {
+      Swal.fire({
+        icon: "warning",
+        title: "⚠️ El evento es hoy",
+        text: "Estás creando un evento para el día de hoy. Asegurate de que haya tiempo suficiente para que los asistentes se enteren y compren sus entradas.",
+        confirmButtonColor: "#171717",
+        confirmButtonText: "Entendido",
+      });
+    }
+  };
+
+  // imagen con validacion
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
- 
+
     if (!FORMATOS_VALIDOS.includes(file.type)) {
       Swal.fire({
         icon: "error",
@@ -122,7 +161,7 @@ const handleFechaBlur = (e: React.FocusEvent<HTMLInputElement>) => {
       e.target.value = "";
       return;
     }
- 
+
     const sizeMB = file.size / (1024 * 1024);
     if (sizeMB > MAX_IMAGE_SIZE_MB) {
       Swal.fire({
@@ -134,11 +173,10 @@ const handleFechaBlur = (e: React.FocusEvent<HTMLInputElement>) => {
       e.target.value = "";
       return;
     }
- 
+
     setArchivoImagen(file);
     setPreviewUrl(URL.createObjectURL(file));
   };
- 
 
   const agregarLocalidad = () => {
     setTicketTypes([
@@ -165,12 +203,14 @@ const handleFechaBlur = (e: React.FocusEvent<HTMLInputElement>) => {
     setTicketTypes(nuevosTickets);
   };
 
+  // Helper: capacidad del venue seleccionado
+  const capacidadVenue = locaciones.find((v) => v.id === evento.venueId)?.capacity ?? null;
+  const stockTotal = ticketTypes.reduce((acc, t) => acc + Number(t.stock), 0);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setStatus(null);
-
-
 
     if (!archivoImagen) {
       setStatus({
@@ -181,8 +221,7 @@ const handleFechaBlur = (e: React.FocusEvent<HTMLInputElement>) => {
       return;
     }
 
-
-     const ticketInvalido = ticketTypes.find(
+    const ticketInvalido = ticketTypes.find(
       (t) =>
         t.name.trim() === "" ||
         String(t.price) === "" ||
@@ -190,19 +229,29 @@ const handleFechaBlur = (e: React.FocusEvent<HTMLInputElement>) => {
         Number(t.price) <= 0 ||
         Number(t.stock) <= 0,
     );
- 
+
     if (ticketInvalido) {
-      setStatus({ type: "error", msg: "Todos los tipos de entrada necesitan nombre, precio mayor a 0 y stock mayor a 0." });
+      setStatus({
+        type: "error",
+        msg: "Todos los tipos de entrada necesitan nombre, precio mayor a 0 y stock mayor a 0.",
+      });
       setLoading(false);
       return;
     }
 
-
-
-
+    // Validación stock vs capacidad del venue
+    if (capacidadVenue !== null && stockTotal > capacidadVenue) {
+      Swal.fire({
+        icon: "error",
+        title: "Stock supera la capacidad del lugar",
+        html: `La suma de entradas (<strong>${stockTotal}</strong>) supera la capacidad del venue (<strong>${capacidadVenue}</strong>). Reducí el stock total en ${stockTotal - capacidadVenue} entradas.`,
+        confirmButtonColor: "#171717",
+      });
+      setLoading(false);
+      return;
+    }
 
     try {
-      // 1. Instanciamos el FormData exigido por el controlador con Multer
       const formData = new FormData();
 
       formData.append("title", evento.title.trim());
@@ -214,9 +263,8 @@ const handleFechaBlur = (e: React.FocusEvent<HTMLInputElement>) => {
         `${evento.fecha}T${evento.hora}:00`
       ).toISOString();
       formData.append("eventDate", combinedDate);
-      formData.append("status", "ACTIVE");
+      formData.append("status", eventStatus);
 
-      // 2. Mapeamos los campos numéricos puros de los tickets
       const ticketsLimpios = ticketTypes.map((ticket) => ({
         name: ticket.name.trim(),
         price: Number(ticket.price),
@@ -224,18 +272,14 @@ const handleFechaBlur = (e: React.FocusEvent<HTMLInputElement>) => {
         zone: ticket.zone.trim(),
       }));
 
-      // 3. Serializamos como string para activar el nuevo plainToInstance del back
       formData.append("ticketTypes", JSON.stringify(ticketsLimpios));
-
-      // 4. Adjuntamos el binario de la imagen que capturará el @UploadedFile()
       formData.append("poster", archivoImagen);
 
-      console.log("🚀 Enviando FormData adaptado al nuevo fix del backend...");
+      console.log(`🚀 Enviando evento con estado: ${eventStatus}`);
 
       const res = await fetch(`/api/backend/events`, {
         method: "POST",
-        // NO agregar Content-Type, dejamos que el navegador maneje los boundaries
-        credentials: 'include',
+        credentials: "include",
         body: formData,
       });
 
@@ -250,10 +294,29 @@ const handleFechaBlur = (e: React.FocusEvent<HTMLInputElement>) => {
         );
       }
 
-      setStatus({
-        type: "success",
-        msg: "¡Evento creado con éxito e impactado en la base de datos!",
+      // Éxito: preguntamos qué quiere hacer
+      const { isConfirmed } = await Swal.fire({
+        icon: "success",
+        title: "¡Evento creado!",
+        text: `El evento fue guardado en estado ${eventStatus === "ACTIVE" ? "AL AIRE 📡" : "BORRADOR 📝"}. ¿Qué querés hacer ahora?`,
+        confirmButtonText: "Ir a Mis Eventos",
+        cancelButtonText: "Crear otro evento",
+        showCancelButton: true,
+        confirmButtonColor: "#171717",
+        cancelButtonColor: "#6750e0",
       });
+
+      if (isConfirmed) {
+        router.push("/producer/dashboard");
+      } else {
+        // Limpiar formulario para crear otro
+        setEvento({ title: "", description: "", fecha: "", hora: "", venueId: "", categoryId: "" });
+        setEventStatus("DRAFT");
+        setArchivoImagen(null);
+        setPreviewUrl(null);
+        setTicketTypes([{ name: "General", price: 0, stock: 100, zone: "Planta Baja" }]);
+        setStatus(null);
+      }
     } catch (error: any) {
       setStatus({
         type: "error",
@@ -277,17 +340,54 @@ const handleFechaBlur = (e: React.FocusEvent<HTMLInputElement>) => {
           {status.msg}
         </div>
       )}
+
       <div className="bg-surface border-4 border-border p-6 shadow-[6px_6px_0px_0px_rgba(23,23,23,1)] dark:shadow-[6px_6px_0px_0px_rgba(255,255,255,1)] space-y-4">
         <h2 className="text-lg font-black uppercase tracking-wider text-text border-b-2 border-border pb-2">
           1. Detalles del Evento
         </h2>
+
+        {/* Selector de estado DRAFT / ACTIVE */}
+        <div className="flex items-center gap-4 bg-background border-2 border-dashed border-border p-4 shadow-[3px_3px_0px_0px_rgba(23,23,23,1)]">
+          <span className="text-xs font-black uppercase tracking-wide text-text">
+            Estado del evento:
+          </span>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => setEventStatus("DRAFT")}
+              className={`px-4 py-2 text-xs font-black uppercase border-2 border-border shadow-[2px_2px_0px_0px_rgba(23,23,23,1)] transition-all ${
+                eventStatus === "DRAFT"
+                  ? "bg-yellow-400 text-black"
+                  : "bg-background text-text opacity-50"
+              }`}
+            >
+              📝 Borrador
+            </button>
+            <button
+              type="button"
+              onClick={() => setEventStatus("ACTIVE")}
+              className={`px-4 py-2 text-xs font-black uppercase border-2 border-border shadow-[2px_2px_0px_0px_rgba(23,23,23,1)] transition-all ${
+                eventStatus === "ACTIVE"
+                  ? "bg-green-400 text-black"
+                  : "bg-background text-text opacity-50"
+              }`}
+            >
+              📡 Al Aire
+            </button>
+          </div>
+          <span className="text-[10px] text-text-soft">
+            {eventStatus === "DRAFT"
+              ? "El evento no será visible para el público hasta que lo pongas Al Aire."
+              : "El evento será visible y aceptará ventas inmediatamente."}
+          </span>
+        </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-center bg-background border-2 border-dashed border-border p-4 shadow-[3px_3px_0px_0px_rgba(23,23,23,1)]">
           <div className="md:col-span-2 space-y-2">
             <label className="text-xs font-black uppercase tracking-wide text-text block">
               Poster / Portada del Evento
             </label>
-              <p className="text-[10px] font-medium text-text-soft">
+            <p className="text-[10px] font-medium text-text-soft">
               Formato JPG, PNG, GIF o WEBP. Tamaño máximo: {MAX_IMAGE_SIZE_MB}MB.
             </p>
             <input
@@ -328,8 +428,8 @@ const handleFechaBlur = (e: React.FocusEvent<HTMLInputElement>) => {
         />
 
         <label className="text-xs font-black uppercase tracking-wide text-text block">
-            Día y hora del evento
-          </label>
+          Día y hora del evento
+        </label>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <input
@@ -341,22 +441,18 @@ const handleFechaBlur = (e: React.FocusEvent<HTMLInputElement>) => {
             required
             min={HOY}
             max={FECHA_MAXIMA}
-            style={{colorScheme: "dark"}}
+            style={{ colorScheme: "dark" }}
             className="p-3 border-2 border-border bg-background text-text text-sm"
           />
-
-
           <input
             type="time"
             name="hora"
             value={evento.hora}
             onChange={handleEventoChange}
             required
-            
             className="p-3 border-2 border-border bg-background text-text text-sm"
           />
         </div>
-
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <select
@@ -413,6 +509,22 @@ const handleFechaBlur = (e: React.FocusEvent<HTMLInputElement>) => {
             + Añadir
           </button>
         </div>
+
+        {/* Indicador de stock vs capacidad */}
+        {capacidadVenue !== null && (
+          <div
+            className={`text-xs font-bold px-4 py-2 border-2 border-border ${
+              stockTotal > capacidadVenue
+                ? "bg-red-500/10 text-red-500 border-red-500"
+                : "bg-success/10 text-success border-success"
+            }`}
+          >
+            {stockTotal > capacidadVenue
+              ? `⚠️ Stock total (${stockTotal}) supera la capacidad del venue (${capacidadVenue}). Exceso: ${stockTotal - capacidadVenue} entradas.`
+              : `✅ Stock total: ${stockTotal} / ${capacidadVenue} lugares disponibles.`}
+          </div>
+        )}
+
         {ticketTypes.map((ticket, index) => (
           <div
             key={index}
@@ -478,25 +590,24 @@ const handleFechaBlur = (e: React.FocusEvent<HTMLInputElement>) => {
           </div>
         ))}
       </div>
-          {status?.type === "success" && (
-        <div className="border-2 border-success bg-success/10 p-4 font-mono text-xs font-bold uppercase text-success">
-          ✅ {status.msg}
-        </div>
-      )}
+
       {status?.type === "error" && (
         <div className="border-2 border-red-500 bg-red-500/10 p-4 font-mono text-xs font-bold uppercase text-red-500">
           ❌ {status.msg}
         </div>
-       )}
+      )}
 
-    <button
+      <button
         type="submit"
         disabled={loading}
         className="w-full p-4 font-black text-sm uppercase bg-primary text-background border-4 border-border shadow-[4px_4px_0px_0px_rgba(23,23,23,1)] disabled:opacity-50"
       >
-        {loading ? "Creando en Sistema..." : "Crear Evento"}
+        {loading
+          ? "Creando en Sistema..."
+          : eventStatus === "ACTIVE"
+          ? "Crear Evento — Al Aire 📡"
+          : "Crear Evento — Guardar Borrador 📝"}
       </button>
- 
     </form>
   );
 }
