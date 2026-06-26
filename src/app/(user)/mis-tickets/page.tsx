@@ -8,27 +8,12 @@ import { useAuth } from "@/context/AuthContext";
 import { ticketService, type ApiTicket } from "@/services/ticketService";
 import TicketQrCode from "@/components/ui/TicketQrCode";
 import AddToWalletButton from "@/components/ui/AddToWalletButton";
-
-
-function statusStyle(status: ApiTicket["order"]["status"]) {
-  switch (status) {
-    case "PAID": return "text-success bg-success/10 border-success";
-    case "PENDING": return "text-yellow-600 bg-yellow-400/10 border-yellow-500";
-    case "FAILED": return "text-red-500 bg-red-500/10 border-red-500";
-    case "REFUNDED": return "text-text-soft bg-surface-2 border-text/30";
-    case "CANCELLED": return "text-red-500 bg-red-500/10 border-red-500";
-  }
-}
-
-function statusLabel(status: ApiTicket["order"]["status"]) {
-  switch (status) {
-    case "PAID": return "PAGADO";
-    case "PENDING": return "PENDIENTE";
-    case "FAILED": return "FALLIDO";
-    case "REFUNDED": return "REEMBOLSADO";
-    case "CANCELLED": return "CANCELADO";
-  }
-}
+import {
+  getEffectiveOrderStatus,
+  isTicketCancelled,
+  orderStatusColor,
+  orderStatusLabel,
+} from "@/lib/orderStatus";
 
 export default function MisTicketsPage() {
   const { user } = useAuth();
@@ -147,13 +132,19 @@ export default function MisTicketsPage() {
       ) : (
         <div className="flex flex-col gap-4">
           {tickets.map((ticket) => {
-            const isCancelled = ticket.order.status === "CANCELLED" || (ticket.order.status === "PAID" && !ticket.allowEntrance);
+            const cancelled = isTicketCancelled(ticket);
+            const displayStatus = cancelled
+              ? getEffectiveOrderStatus({
+                  status: ticket.order.status,
+                  tickets: [{ allowEntrance: ticket.allowEntrance, usedAt: ticket.usedAt }],
+                })
+              : ticket.order.status;
             return (
             <div
               key={ticket.id}
               onClick={() => setTicketExpandido(ticket)}
               className={`bg-surface border-2 shadow-[4px_4px_0px_0px_var(--color-text)] cursor-pointer transition-all group ${
-                isCancelled
+                cancelled
                   ? "border-text/30 opacity-60 hover:opacity-80"
                   : "border-text hover:shadow-[7px_7px_0px_0px_var(--color-text)] hover:-translate-x-0.5 hover:-translate-y-0.5"
               }`}
@@ -164,12 +155,12 @@ export default function MisTicketsPage() {
                 <div className="flex flex-col gap-1.5">
                   <div className="flex items-center gap-2 flex-wrap">
                     <h2 className={`text-lg font-black uppercase tracking-tight transition-colors ${
-                      isCancelled ? "text-text/50 line-through" : "text-text group-hover:text-primary"
+                      cancelled ? "text-text/50 line-through" : "text-text group-hover:text-primary"
                     }`}>
                       {eventTitles[ticket.ticketType.eventId ?? ""] ?? ticket.eventTitle ?? ticket.ticketType.name}
                     </h2>
-                    <span className={`text-[10px] font-mono font-black uppercase border px-2 py-0.5 ${isCancelled ? statusStyle("CANCELLED") : statusStyle(ticket.order.status)}`}>
-                      {isCancelled ? statusLabel("CANCELLED") : statusLabel(ticket.order.status)}
+                    <span className={`text-[10px] font-mono font-black uppercase border px-2 py-0.5 ${orderStatusColor(displayStatus)}`}>
+                      {orderStatusLabel(displayStatus)}
                     </span>
                   </div>
 
@@ -191,14 +182,14 @@ export default function MisTicketsPage() {
                     })}
                   </p>
 
-                  <strong className={`text-lg font-black font-mono ${isCancelled ? "text-text/40" : "text-success"}`}>
+                  <strong className={`text-lg font-black font-mono ${cancelled ? "text-text/40" : "text-success"}`}>
                     ${ticket.ticketType.price.toLocaleString("es-AR")}
                   </strong>
                 </div>
 
                 {/* QR / Cancelado */}
                 <div className="flex flex-col items-center gap-2 shrink-0">
-                  {isCancelled ? (
+                  {cancelled ? (
                     <div className="flex h-28 w-28 flex-col items-center justify-center border-4 border-dashed border-red-400/50 bg-red-50/30 dark:bg-red-950/20 gap-1">
                       <span className="text-2xl font-black text-red-400/60">✕</span>
                       <span className="text-center text-[9px] font-black uppercase tracking-wide text-red-400/70 font-mono leading-tight px-1">
@@ -211,7 +202,7 @@ export default function MisTicketsPage() {
                     </div>
                   )}
                   <span className="text-center text-[10px] font-bold uppercase tracking-wide text-text-soft font-mono">
-                    {isCancelled ? "Ver detalle" : "Tocá para ver"}
+                    {cancelled ? "Ver detalle" : "Tocá para ver"}
                   </span>
                 </div>
               </div>
@@ -222,7 +213,9 @@ export default function MisTicketsPage() {
       )}
 
       {/*Modal ticket expandido  */}
-      {ticketExpandido && (
+      {ticketExpandido && (() => {
+        const expandedCancelled = isTicketCancelled(ticketExpandido);
+        return (
         <div
           className="fixed inset-0 z-50 bg-black/95 backdrop-blur-sm flex items-center justify-center p-4"
           onClick={() => setTicketExpandido(null)}
@@ -261,7 +254,7 @@ export default function MisTicketsPage() {
             </div>
 
             {/* QR expandido / Cancelado */}
-            {(ticketExpandido.order.status === "CANCELLED" || (ticketExpandido.order.status === "PAID" && !ticketExpandido.allowEntrance)) ? (
+            {expandedCancelled ? (
               <div className="my-6 flex flex-col items-center justify-center gap-3 border-4 border-dashed border-red-400 bg-red-50 aspect-square w-full max-w-60 mx-auto">
                 <span className="text-4xl font-black text-red-400">✕</span>
                 <p className="text-center font-mono text-[11px] font-black uppercase tracking-wide text-red-500 leading-tight px-4">
@@ -276,12 +269,12 @@ export default function MisTicketsPage() {
 
             <div className="space-y-3">
               <p className="text-center text-[10px] font-mono font-black text-neutral-600 uppercase tracking-tight">
-                {(ticketExpandido.order.status === "CANCELLED" || (ticketExpandido.order.status === "PAID" && !ticketExpandido.allowEntrance))
-                  ? "⚠ Este evento fue cancelado por el organizador"
+                {expandedCancelled
+                  ? "⚠ Esta entrada fue cancelada y ya no es válida"
                   : "📱 Presentá esta pantalla en los lectores de puerta"}
               </p>
               <div className="grid grid-cols-1 gap-2">
-                {!(ticketExpandido.order.status === "CANCELLED" || (ticketExpandido.order.status === "PAID" && !ticketExpandido.allowEntrance)) && (
+                {!expandedCancelled && (
                 <AddToWalletButton
                   ticket={{
                     id: ticketExpandido.id,
@@ -302,7 +295,8 @@ export default function MisTicketsPage() {
             </div>
           </div>
         </div>
-      )}
+        );
+      })()}
     </div>
   );
 }

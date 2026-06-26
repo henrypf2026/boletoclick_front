@@ -12,6 +12,14 @@ import AddToWalletButton from "@/components/ui/AddToWalletButton";
 import UserHistoryFilterForm from "@/components/dashboard/UserHistoryFilterForm";
 import jsPDF from "jspdf";
 import Swal from "sweetalert2";
+import {
+  getEffectiveOrderStatus,
+  isTicketCancelled,
+  orderStatusBadgeColor,
+  orderStatusColor,
+  orderStatusLabel,
+  type OrderStatus,
+} from "@/lib/orderStatus";
 
 // 🛠️ PLACEHOLDER: tu compañero usaba SWAL_CUSTOM pero no estaba definido en
 // ningún lado (probablemente se perdió en un merge). Lo armo acá con clases
@@ -32,12 +40,14 @@ interface OrderItem {
   total: number;
   producerSubtotal: number;
   platformFee: number;
-  status: "PENDING" | "PAID" | "FAILED" | "REFUNDED" | "CANCELLED";
+  status: OrderStatus;
   transactionId: string | null;
   createdAt: string;
   updatedAt: string;
   tickets?: {
     id: string;
+    allowEntrance?: boolean;
+    usedAt?: string | null;
     ticketType?: {
       id: string;
       eventId: string;
@@ -53,40 +63,6 @@ interface EventData {
   title: string;
   eventDate: string;
   venue?: { name: string };
-}
-
-function orderStatusLabel(status: string) {
-  switch (status) {
-    case "PAID":
-      return "PAGADO";
-    case "PENDING":
-      return "PENDIENTE";
-    case "FAILED":
-      return "FALLIDO";
-    case "REFUNDED":
-      return "REEMBOLSADO";
-    case "CANCELLED":
-      return "CANCELADO";
-    default:
-      return status;
-  }
-}
-
-function orderStatusColor(status: string) {
-  switch (status) {
-    case "PAID":
-      return "text-success bg-success/10 border-success";
-    case "PENDING":
-      return "text-yellow-600 bg-yellow-400/10 border-yellow-500";
-    case "FAILED":
-      return "text-red-500 bg-red-500/10 border-red-500";
-    case "REFUNDED":
-      return "text-text-soft bg-surface-2 border-text/30";
-    case "CANCELLED":
-      return "text-text-soft bg-surface-2 border-text/30";
-    default:
-      return "text-text-soft bg-surface-2 border-text/30";
-  }
 }
 
 async function fetchEvent(eventId: string): Promise<EventData | null> {
@@ -168,13 +144,15 @@ async function generarComprobantePDF(orden: OrderItem) {
 
   y = 42;
 
-  const estadoTexto = orderStatusLabel(orden.status);
-  const badgeColor =
-    orden.status === "PAID"
-      ? PURPLE
-      : orden.status === "REFUNDED"
-        ? "#555"
-        : "#cc3333";
+  const efectiveStatus = getEffectiveOrderStatus({
+    status: orden.status,
+    tickets: (orden.tickets ?? []).map((ticket) => ({
+      allowEntrance: ticket.allowEntrance ?? true,
+      usedAt: ticket.usedAt ?? null,
+    })),
+  });
+  const estadoTexto = orderStatusLabel(efectiveStatus);
+  const badgeColor = orderStatusBadgeColor(efectiveStatus);
   doc.setFillColor(badgeColor);
   doc.roundedRect(margen, y - 4, 38, 7, 1, 1, "F");
   doc.setFontSize(7);
@@ -641,28 +619,34 @@ export default function UserDashboard() {
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
               {tickets.map((ticket) => {
-                const isCancelled = ticket.order.status === "CANCELLED" || (ticket.order.status === "PAID" && !ticket.allowEntrance);
+                const cancelled = isTicketCancelled(ticket);
+                const displayStatus = cancelled
+                  ? getEffectiveOrderStatus({
+                      status: ticket.order.status,
+                      tickets: [{ allowEntrance: ticket.allowEntrance, usedAt: ticket.usedAt }],
+                    })
+                  : ticket.order.status;
                 return (
                 <div
                   key={ticket.id}
                   onClick={() => setTicketExpandido(ticket)}
                   className={`bg-surface border-2 rounded-none shadow-[4px_4px_0px_0px_var(--color-text)] p-5 flex flex-col justify-between transition-all cursor-pointer group ${
-                    isCancelled
+                    cancelled
                       ? "border-text/30 opacity-60 hover:opacity-80"
                       : "border-text hover:shadow-[7px_7px_0px_0px_var(--color-text)] hover:-translate-x-0.5 hover:-translate-y-0.5"
                   }`}
                 >
                   <div className="border-b-2 border-dashed border-text/40 pb-4 mb-4">
                     <div className="flex justify-between items-start gap-2">
-                      <h3 className={`font-black text-lg uppercase tracking-tight transition-colors ${isCancelled ? "text-text/50 line-through" : "text-text group-hover:text-primary"}`}>
+                      <h3 className={`font-black text-lg uppercase tracking-tight transition-colors ${cancelled ? "text-text/50 line-through" : "text-text group-hover:text-primary"}`}>
                         {ticketEventTitles[ticket.ticketType.eventId ?? ""] ??
                           ticket.eventTitle ??
                           ticket.ticketType.name}
                       </h3>
                       <span
-                        className={`text-[9px] font-mono px-1.5 py-0.5 font-bold whitespace-nowrap border ${orderStatusColor(isCancelled ? "CANCELLED" : ticket.order.status)}`}
+                        className={`text-[9px] font-mono px-1.5 py-0.5 font-bold whitespace-nowrap border ${orderStatusColor(displayStatus)}`}
                       >
-                        {orderStatusLabel(isCancelled ? "CANCELLED" : ticket.order.status)}
+                        {orderStatusLabel(displayStatus)}
                       </span>
                     </div>
                     {ticket.ticketType.zone && (
@@ -673,11 +657,11 @@ export default function UserDashboard() {
                         </span>
                       </p>
                     )}
-                    <p className={`font-black mt-2 font-mono text-sm ${isCancelled ? "text-text/40" : "text-primary-deep dark:text-primary"}`}>
+                    <p className={`font-black mt-2 font-mono text-sm ${cancelled ? "text-text/40" : "text-primary-deep dark:text-primary"}`}>
                       ${ticket.ticketType.price.toLocaleString("es-MX")}
                     </p>
                   </div>
-                  {isCancelled ? (
+                  {cancelled ? (
                     <div className="flex flex-col items-center justify-center max-w-40 mx-auto w-full border-4 border-dashed border-red-400/50 bg-red-50/30 dark:bg-red-950/20 aspect-square gap-1">
                       <span className="text-2xl font-black text-red-400/60">✕</span>
                       <span className="text-[9px] font-black uppercase tracking-wide text-red-400/70 font-mono text-center leading-tight px-1">QR<br/>inválido</span>
@@ -715,7 +699,15 @@ export default function UserDashboard() {
           ) : (
             <div className="bg-surface border-2 border-text rounded-none shadow-[4px_4px_0px_0px_var(--color-text)] divide-y-2 divide-text">
               {ordenesFiltradas.length > 0 ? (
-                ordenesFiltradas.map((orden) => (
+                ordenesFiltradas.map((orden) => {
+                  const displayStatus = getEffectiveOrderStatus({
+                    status: orden.status,
+                    tickets: (orden.tickets ?? []).map((ticket) => ({
+                      allowEntrance: ticket.allowEntrance ?? true,
+                      usedAt: ticket.usedAt ?? null,
+                    })),
+                  });
+                  return (
                   <div
                     key={orden.id}
                     className="p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-surface"
@@ -741,9 +733,9 @@ export default function UserDashboard() {
                           )}
                         </span>
                         <span
-                          className={`text-[10px] font-mono font-black uppercase border px-2 py-0.5 ${orderStatusColor(orden.status)}`}
+                          className={`text-[10px] font-mono font-black uppercase border px-2 py-0.5 ${orderStatusColor(displayStatus)}`}
                         >
-                          {orderStatusLabel(orden.status)}
+                          {orderStatusLabel(displayStatus)}
                         </span>
                       </div>
                       <p className="text-text-soft text-xs font-mono mt-0.5">
@@ -766,8 +758,8 @@ export default function UserDashboard() {
                           sin atributos válidos, cerrado vacío, con contenido
                           suelto fuera de cualquier botón, y un segundo botón
                           bien armado después). Dejamos solo el botón correcto. */}
-                      {orden.status !== "CANCELLED" &&
-                        orden.status === "PAID" && (
+                      {displayStatus !== "CANCELLED" &&
+                        displayStatus === "PAID" && (
                           <button
                             onClick={() => handleCancelOrder(orden.id)}
                             disabled={cancellingId === orden.id}
@@ -780,7 +772,7 @@ export default function UserDashboard() {
                       <button
                         onClick={() => handleDescargarPDF(orden)}
                         disabled={
-                          orden.status !== "PAID" || pdfLoading === orden.id
+                          displayStatus !== "PAID" || pdfLoading === orden.id
                         }
                         className="bg-primary text-background font-mono font-black text-xs uppercase tracking-wider transition-all border-2 border-text px-4 py-2 shadow-[2px_2px_0px_0px_var(--color-text)] hover:shadow-none hover:translate-x-0.5 hover:translate-y-0.5 active:shadow-none active:translate-x-0.5 active:translate-y-0.5 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed disabled:shadow-none disabled:translate-x-0 disabled:translate-y-0 min-w-16 flex items-center justify-center gap-1"
                       >
@@ -813,7 +805,8 @@ export default function UserDashboard() {
                       </button>
                     </div>
                   </div>
-                ))
+                  );
+                })
               ) : (
                 <div className="p-8 text-center font-mono text-xs uppercase text-text-soft">
                   No se encontraron registros que coincidan.
@@ -825,7 +818,9 @@ export default function UserDashboard() {
       )}
 
       {/* Ticket expandido */}
-      {ticketExpandido && (
+      {ticketExpandido && (() => {
+        const expandedCancelled = isTicketCancelled(ticketExpandido);
+        return (
         <div
           className="fixed inset-0 z-50 bg-black/95 backdrop-blur-sm flex items-center justify-center p-4"
           onClick={() => setTicketExpandido(null)}
@@ -868,7 +863,7 @@ export default function UserDashboard() {
               </p>
             </div>
 
-            {(ticketExpandido.order.status === "CANCELLED" || (ticketExpandido.order.status === "PAID" && !ticketExpandido.allowEntrance)) ? (
+            {expandedCancelled ? (
               <div className="my-6 flex flex-col items-center justify-center gap-3 border-4 border-dashed border-red-400 bg-red-50 aspect-square w-full max-w-60 mx-auto">
                 <span className="text-4xl font-black text-red-400">✕</span>
                 <p className="text-center font-mono text-[11px] font-black uppercase tracking-wide text-red-500 leading-tight px-4">
@@ -883,12 +878,12 @@ export default function UserDashboard() {
 
             <div className="space-y-3">
               <p className="text-center text-[10px] font-mono font-black text-neutral-600 uppercase tracking-tight">
-                {(ticketExpandido.order.status === "CANCELLED" || (ticketExpandido.order.status === "PAID" && !ticketExpandido.allowEntrance))
-                  ? "⚠ Este evento fue cancelado por el organizador"
+                {expandedCancelled
+                  ? "⚠ Esta entrada fue cancelada y ya no es válida"
                   : "📱 Presentá esta pantalla en los lectores de puerta"}
               </p>
               <div className="grid grid-cols-1 gap-2">
-                {!(ticketExpandido.order.status === "CANCELLED" || (ticketExpandido.order.status === "PAID" && !ticketExpandido.allowEntrance)) && (
+                {!expandedCancelled && (
                 <AddToWalletButton
                   ticket={{
                     id: ticketExpandido.id,
@@ -909,7 +904,8 @@ export default function UserDashboard() {
             </div>
           </div>
         </div>
-      )}
+        );
+      })()}
     </div>
   );
 }
