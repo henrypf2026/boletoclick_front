@@ -441,7 +441,6 @@ export default function EventForm() {
             required
             min={HOY}
             max={FECHA_MAXIMA}
-            style={{ colorScheme: "dark" }}
             className="p-3 border-2 border-border bg-background text-text text-sm"
           />
           <input
