@@ -8,7 +8,7 @@ import { loginSchema } from '@/validators/authSchemas';
 import type { AuthUser } from '@/services/authService';
 
 interface ProducerScannerAuthProps {
-  onAuthorized: () => void;
+  onAuthorized: () => void | Promise<void>;
   eventTitle?: string;
 }
 
@@ -134,7 +134,7 @@ export default function ProducerScannerAuth({
               );
             }
 
-            onAuthorized();
+            await onAuthorized();
           } catch (error: unknown) {
             const message =
               error instanceof Error
