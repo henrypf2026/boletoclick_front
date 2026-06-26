@@ -4,6 +4,7 @@ import CenterNav from "./CenterNav";
 import { NavDarkModeToggle } from "./DarkModeToggle";
 import UserMenuButton from "./UserMenuButton";
 import MobileMenu from "./MobileMenu";
+import NotificationBell from "@/components/ui/NotificationBell";
 
 export default function Navbar() {
   return (
@@ -30,6 +31,7 @@ export default function Navbar() {
 
         <div className="ml-auto flex items-center gap-2">
           <NavDarkModeToggle />
+          <NotificationBell />
           <UserMenuButton />
           <div className="md:hidden">
             <MobileMenu navLinks={navItems} />

@@ -14,6 +14,7 @@ function statusStyle(status: ApiTicket["order"]["status"]) {
     case "PENDING": return "text-yellow-600 bg-yellow-400/10 border-yellow-500";
     case "FAILED": return "text-red-500 bg-red-500/10 border-red-500";
     case "REFUNDED": return "text-text-soft bg-surface-2 border-text/30";
+    case "CANCELLED": return "text-red-500 bg-red-500/10 border-red-500";
   }
 }
 
@@ -23,6 +24,7 @@ function statusLabel(status: ApiTicket["order"]["status"]) {
     case "PENDING": return "PENDIENTE";
     case "FAILED": return "FALLIDO";
     case "REFUNDED": return "REEMBOLSADO";
+    case "CANCELLED": return "CANCELADO";
   }
 }
 
@@ -34,15 +36,22 @@ export default function MisTicketsPage() {
   const [ticketExpandido, setTicketExpandido] = useState<ApiTicket | null>(null);
   const [eventTitles, setEventTitles] = useState<Record<string, string>>({});
 
-  
   useEffect(() => {
     if (!user) return;
 
-    ticketService
-      .getMyTickets(user.id)
-      .then((data) => setTickets(data))
-      .catch(() => setTickets([]))
-      .finally(() => setLoading(false));
+    const load = () => {
+      ticketService
+        .getMyTickets(user.id)
+        .then((data) => setTickets(data))
+        .catch(() => setTickets([]))
+        .finally(() => setLoading(false));
+    };
+
+    load();
+
+    const onVisible = () => { if (!document.hidden) load(); };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => document.removeEventListener('visibilitychange', onVisible);
   }, [user]);
 
   useEffect(() => {
@@ -135,22 +144,30 @@ export default function MisTicketsPage() {
       /* Lista de tickets */
       ) : (
         <div className="flex flex-col gap-4">
-          {tickets.map((ticket) => (
+          {tickets.map((ticket) => {
+            const isCancelled = ticket.order.status === "CANCELLED" || (ticket.order.status === "PAID" && !ticket.allowEntrance);
+            return (
             <div
               key={ticket.id}
               onClick={() => setTicketExpandido(ticket)}
-              className="bg-surface border-2 border-text shadow-[4px_4px_0px_0px_var(--color-text)] cursor-pointer transition-all hover:shadow-[7px_7px_0px_0px_var(--color-text)] hover:-translate-x-0.5 hover:-translate-y-0.5 group"
+              className={`bg-surface border-2 shadow-[4px_4px_0px_0px_var(--color-text)] cursor-pointer transition-all group ${
+                isCancelled
+                  ? "border-text/30 opacity-60 hover:opacity-80"
+                  : "border-text hover:shadow-[7px_7px_0px_0px_var(--color-text)] hover:-translate-x-0.5 hover:-translate-y-0.5"
+              }`}
             >
               <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 p-5">
 
                 {/* Info del ticket */}
                 <div className="flex flex-col gap-1.5">
                   <div className="flex items-center gap-2 flex-wrap">
-                    <h2 className="text-lg font-black uppercase tracking-tight text-text group-hover:text-primary transition-colors">
+                    <h2 className={`text-lg font-black uppercase tracking-tight transition-colors ${
+                      isCancelled ? "text-text/50 line-through" : "text-text group-hover:text-primary"
+                    }`}>
                       {eventTitles[ticket.ticketType.eventId ?? ""] ?? ticket.eventTitle ?? ticket.ticketType.name}
                     </h2>
-                    <span className={`text-[10px] font-mono font-black uppercase border px-2 py-0.5 ${statusStyle(ticket.order.status)}`}>
-                      {statusLabel(ticket.order.status)}
+                    <span className={`text-[10px] font-mono font-black uppercase border px-2 py-0.5 ${isCancelled ? statusStyle("CANCELLED") : statusStyle(ticket.order.status)}`}>
+                      {isCancelled ? statusLabel("CANCELLED") : statusLabel(ticket.order.status)}
                     </span>
                   </div>
 
@@ -172,23 +189,33 @@ export default function MisTicketsPage() {
                     })}
                   </p>
 
-                  <strong className="text-lg font-black text-success font-mono">
+                  <strong className={`text-lg font-black font-mono ${isCancelled ? "text-text/40" : "text-success"}`}>
                     ${ticket.ticketType.price.toLocaleString("es-AR")}
                   </strong>
                 </div>
 
-                {/* QR */}
+                {/* QR / Cancelado */}
                 <div className="flex flex-col items-center gap-2 shrink-0">
-                  <div className="flex h-28 w-28 items-center justify-center border-4 border-text bg-background p-2 shadow-[2px_2px_0px_0px_var(--color-text)] group-hover:scale-105 transition-transform">
-                    <TicketQrCode value={ticket.qrCode} size={96} className="w-full h-full" />
-                  </div>
+                  {isCancelled ? (
+                    <div className="flex h-28 w-28 flex-col items-center justify-center border-4 border-dashed border-red-400/50 bg-red-50/30 dark:bg-red-950/20 gap-1">
+                      <span className="text-2xl font-black text-red-400/60">✕</span>
+                      <span className="text-center text-[9px] font-black uppercase tracking-wide text-red-400/70 font-mono leading-tight px-1">
+                        QR<br/>inválido
+                      </span>
+                    </div>
+                  ) : (
+                    <div className="flex h-28 w-28 items-center justify-center border-4 border-text bg-background p-2 shadow-[2px_2px_0px_0px_var(--color-text)] group-hover:scale-105 transition-transform">
+                      <TicketQrCode value={ticket.qrCode} size={96} className="w-full h-full" />
+                    </div>
+                  )}
                   <span className="text-center text-[10px] font-bold uppercase tracking-wide text-text-soft font-mono">
-                    Tocá para ver
+                    {isCancelled ? "Ver detalle" : "Tocá para ver"}
                   </span>
                 </div>
               </div>
             </div>
-          ))}
+            );
+          })}
         </div>
       )}
 
@@ -231,16 +258,28 @@ export default function MisTicketsPage() {
               </p>
             </div>
 
-            {/* QR expandido */}
-            <div className="my-6 bg-white p-4 border-4 border-black flex flex-col items-center justify-center aspect-square w-full max-w-60 mx-auto shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
-              <TicketQrCode value={ticketExpandido.qrCode} size={200} className="w-full h-full" />
-            </div>
+            {/* QR expandido / Cancelado */}
+            {(ticketExpandido.order.status === "CANCELLED" || (ticketExpandido.order.status === "PAID" && !ticketExpandido.allowEntrance)) ? (
+              <div className="my-6 flex flex-col items-center justify-center gap-3 border-4 border-dashed border-red-400 bg-red-50 aspect-square w-full max-w-60 mx-auto">
+                <span className="text-4xl font-black text-red-400">✕</span>
+                <p className="text-center font-mono text-[11px] font-black uppercase tracking-wide text-red-500 leading-tight px-4">
+                  QR inválido<br/>Entrada cancelada
+                </p>
+              </div>
+            ) : (
+              <div className="my-6 bg-white p-4 border-4 border-black flex flex-col items-center justify-center aspect-square w-full max-w-60 mx-auto shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
+                <TicketQrCode value={ticketExpandido.qrCode} size={200} className="w-full h-full" />
+              </div>
+            )}
 
             <div className="space-y-3">
               <p className="text-center text-[10px] font-mono font-black text-neutral-600 uppercase tracking-tight">
-                📱 Presentá esta pantalla en los lectores de puerta
+                {(ticketExpandido.order.status === "CANCELLED" || (ticketExpandido.order.status === "PAID" && !ticketExpandido.allowEntrance))
+                  ? "⚠ Este evento fue cancelado por el organizador"
+                  : "📱 Presentá esta pantalla en los lectores de puerta"}
               </p>
               <div className="grid grid-cols-1 gap-2">
+                {!(ticketExpandido.order.status === "CANCELLED" || (ticketExpandido.order.status === "PAID" && !ticketExpandido.allowEntrance)) && (
                 <AddToWalletButton
                   ticket={{
                     id: ticketExpandido.id,
@@ -250,6 +289,7 @@ export default function MisTicketsPage() {
                     zone: ticketExpandido.ticketType.zone,
                   }}
                 />
+                )}
                 <button
                   onClick={() => setTicketExpandido(null)}
                   className="w-full bg-black hover:bg-neutral-900 text-white font-mono font-black py-2.5 text-[11px] uppercase tracking-wider border-2 border-black transition-colors cursor-pointer"

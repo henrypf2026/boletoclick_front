@@ -47,6 +47,17 @@ interface EventData {
   venue?: { name: string };
 }
 
+function getEffectiveStatus(orden: Order): OrderStatus {
+  if (
+    orden.status === "PAID" &&
+    orden.tickets.length > 0 &&
+    orden.tickets.every((t) => !t.allowEntrance)
+  ) {
+    return "CANCELLED";
+  }
+  return orden.status;
+}
+
 function statusLabel(status: OrderStatus) {
   switch (status) {
     case "PAID":      return "PAGADO";
@@ -151,8 +162,9 @@ async function generarComprobantePDF(orden: Order) {
 
   y = 42;
 
-  const estadoTexto = statusLabel(orden.status);
-  const badgeColor = orden.status === "PAID" ? PURPLE : orden.status === "REFUNDED" ? "#555" : "#cc3333";
+  const efectiveStatus = getEffectiveStatus(orden);
+  const estadoTexto = statusLabel(efectiveStatus);
+  const badgeColor = efectiveStatus === "PAID" ? PURPLE : efectiveStatus === "REFUNDED" ? "#555" : "#cc3333";
   doc.setFillColor(badgeColor);
   doc.roundedRect(margen, y - 4, 38, 7, 1, 1, "F");
   doc.setFontSize(7);
@@ -341,29 +353,61 @@ export default function MisComprasPage() {
   const [busqueda,    setBusqueda]    = useState("");
   const [cancellingId, setCancellingId] = useState<string | null>(null);
   const [pdfLoading,  setPdfLoading]  = useState<string | null>(null);
+  const [eventTitles, setEventTitles] = useState<Record<string, string>>({});
 
   useEffect(() => {
     if (!user) return;
-    fetch("/api/backend/orders/me", { credentials: "include" })
-      .then((res) => {
-        if (!res.ok) throw new Error("Error al traer órdenes");
-        return res.json();
-      })
-      .then((data) => setOrders(data))
-      .catch(() => {
-        Swal.fire({
-          title: "ERROR",
-          text: "No pudimos cargar tu historial de compras. Intentá de nuevo.",
-          icon: "error",
-          confirmButtonText: "OK",
-          confirmButtonColor: "#6750e0",
-          background: "#f5f4f0",
-          color: "#171717",
-          customClass: SWAL_CUSTOM,
-        });
-      })
-      .finally(() => setLoading(false));
+
+    const load = () => {
+      fetch("/api/backend/orders/me", { credentials: "include" })
+        .then((res) => {
+          if (!res.ok) throw new Error("Error al traer órdenes");
+          return res.json();
+        })
+        .then((data) => setOrders(data))
+        .catch(() => {
+          Swal.fire({
+            title: "ERROR",
+            text: "No pudimos cargar tu historial de compras. Intentá de nuevo.",
+            icon: "error",
+            confirmButtonText: "OK",
+            confirmButtonColor: "#6750e0",
+            background: "#f5f4f0",
+            color: "#171717",
+            customClass: SWAL_CUSTOM,
+          });
+        })
+        .finally(() => setLoading(false));
+    };
+
+    load();
+
+    const onVisible = () => { if (!document.hidden) load(); };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => document.removeEventListener("visibilitychange", onVisible);
   }, [user]);
+
+  useEffect(() => {
+    const uniqueIds = [
+      ...new Set(
+        orders
+          .map((o) => o.tickets?.[0]?.ticketType?.eventId)
+          .filter(Boolean) as string[]
+      ),
+    ];
+    if (!uniqueIds.length) return;
+    Promise.all(
+      uniqueIds.map((id) =>
+        fetch(`/api/backend/events/${id}`, { credentials: "include" })
+          .then((r) => (r.ok ? r.json() : null))
+          .catch(() => null)
+      )
+    ).then((results) => {
+      const map: Record<string, string> = {};
+      results.forEach((ev) => { if (ev?.id && ev?.title) map[ev.id] = ev.title; });
+      setEventTitles(map);
+    });
+  }, [orders]);
 
   async function handleCancelOrder(orderId: string) {
     const result = await Swal.fire({
@@ -451,7 +495,7 @@ export default function MisComprasPage() {
       orders.filter(
         (o) =>
           o.id.toLowerCase().includes(busqueda.toLowerCase()) ||
-          statusLabel(o.status).toLowerCase().includes(busqueda.toLowerCase())
+          statusLabel(getEffectiveStatus(o)).toLowerCase().includes(busqueda.toLowerCase())
       ),
     [orders, busqueda]
   );
@@ -524,24 +568,35 @@ export default function MisComprasPage() {
               key={orden.id}
               className="bg-surface border-2 border-text shadow-[4px_4px_0px_0px_var(--color-text)]"
             >
-              <div className="border-b-2 border-text px-5 py-3 flex items-center justify-between gap-2 flex-wrap bg-background/40">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className="font-mono bg-text text-surface px-2 py-0.5 font-bold text-[10px] whitespace-nowrap">
-                    {orden.id.slice(0, 8).toUpperCase()}
-                  </span>
-                  <span className="text-text-soft text-[11px] font-mono font-bold">
-                    {new Date(orden.createdAt).toLocaleDateString("es-AR", {
-                      day: "numeric",
-                      month: "short",
-                      year: "numeric",
-                    })}
+              <div className="border-b-2 border-text px-5 py-3 bg-background/40">
+                <div className="flex items-center justify-between gap-2 flex-wrap">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="font-mono bg-text text-surface px-2 py-0.5 font-bold text-[10px] whitespace-nowrap">
+                      {orden.id.slice(0, 8).toUpperCase()}
+                    </span>
+                    <span className="text-text-soft text-[11px] font-mono font-bold">
+                      {new Date(orden.createdAt).toLocaleDateString("es-AR", {
+                        day: "numeric",
+                        month: "short",
+                        year: "numeric",
+                      })}
+                    </span>
+                  </div>
+                  <span
+                    className={`text-[10px] font-mono font-black uppercase border px-2 py-0.5 whitespace-nowrap ${statusStyle(getEffectiveStatus(orden))}`}
+                  >
+                    {statusLabel(getEffectiveStatus(orden))}
                   </span>
                 </div>
-                <span
-                  className={`text-[10px] font-mono font-black uppercase border px-2 py-0.5 whitespace-nowrap ${statusStyle(orden.status)}`}
-                >
-                  {statusLabel(orden.status)}
-                </span>
+                {(() => {
+                  const eventId = orden.tickets?.[0]?.ticketType?.eventId;
+                  const title = eventId ? eventTitles[eventId] : null;
+                  return title ? (
+                    <p className="mt-1.5 font-black text-sm uppercase tracking-tight text-text truncate">
+                      {title}
+                    </p>
+                  ) : null;
+                })()}
               </div>
 
               <div className="p-5">
@@ -589,7 +644,7 @@ export default function MisComprasPage() {
                   </div>
 
                   <div className="flex items-center gap-2 flex-wrap">
-                    {orden.status === "PAID" && (
+                    {getEffectiveStatus(orden) === "PAID" && (
                       <button
                         onClick={() => handleCancelOrder(orden.id)}
                         disabled={cancellingId === orden.id}
@@ -600,7 +655,7 @@ export default function MisComprasPage() {
                     )}
                     <button
                       onClick={() => handleDescargarPDF(orden)}
-                      disabled={orden.status !== "PAID" || pdfLoading === orden.id}
+                      disabled={getEffectiveStatus(orden) !== "PAID" || pdfLoading === orden.id}
                       className="flex items-center gap-2 bg-primary text-background font-mono font-black text-xs uppercase tracking-wider border-2 border-text px-4 py-2.5 shadow-[2px_2px_0px_0px_var(--color-text)] hover:shadow-none hover:translate-x-0.5 hover:translate-y-0.5 transition-all cursor-pointer whitespace-nowrap disabled:opacity-40 disabled:cursor-not-allowed disabled:shadow-none disabled:translate-x-0 disabled:translate-y-0"
                     >
                       {pdfLoading === orden.id ? (

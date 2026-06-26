@@ -47,11 +47,30 @@ export default function EntradaContent({ ticketId, encoded: encodedFromServer }:
     resolveTicket(encoded, ticketId),
   );
   const [loadingMap, setLoadingMap] = useState(true);
+  const [cancelled, setCancelled] = useState(false);
 
   useEffect(() => {
     const token = encoded ?? readEncodedFromUrl();
     setTicket(resolveTicket(token, ticketId));
   }, [encoded, ticketId]);
+
+  useEffect(() => {
+    const check = () => {
+      fetch('/api/backend/tickets/me', { credentials: 'include' })
+        .then((r) => (r.ok ? r.json() : []))
+        .then((tickets: { id: string; allowEntrance: boolean }[]) => {
+          const found = tickets.find((t) => t.id === ticketId);
+          if (found && !found.allowEntrance) setCancelled(true);
+        })
+        .catch(() => {});
+    };
+
+    check();
+
+    const onVisible = () => { if (!document.hidden) check(); };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => document.removeEventListener('visibilitychange', onVisible);
+  }, [ticketId]);
 
   useEffect(() => {
     if (!ticket) return;
@@ -93,6 +112,24 @@ export default function EntradaContent({ ticketId, encoded: encodedFromServer }:
           </p>
           <p className="mt-2 text-xs text-text-soft">
             El enlace puede estar incompleto. Volvé a escanear el QR desde Mis Entradas.
+          </p>
+          <Link href="/mis-tickets" className="mt-6 inline-block text-sm font-black uppercase tracking-wider text-primary hover:underline">
+            ← Regresar a mis entradas
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  if (cancelled) {
+    return (
+      <div className="min-h-dvh -mx-4 -my-8 flex items-center justify-center px-4">
+        <div className="max-w-md border-4 border-red-500 bg-surface p-8 text-center shadow-[4px_4px_0px_0px_rgba(239,68,68,1)]">
+          <p className="text-sm font-black uppercase tracking-wide text-red-500">
+            Entrada cancelada
+          </p>
+          <p className="mt-2 text-xs text-text-soft">
+            El evento fue cancelado. Esta entrada ya no es válida.
           </p>
           <Link href="/mis-tickets" className="mt-6 inline-block text-sm font-black uppercase tracking-wider text-primary hover:underline">
             ← Regresar a mis entradas

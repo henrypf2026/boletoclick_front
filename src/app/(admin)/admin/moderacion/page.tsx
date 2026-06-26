@@ -18,7 +18,7 @@ import {
   Sparkles,
 } from "lucide-react";
 
-type EventoEstado = "APROBADO" | "RECHAZADO";
+type EventoEstado = "APROBADO" | "RECHAZADO" | "CANCELADO";
 
 interface EventoAdmin {
   id: string;
@@ -58,7 +58,9 @@ export default function AdminModeracion() {
       const mapeados: EventoAdmin[] = (Array.isArray(data) ? data : []).map(
         (ev: any) => {
           const estadoFormateado: EventoEstado =
-            ev.status === "REJECTED" ? "RECHAZADO" : "APROBADO";
+            ev.status === "REJECTED" ? "RECHAZADO"
+            : ev.status === "CANCELLED" || ev.status === "INACTIVE" ? "CANCELADO"
+            : "APROBADO";
 
           const primerTicketType = ev.ticketTypes?.[0];
 
@@ -385,7 +387,7 @@ export default function AdminModeracion() {
                         isChecked
                           ? "ring-2 ring-primary ring-offset-2 ring-offset-bg"
                           : ""
-                      } ${!isActivo ? "opacity-70" : ""}`}
+                      } ${ev.estado === "CANCELADO" ? "opacity-50" : !isActivo ? "opacity-70" : ""}`}
                     >
                       <button
                         onClick={() => toggleSeleccion(ev.id)}
@@ -408,12 +410,14 @@ export default function AdminModeracion() {
                           </span>
                           <span
                             className={`text-[10px] font-black px-2 py-0.5 border-2 uppercase ${
-                              isActivo
+                              ev.estado === "APROBADO"
                                 ? "bg-success/15 text-success border-success/50"
+                                : ev.estado === "CANCELADO"
+                                ? "bg-red-400/15 text-red-500 border-red-400/50"
                                 : "bg-accent/15 text-accent border-accent/50"
                             }`}
                           >
-                            {ev.estado}
+                            {ev.estado === "CANCELADO" ? "✕ CANCELADO" : ev.estado}
                           </span>
                           {ev.aforo >= 5000 && (
                             <span className="bg-accent text-background font-black text-[10px] px-1.5 py-0.5 border border-border">
@@ -635,13 +639,16 @@ export default function AdminModeracion() {
                     className={`px-2 py-0.5 border-2 font-black uppercase ${
                       selectedEvento.estado === "APROBADO"
                         ? "bg-success/15 text-success border-success/50"
+                        : selectedEvento.estado === "CANCELADO"
+                        ? "bg-red-400/15 text-red-500 border-red-400/50"
                         : "bg-accent/15 text-accent border-accent/50"
                     }`}
                   >
-                    {selectedEvento.estado}
+                    {selectedEvento.estado === "CANCELADO" ? "✕ CANCELADO" : selectedEvento.estado}
                   </span>
                 </div>
 
+                {selectedEvento.estado !== "CANCELADO" && (
                 <button
                   onClick={() =>
                     cambiarEstadoEvento(
@@ -664,6 +671,7 @@ export default function AdminModeracion() {
                     </>
                   )}
                 </button>
+                )}
               </div>
             </motion.div>
           </>
