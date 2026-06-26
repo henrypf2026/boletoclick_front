@@ -104,6 +104,11 @@ export function normalizeQrUrl(qrCode: string, fallbackOrigin = ''): string {
 }
 
 export function toScannableQrValue(value: string, fallbackOrigin = ''): string {
+  const trimmed = value.trim();
+  if (/^eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+/.test(trimmed)) {
+    return trimmed.match(/^eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+/)![0];
+  }
+
   const normalized = normalizeQrUrl(value, fallbackOrigin);
   if (normalized.startsWith('http')) return normalized;
   const base = getQrPublicBaseUrl(fallbackOrigin).replace(/\/$/, '');

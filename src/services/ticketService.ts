@@ -154,9 +154,14 @@ function mergeTicketWithLocal(
   );
 
   if (stored) {
+    const apiQr = apiTicket.qrCode?.trim() ?? '';
+    const qrForDisplay = /^eyJ/.test(apiQr)
+      ? apiQr
+      : normalizeQrUrl(stored.qrCode);
+
     return {
       ...apiTicket,
-      qrCode: normalizeQrUrl(stored.qrCode),
+      qrCode: qrForDisplay,
       eventTitle: stored.eventTitle,
       ticketType: {
         ...apiTicket.ticketType,

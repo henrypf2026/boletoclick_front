@@ -6,6 +6,7 @@ import {
   isDuplicateScanError,
   vibrateMobile,
 } from '@/lib/scannerFeedback';
+import { parseScannedQr } from '@/lib/parseScannedQr';
 import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
 import { Html5Qrcode, Html5QrcodeScannerState } from 'html5-qrcode';
@@ -164,12 +165,16 @@ export default function ProducerEventScanner({
       setFeedbackMsg('');
 
       try {
+        const parsed = parseScannedQr(normalizedCode);
+        if (!parsed.qrCode && !parsed.ticketId) return;
+
         const response = await authenticatedFetch('/api/backend/tickets/scan', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           credentials: 'include',
           body: JSON.stringify({
-            qrCode: normalizedCode,
+            ...(parsed.qrCode ? { qrCode: parsed.qrCode } : {}),
+            ...(parsed.ticketId ? { ticketId: parsed.ticketId } : {}),
             ...(eventId ? { eventId } : {}),
           }),
         });
