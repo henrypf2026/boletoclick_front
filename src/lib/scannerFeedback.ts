@@ -1,7 +1,7 @@
-const DUPLICATE_SCAN_MESSAGE =
+export const DUPLICATE_SCAN_MESSAGE =
   'Este boleto ya fue escaneado. No se puede repetir la lectura.';
 
-function isDuplicateScanError(message: string): boolean {
+export function isDuplicateScanError(message: string): boolean {
   const normalized = message.toLowerCase();
   return (
     normalized.includes('ya utilizado') ||
@@ -13,7 +13,7 @@ function isDuplicateScanError(message: string): boolean {
   );
 }
 
-function vibrateMobile(pattern: number | number[]) {
+export function vibrateMobile(pattern: number | number[]) {
   if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
     navigator.vibrate(pattern);
   }
