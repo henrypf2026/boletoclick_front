@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
+import { authenticatedFetch } from '@/lib/authenticatedFetch';
 import { decodeTicketQrData } from '@/lib/ticketQr';
 import { formatEventDate, formatPrice } from '@/mocks/events';
 import { eventService } from '@/services/eventService';
@@ -56,7 +57,7 @@ export default function EntradaContent({ ticketId, encoded: encodedFromServer }:
 
   useEffect(() => {
     const check = () => {
-      fetch('/api/backend/tickets/me', { credentials: 'include' })
+      authenticatedFetch('/api/backend/tickets/me', { credentials: 'include' })
         .then((r) => (r.ok ? r.json() : []))
         .then((tickets: { id: string; allowEntrance: boolean }[]) => {
           const found = tickets.find((t) => t.id === ticketId);

@@ -1,5 +1,7 @@
 "use client";
 
+import { authenticatedFetch } from '@/lib/authenticatedFetch';
+
 import { useState, useEffect, useCallback, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
@@ -284,7 +286,7 @@ function CheckoutContent() {
         total: totalFinal,
       });
 
-      const res = await fetch("/api/backend/payments/create-session", {
+      const res = await authenticatedFetch("/api/backend/payments/create-session", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: 'include',

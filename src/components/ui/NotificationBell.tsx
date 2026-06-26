@@ -1,5 +1,7 @@
 'use client';
 
+import { authenticatedFetch } from '@/lib/authenticatedFetch';
+
 import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { Bell } from 'lucide-react';
@@ -21,7 +23,7 @@ const SEEN_KEY = 'bc_seen_notifs';
 // ─── Notificaciones para el usuario comprador ────────────────────────────────
 
 async function fetchUserNotifications(): Promise<Notification[]> {
-  const orders: any[] = await fetch('/api/backend/orders/me', { credentials: 'include' })
+  const orders: any[] = await authenticatedFetch('/api/backend/orders/me', { credentials: 'include' })
     .then((r) => (r.ok ? r.json() : []))
     .catch(() => []);
 
@@ -39,7 +41,7 @@ async function fetchUserNotifications(): Promise<Notification[]> {
       let title = 'Evento cancelado';
       if (eventId) {
         try {
-          const ev = await fetch(`/api/backend/events/${eventId}`).then((r) =>
+          const ev = await authenticatedFetch(`/api/backend/events/${eventId}`).then((r) =>
             r.ok ? r.json() : null
           );
           if (ev?.title) title = ev.title;
@@ -68,7 +70,7 @@ async function fetchUserNotifications(): Promise<Notification[]> {
 
   const purchasedEvents: any[] = await Promise.all(
     purchasedEventIds.map((id) =>
-      fetch(`/api/backend/events/${id}`)
+      authenticatedFetch(`/api/backend/events/${id}`)
         .then((r) => (r.ok ? r.json() : null))
         .catch(() => null)
     )
@@ -82,7 +84,7 @@ async function fetchUserNotifications(): Promise<Notification[]> {
     if (e.categoryId && e.category?.name) categoryName[e.categoryId] = e.category.name;
   });
 
-  const allEvents: any[] = await fetch('/api/backend/events')
+  const allEvents: any[] = await authenticatedFetch('/api/backend/events')
     .then((r) => (r.ok ? r.json() : []))
     .catch(() => []);
 
@@ -112,7 +114,7 @@ async function fetchUserNotifications(): Promise<Notification[]> {
 // ─── Notificaciones para el productor ────────────────────────────────────────
 
 async function fetchProducerNotifications(seenIds: Set<string>): Promise<Notification[]> {
-  const events: any[] = await fetch('/api/backend/events/producer', { credentials: 'include' })
+  const events: any[] = await authenticatedFetch('/api/backend/events/producer', { credentials: 'include' })
     .then((r) => (r.ok ? r.json() : []))
     .catch(() => []);
 

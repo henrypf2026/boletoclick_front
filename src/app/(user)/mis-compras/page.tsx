@@ -1,12 +1,19 @@
 "use client";
 
+import { authenticatedFetch } from '@/lib/authenticatedFetch';
+
 import { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
 import Swal from "sweetalert2";
 import jsPDF from "jspdf";
-
-type OrderStatus = "PENDING" | "PAID" | "FAILED" | "REFUNDED" | "CANCELLED";
+import {
+  getEffectiveOrderStatus,
+  orderStatusBadgeColor,
+  orderStatusColor,
+  orderStatusLabel,
+  type OrderStatus,
+} from "@/lib/orderStatus";
 
 interface TicketType {
   id: string;
@@ -47,37 +54,6 @@ interface EventData {
   venue?: { name: string };
 }
 
-function getEffectiveStatus(orden: Order): OrderStatus {
-  if (
-    orden.status === "PAID" &&
-    orden.tickets.length > 0 &&
-    orden.tickets.every((t) => !t.allowEntrance)
-  ) {
-    return "CANCELLED";
-  }
-  return orden.status;
-}
-
-function statusLabel(status: OrderStatus) {
-  switch (status) {
-    case "PAID":      return "PAGADO";
-    case "PENDING":   return "PENDIENTE";
-    case "FAILED":    return "FALLIDO";
-    case "REFUNDED":  return "REEMBOLSADO";
-    case "CANCELLED": return "CANCELADO";
-  }
-}
-
-function statusStyle(status: OrderStatus) {
-  switch (status) {
-    case "PAID":      return "text-success bg-success/10 border-success";
-    case "PENDING":   return "text-yellow-600 bg-yellow-400/10 border-yellow-500";
-    case "FAILED":    return "text-red-500 bg-red-500/10 border-red-500";
-    case "REFUNDED":  return "text-text-soft bg-surface-2 border-text/30";
-    case "CANCELLED": return "text-text-soft bg-surface-2 border-text/30";
-  }
-}
-
 const SWAL_CUSTOM = {
   popup: "border-4 border-[#171717] rounded-none shadow-[6px_6px_0px_0px_#171717] font-mono",
   title: "uppercase font-black tracking-tighter",
@@ -87,7 +63,7 @@ const SWAL_CUSTOM = {
 
 async function fetchEvent(eventId: string): Promise<EventData | null> {
   try {
-    const res = await fetch(`/api/backend/events/${eventId}`, {
+    const res = await authenticatedFetch(`/api/backend/events/${eventId}`, {
       credentials: "include",
     });
     if (!res.ok) return null;
@@ -162,9 +138,9 @@ async function generarComprobantePDF(orden: Order) {
 
   y = 42;
 
-  const efectiveStatus = getEffectiveStatus(orden);
-  const estadoTexto = statusLabel(efectiveStatus);
-  const badgeColor = efectiveStatus === "PAID" ? PURPLE : efectiveStatus === "REFUNDED" ? "#555" : "#cc3333";
+  const efectiveStatus = getEffectiveOrderStatus(orden);
+  const estadoTexto = orderStatusLabel(efectiveStatus);
+  const badgeColor = orderStatusBadgeColor(efectiveStatus);
   doc.setFillColor(badgeColor);
   doc.roundedRect(margen, y - 4, 38, 7, 1, 1, "F");
   doc.setFontSize(7);
@@ -359,7 +335,7 @@ export default function MisComprasPage() {
     if (!user) return;
 
     const load = () => {
-      fetch("/api/backend/orders/me", { credentials: "include" })
+      authenticatedFetch("/api/backend/orders/me", { credentials: "include" })
         .then((res) => {
           if (!res.ok) throw new Error("Error al traer órdenes");
           return res.json();
@@ -398,7 +374,7 @@ export default function MisComprasPage() {
     if (!uniqueIds.length) return;
     Promise.all(
       uniqueIds.map((id) =>
-        fetch(`/api/backend/events/${id}`, { credentials: "include" })
+        authenticatedFetch(`/api/backend/events/${id}`, { credentials: "include" })
           .then((r) => (r.ok ? r.json() : null))
           .catch(() => null)
       )
@@ -428,7 +404,7 @@ export default function MisComprasPage() {
 
     setCancellingId(orderId);
     try {
-      const res = await fetch(`/api/backend/orders/${orderId}/cancel`, {
+      const res = await authenticatedFetch(`/api/backend/orders/${orderId}/cancel`, {
         method: "PATCH",
         credentials: "include",
       });
@@ -495,7 +471,7 @@ export default function MisComprasPage() {
       orders.filter(
         (o) =>
           o.id.toLowerCase().includes(busqueda.toLowerCase()) ||
-          statusLabel(getEffectiveStatus(o)).toLowerCase().includes(busqueda.toLowerCase())
+          orderStatusLabel(getEffectiveOrderStatus(o)).toLowerCase().includes(busqueda.toLowerCase())
       ),
     [orders, busqueda]
   );
@@ -583,9 +559,9 @@ export default function MisComprasPage() {
                     </span>
                   </div>
                   <span
-                    className={`text-[10px] font-mono font-black uppercase border px-2 py-0.5 whitespace-nowrap ${statusStyle(getEffectiveStatus(orden))}`}
+                    className={`text-[10px] font-mono font-black uppercase border px-2 py-0.5 whitespace-nowrap ${orderStatusColor(getEffectiveOrderStatus(orden))}`}
                   >
-                    {statusLabel(getEffectiveStatus(orden))}
+                    {orderStatusLabel(getEffectiveOrderStatus(orden))}
                   </span>
                 </div>
                 {(() => {
@@ -644,7 +620,7 @@ export default function MisComprasPage() {
                   </div>
 
                   <div className="flex items-center gap-2 flex-wrap">
-                    {getEffectiveStatus(orden) === "PAID" && (
+                    {getEffectiveOrderStatus(orden) === "PAID" && (
                       <button
                         onClick={() => handleCancelOrder(orden.id)}
                         disabled={cancellingId === orden.id}
@@ -655,7 +631,7 @@ export default function MisComprasPage() {
                     )}
                     <button
                       onClick={() => handleDescargarPDF(orden)}
-                      disabled={getEffectiveStatus(orden) !== "PAID" || pdfLoading === orden.id}
+                      disabled={getEffectiveOrderStatus(orden) !== "PAID" || pdfLoading === orden.id}
                       className="flex items-center gap-2 bg-primary text-background font-mono font-black text-xs uppercase tracking-wider border-2 border-text px-4 py-2.5 shadow-[2px_2px_0px_0px_var(--color-text)] hover:shadow-none hover:translate-x-0.5 hover:translate-y-0.5 transition-all cursor-pointer whitespace-nowrap disabled:opacity-40 disabled:cursor-not-allowed disabled:shadow-none disabled:translate-x-0 disabled:translate-y-0"
                     >
                       {pdfLoading === orden.id ? (

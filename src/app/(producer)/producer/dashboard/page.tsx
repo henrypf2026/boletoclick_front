@@ -1,7 +1,15 @@
 "use client";
-import React, { useState, useEffect, useMemo } from "react";
+
+import { authenticatedFetch } from '@/lib/authenticatedFetch';
+import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Swal from "sweetalert2";
+import {
+  normalizeEventStatusForUi,
+  toApiEventStatus,
+} from "@/lib/eventStatus";
+import ProducerEventEditForm from "@/components/dashboard/ProducerEventEditForm";
+import type { ProducerEventFormValues } from "@/validators/dashboardSchemas";
 
 interface TicketType {
   name: string;
@@ -59,14 +67,6 @@ export default function DashboardProducer() {
   const [statusScanner, setStatusScanner] = useState<"idle" | "success" | "error">("idle");
   const [ultimosAccesos, setUltimosAccesos] = useState<Acceso[]>([]);
 
-  const [formTitle, setFormTitle] = useState("");
-  const [formDescription, setFormDescription] = useState("");
-  const [formDate, setFormDate] = useState("");
-  const [formTime, setFormTime] = useState("");
-  const [formLocation, setFormLocation] = useState("");
-  const [formCategory, setFormCategory] = useState("");
-  const [formTicketTypes, setFormTicketTypes] = useState<TicketType[]>([]);
-
   const [loadingAccion, setLoadingAccion] = useState<boolean>(false);
   const [mostrarPanel, setMostrarPanel] = useState(false);
   const [categorias, setCategorias] = useState<ApiItem[]>([]);
@@ -76,14 +76,21 @@ export default function DashboardProducer() {
     const fetchEventosProductor = async () => {
       try {
         setLoading(true);
-        const response = await fetch("/api/backend/events/producer", {
+        const response = await authenticatedFetch("/api/backend/events/producer", {
           method: "GET",
           headers: { "Content-Type": "application/json" },
           credentials: "include",
         });
         if (!response.ok) throw new Error(`Error al obtener eventos: ${response.status}`);
         const data = await response.json();
-        setEventos(data.filter((ev: Evento) => ev.status !== "INACTIVE"));
+        setEventos(
+          data
+            .filter((ev: Evento) => ev.status !== "INACTIVE")
+            .map((ev: Evento) => ({
+              ...ev,
+              status: normalizeEventStatusForUi(ev.status),
+            })),
+        );
         setErrorApi(null);
       } catch (err: any) {
         console.error("🚨 Error capturado en Dashboard:", err.message);
@@ -98,8 +105,8 @@ export default function DashboardProducer() {
   useEffect(() => {
     const cargarDesplegables = async () => {
       const [resCat, resVen] = await Promise.all([
-        fetch("/api/backend/categories").catch(() => null),
-        fetch("/api/backend/venues").catch(() => null),
+        authenticatedFetch("/api/backend/categories").catch(() => null),
+        authenticatedFetch("/api/backend/venues").catch(() => null),
       ]);
       if (resCat?.ok) setCategorias(await resCat.json());
       if (resVen?.ok) setLocaciones(await resVen.json());
@@ -111,94 +118,31 @@ export default function DashboardProducer() {
     setEventoSeleccionado(ev);
     setEventStats(null);
     setLoadingStats(true);
-    fetch(`/api/backend/tickets/event/${ev.id}/stats`, { credentials: "include" })
+    authenticatedFetch(`/api/backend/tickets/event/${ev.id}/stats`, { credentials: "include" })
       .then((r) => r.ok ? r.json() : null)
       .then((data) => { if (data) setEventStats(data); })
       .catch(() => {})
       .finally(() => setLoadingStats(false));
 
-    setFormTitle(ev.title);
-    setFormDescription(ev.description || "");
-
-    const date = new Date(ev.eventDate);
-    setFormDate(ev.eventDate ? ev.eventDate.split("T")[0] : "");
-    setFormTime(
-      ev.eventDate
-        ? `${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`
-        : ""
-    );
-
-    setFormLocation(ev.venueId || "");
-    setFormCategory(ev.categoryId || "");
-    setFormTicketTypes(ev.ticketTypes ? ev.ticketTypes.map((t) => ({ ...t })) : []);
     setStatusScanner("idle");
     if (ev.status === "CONCLUIDO") setSeccionActiva("ajustes");
     setMostrarPanel(true);
   };
 
-  const handleTicketTypeChange = (index: number, field: keyof TicketType, value: any) => {
-    setFormTicketTypes((prev) =>
-      prev.map((ticket, idx) => (idx === index ? { ...ticket, [field]: value } : ticket))
-    );
-  };
-
-  const guardarCambios = async () => {
+  const guardarCambios = async (values: ProducerEventFormValues) => {
     if (!eventoSeleccionado) return;
-
-    for (let i = 0; i < formTicketTypes.length; i++) {
-      const original = eventoSeleccionado.ticketTypes?.[i];
-      const modificado = formTicketTypes[i];
-      const vendidos = original?.sold || 0;
-
-      if (vendidos > 0) {
-        if (original && original.price !== Number(modificado.price)) {
-          Swal.fire({
-            title: "ERROR DE SEGURIDAD",
-            text: `No podés cambiar el precio de "${modificado.name}" porque ya tiene ${vendidos} entradas vendidas.`,
-            icon: "error",
-            confirmButtonText: "OK",
-            confirmButtonColor: "#6750e0",
-            background: "#f5f4f0",
-            color: "#171717",
-            customClass: {
-              popup: "border-4 border-[#171717] rounded-none shadow-[6px_6px_0px_0px_#171717] font-mono",
-              title: "uppercase font-black tracking-tighter",
-              confirmButton: "font-mono font-black uppercase tracking-wider border-2 border-[#171717] rounded-none",
-            },
-          });
-          return;
-        }
-        if (Number(modificado.stock) < vendidos) {
-          Swal.fire({
-            title: "ERROR DE SEGURIDAD",
-            text: `El stock de "${modificado.name}" no puede ser menor a las entradas ya vendidas (${vendidos}).`,
-            icon: "error",
-            confirmButtonText: "OK",
-            confirmButtonColor: "#6750e0",
-            background: "#f5f4f0",
-            color: "#171717",
-            customClass: {
-              popup: "border-4 border-[#171717] rounded-none shadow-[6px_6px_0px_0px_#171717] font-mono",
-              title: "uppercase font-black tracking-tighter",
-              confirmButton: "font-mono font-black uppercase tracking-wider border-2 border-[#171717] rounded-none",
-            },
-          });
-          return;
-        }
-      }
-    }
 
     setLoadingAccion(true);
     try {
       const payloadDto = {
-        title: formTitle,
-        description: formDescription,
-        eventDate: formDate
-          ? new Date(`${formDate}T${formTime || "12:00"}:00`).toISOString()
+        title: values.title,
+        description: values.description,
+        eventDate: values.formDate
+          ? new Date(`${values.formDate}T${values.formTime || "12:00"}:00`).toISOString()
           : undefined,
-        categoryId: formCategory,
-        venueId: formLocation,
-        ticketTypes: formTicketTypes.map((ticket) => ({
+        categoryId: values.categoryId,
+        venueId: values.venueId,
+        ticketTypes: values.ticketTypes.map((ticket) => ({
           name: ticket.name,
           zone: ticket.zone || ticket.name,
           price: Number(ticket.price),
@@ -206,7 +150,7 @@ export default function DashboardProducer() {
         })),
       };
 
-      const response = await fetch(`/api/backend/events/${eventoSeleccionado.id}`, {
+      const response = await authenticatedFetch(`/api/backend/events/${eventoSeleccionado.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
@@ -286,11 +230,11 @@ export default function DashboardProducer() {
 
     setLoadingAccion(true);
     try {
-      const response = await fetch(`/api/backend/events/${eventoSeleccionado.id}`, {
+      const response = await authenticatedFetch(`/api/backend/events/${eventoSeleccionado.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ status: nuevoStatus }),
+        body: JSON.stringify({ status: toApiEventStatus(nuevoStatus) }),
       });
 
       if (!response.ok) throw new Error(`Error del servidor: ${response.status}`);
@@ -364,7 +308,7 @@ export default function DashboardProducer() {
     setLoadingAccion(true);
 
     try {
-      const response = await fetch(`/api/backend/events/${idABorrar}`, {
+      const response = await authenticatedFetch(`/api/backend/events/${idABorrar}`, {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
@@ -428,9 +372,6 @@ export default function DashboardProducer() {
     }
   };
 
-  const capacidadTotalPantalla = useMemo(() => {
-    return formTicketTypes.reduce((acc, curr) => acc + (Number(curr.stock) || 0), 0);
-  }, [formTicketTypes]);
 
   return (
     <div className="p-4 md:p-8 max-w-7xl mx-auto min-h-screen bg-background text-text selection:bg-primary selection:text-background">
@@ -614,224 +555,15 @@ export default function DashboardProducer() {
             <div>
               {/* SECCIÓN AJUSTES */}
               {seccionActiva === "ajustes" && (
-                <div className="bg-surface border-2 border-text p-6 space-y-5 shadow-[4px_4px_0px_0px_var(--color-text)]">
-                  <div className="flex justify-between items-center border-b-2 border-text pb-1">
-                    <h3 className="text-lg font-black uppercase">Editor Maestro del Evento</h3>
-                    <span className="font-mono text-xs bg-secondary/10 border border-text px-2 py-0.5 font-bold uppercase">
-                      Capacidad total: {capacidadTotalPantalla} pax
-                    </span>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-1">
-                      <label className="text-[10px] font-mono font-bold uppercase text-text-soft">Título Comercial</label>
-                      <input
-                        type="text"
-                        value={formTitle}
-                        onChange={(e) => setFormTitle(e.target.value)}
-                        className="w-full border-2 border-text p-2 bg-background font-bold text-xs uppercase shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] focus:outline-none"
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <label className="text-[10px] font-mono font-bold uppercase text-text-soft">Categoría del Show</label>
-                      <select
-                        value={formCategory}
-                        onChange={(e) => setFormCategory(e.target.value)}
-                        className="w-full border-2 border-text p-2 bg-background font-bold text-xs uppercase shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] focus:outline-none"
-                      >
-                        <option value="">-- Seleccioná Categoría --</option>
-                        {categorias.map((cat) => (
-                          <option key={cat.id} value={cat.id}>{cat.name}</option>
-                        ))}
-                      </select>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-1">
-                      <label className="text-[10px] font-mono font-bold uppercase text-text-soft">Fecha del Evento</label>
-                      <input
-                        type="date"
-                        value={formDate}
-                        onChange={(e) => setFormDate(e.target.value)}
-                        style={{ colorScheme: "dark" }}
-                        className="w-full border-2 border-text p-2 bg-background font-mono text-xs shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] focus:outline-none"
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <label className="text-[10px] font-mono font-bold uppercase text-text-soft">Hora del Evento</label>
-                      <input
-                        type="time"
-                        value={formTime}
-                        onChange={(e) => setFormTime(e.target.value)}
-                        style={{ colorScheme: "dark" }}
-                        className="w-full border-2 border-text p-2 bg-background font-mono text-xs shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] focus:outline-none"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-mono font-bold uppercase text-text-soft">Locación / Estadio</label>
-                    <select
-                      value={formLocation}
-                      onChange={(e) => setFormLocation(e.target.value)}
-                      className="w-full border-2 border-text p-2 bg-background font-bold text-xs uppercase shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] focus:outline-none"
-                    >
-                      <option value="">-- Seleccioná Lugar --</option>
-                      {locaciones.map((ven) => (
-                        <option key={ven.id} value={ven.id}>{ven.name}</option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-mono font-bold uppercase text-text-soft">Descripción de Cartelera</label>
-                    <textarea
-                      rows={3}
-                      value={formDescription}
-                      onChange={(e) => setFormDescription(e.target.value)}
-                      className="w-full border-2 border-text p-2 bg-background font-medium text-xs shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] focus:outline-none resize-none"
-                    />
-                  </div>
-
-                  <div className="pt-2 space-y-3">
-                    <h4 className="text-xs font-mono font-black uppercase tracking-tight text-primary">
-                      🔒 Gestión Macroeconómica de Tickets
-                    </h4>
-                    <div className="space-y-3">
-                      {formTicketTypes.map((ticket, idx) => {
-                        const entradasVendidas = ticket.sold || 0;
-                        const tieneVentas = entradasVendidas > 0;
-                        return (
-                          <div
-                            key={idx}
-                            className={`p-4 border-2 border-text shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] ${tieneVentas ? "bg-secondary/5" : "bg-background"}`}
-                          >
-                            <div className="flex justify-between items-center mb-2 gap-2">
-                              {tieneVentas ? (
-                                <span className="text-xs font-mono font-black uppercase text-text">{ticket.name}</span>
-                              ) : (
-                                <input
-                                  type="text"
-                                  value={ticket.name}
-                                  placeholder="NOMBRE DEL TICKET"
-                                  onChange={(e) => handleTicketTypeChange(idx, "name", e.target.value)}
-                                  className="flex-1 border border-text p-1.5 bg-background font-mono text-xs font-black uppercase focus:outline-none placeholder:text-text-soft/40"
-                                />
-                              )}
-                              {tieneVentas && (
-                                <span className="text-[10px] font-mono bg-accent text-white font-black px-2 py-0.5 uppercase tracking-tighter shrink-0">
-                                  ⚠️ BLOQUEO ACTIVO: {entradasVendidas} VENDIDAS
-                                </span>
-                              )}
-                            </div>
-                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                              <div>
-                                <label className="text-[9px] font-mono font-bold text-text-soft uppercase">Sector</label>
-                                <input
-                                  type="text"
-                                  value={ticket.zone || ""}
-                                  disabled={tieneVentas}
-                                  onChange={(e) => handleTicketTypeChange(idx, "zone", e.target.value)}
-                                  className="w-full border border-text p-1.5 bg-background font-bold text-xs uppercase disabled:opacity-50 disabled:bg-surface"
-                                />
-                              </div>
-                              <div>
-                                <label className="text-[9px] font-mono font-bold text-text-soft uppercase">Precio ($)</label>
-                                <input
-                                  type="number"
-                                  value={ticket.price === 0 ? "" : ticket.price}
-                                  disabled={tieneVentas}
-                                  onChange={(e) => handleTicketTypeChange(idx, "price", e.target.value === "" ? 0 : Number(e.target.value))}
-                                  className="w-full border border-text p-1.5 bg-background font-mono text-xs disabled:opacity-50 disabled:bg-surface"
-                                />
-                              </div>
-                              <div>
-                                <label className="text-[9px] font-mono font-bold text-text-soft uppercase">Stock Disponible</label>
-                                <input
-                                  type="number"
-                                  value={ticket.stock === 0 ? "" : ticket.stock}
-                                  min={entradasVendidas}
-                                  onChange={(e) => handleTicketTypeChange(idx, "stock", e.target.value === "" ? 0 : Number(e.target.value))}
-                                  className="w-full border border-text p-1.5 bg-background font-mono text-xs"
-                                />
-                              </div>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                    <button
-                      type="button"
-                      onClick={async () => {
-                        const { isConfirmed } = await Swal.fire({
-                          title: "¿AGREGAR TICKET TYPE?",
-                          text: "Esta acción es irreversible. Una vez guardado, el tipo de ticket no se puede eliminar. Si necesitás desactivarlo, poné el stock en 0.",
-                          icon: "warning",
-                          showCancelButton: true,
-                          confirmButtonText: "SÍ, AGREGAR",
-                          cancelButtonText: "CANCELAR",
-                          confirmButtonColor: "#6750e0",
-                          cancelButtonColor: "#4a4a4a",
-                          background: "#f5f4f0",
-                          color: "#171717",
-                          customClass: {
-                            popup: "border-4 border-[#171717] rounded-none shadow-[6px_6px_0px_0px_#171717] font-mono",
-                            title: "uppercase font-black tracking-tighter",
-                            confirmButton: "font-mono font-black uppercase tracking-wider border-2 border-[#171717] rounded-none",
-                            cancelButton: "font-mono font-black uppercase tracking-wider border-2 border-[#171717] rounded-none",
-                          },
-                        });
-                        if (isConfirmed) {
-                          setFormTicketTypes((prev) => [
-                            ...prev,
-                            { name: "", zone: "", price: 0, stock: 0, sold: 0 },
-                          ]);
-                        }
-                      }}
-                      className="w-full border-2 border-dashed border-text py-2 font-mono text-xs font-black uppercase text-text-soft hover:text-text hover:border-solid hover:bg-surface transition-all"
-                    >
-                      + Agregar tipo de ticket
-                    </button>
-                  </div>
-
-                  {/* Botones de acción */}
-                  <div className="pt-4 flex flex-col sm:flex-row gap-3">
-                    <button
-                      onClick={guardarCambios}
-                      disabled={loadingAccion}
-                      className="flex-1 bg-primary text-background border-2 border-text py-2.5 font-mono text-xs font-black uppercase shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] hover:translate-x-0.5 hover:translate-y-0.5 transition-all active:shadow-none"
-                    >
-                      {loadingAccion ? "[ ACTUALIZANDO... ]" : "💾 GUARDAR AJUSTES"}
-                    </button>
-
-                    {(eventoSeleccionado.status === "DRAFT" || eventoSeleccionado.status === "ACTIVE") && (
-                      <button
-                        onClick={cambiarStatus}
-                        disabled={loadingAccion}
-                        className={`px-4 py-2.5 border-2 border-text font-mono text-xs font-black uppercase shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] hover:translate-x-0.5 hover:translate-y-0.5 transition-all active:shadow-none disabled:opacity-50 ${
-                          eventoSeleccionado.status === "DRAFT"
-                            ? "bg-green-400 text-black"
-                            : "bg-yellow-400 text-black"
-                        }`}
-                      >
-                        {loadingAccion
-                          ? "[ PROCESANDO... ]"
-                          : eventoSeleccionado.status === "DRAFT"
-                          ? "📡 PUBLICAR"
-                          : "📝 DESPUBLICAR"}
-                      </button>
-                    )}
-
-                    <button
-                      onClick={eliminarEvento}
-                      disabled={loadingAccion}
-                      className="bg-red-600 text-white border-2 border-red-800 px-4 py-2.5 font-mono text-xs font-black uppercase shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] hover:bg-red-700 hover:translate-x-0.5 hover:translate-y-0.5 transition-all active:shadow-none disabled:opacity-50"
-                    >
-                      {loadingAccion ? "[ PROCESANDO... ]" : "🗑️ DAR DE BAJA"}
-                    </button>
-                  </div>
-                </div>
+                <ProducerEventEditForm
+                  evento={eventoSeleccionado}
+                  categorias={categorias}
+                  locaciones={locaciones}
+                  loading={loadingAccion}
+                  onSave={guardarCambios}
+                  onChangeStatus={cambiarStatus}
+                  onDelete={eliminarEvento}
+                />
               )}
 
               {/* SECCIÓN STATS */}

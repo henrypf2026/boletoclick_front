@@ -29,6 +29,8 @@ export interface SupabaseUser {
 export interface LoginApiResponse {
   message: string;
   user: SupabaseUser;
+  accessToken?: string;
+  refreshToken?: string;
 }
 
 export interface RegisterApiResponse {
