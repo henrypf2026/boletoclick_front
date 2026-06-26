@@ -2,12 +2,13 @@
 
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import { clearToken, getUserFromToken, saveToken, type User } from "@/lib/auth";
-import { saveTabSession, getTabAccessToken } from "@/lib/tabSession";
+import { saveTabSession } from "@/lib/tabSession";
+import { getValidAccessToken } from "@/lib/sessionToken";
 import { authService, type RegisterDto } from "@/services/authService";
 import { supabase } from "@/lib/supabaseClient";
 
 export const getAuthToken = async (): Promise<string | null> => {
-  return getTabAccessToken() ?? null;
+  return getValidAccessToken();
 };
 
 interface AuthContextValue {
@@ -51,6 +52,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     getUserFromToken()
       .then(setUser)
       .finally(() => setLoading(false));
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((event, session) => {
+      if (
+        session?.access_token &&
+        (event === "TOKEN_REFRESHED" || event === "SIGNED_IN")
+      ) {
+        saveTabSession({
+          accessToken: session.access_token,
+          refreshToken: session.refresh_token,
+        });
+      }
+    });
+
+    return () => subscription.unsubscribe();
   }, []);
 
   const login = async ({

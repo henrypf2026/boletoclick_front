@@ -17,6 +17,7 @@ function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const redirectTo = searchParams.get('from') || '/';
+  const sessionExpired = searchParams.get('expired') === '1';
 
   const handleGoogleLogin = async () => {
     if (redirectTo !== '/') localStorage.setItem('oauth_redirect', redirectTo);
@@ -54,6 +55,10 @@ function LoginForm() {
       <p className="text-text-soft">
         Ingresa con tu cuenta para comprar entradas y ver tus boletos.
       </p>
+
+      {sessionExpired && (
+        <FormAlert message="Tu sesión expiró por inactividad. Volvé a iniciar sesión para continuar." />
+      )}
 
       <Formik initialValues={initialValues} validationSchema={loginSchema} onSubmit={handleSubmit}>
         {({ isSubmitting, status }) => (
