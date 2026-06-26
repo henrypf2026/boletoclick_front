@@ -1,11 +1,6 @@
-import { createClient } from "@supabase/supabase-js";
+import { getTabAccessToken } from "@/lib/tabSession";
 
 const BASE_URL = "/api/backend";
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-);
 
 interface RequestOptions {
   method?: string;
@@ -32,14 +27,9 @@ async function getAuthHeaders(): Promise<Record<string, string>> {
     "Content-Type": "application/json",
   };
 
-  try {
-    const { data } = await supabase.auth.getSession();
-    const token = data.session?.access_token;
-    if (token) {
-      headers["Authorization"] = `Bearer ${token}`;
-    }
-  } catch {
-    // Si falla silenciosamente, el backend devolverá 401
+  const token = getTabAccessToken();
+  if (token) {
+    headers.Authorization = `Bearer ${token}`;
   }
 
   return headers;

@@ -1,4 +1,5 @@
 import { api } from '@/lib/apiClient';
+import { saveTabSession } from '@/lib/tabSession';
 import type {
   LoginApiResponse,
   RegisterApiResponse,
@@ -29,6 +30,7 @@ export interface AuthUser {
   email: string;
   name?: string;
   role?: UserRole;
+  user_role?: UserRole;
   profileImageUrl?: string | null;
   allowNewsletter?: boolean;
 }
@@ -42,7 +44,14 @@ function fromSupabaseUser(supabaseUser: SupabaseUser): AuthUser {
 }
 
 function fromUserProfile(profile: UserProfile): AuthUser {
-  return { id: profile.id, email: profile.email, name: profile.name, role: profile.role, profileImageUrl: profile.profileImageUrl, allowNewsletter: profile.allowNewsletter};
+  return {
+    id: profile.id,
+    email: profile.email,
+    name: profile.name,
+    role: profile.role,
+    profileImageUrl: profile.profileImageUrl,
+    allowNewsletter: profile.allowNewsletter,
+  };
 }
 
 async function fetchProfile(userId: string): Promise<AuthUser | null> {
@@ -55,17 +64,47 @@ async function fetchProfile(userId: string): Promise<AuthUser | null> {
 }
 
 export const authService = {
-  async login(credentials: LoginDto): Promise<{ user: AuthUser }> {
+  async login(
+    credentials: LoginDto,
+  ): Promise<{ user: AuthUser; accessToken?: string; refreshToken?: string }> {
     const data = await api.post<LoginApiResponse>('/auth/login', credentials);
+
+    if (data.accessToken) {
+      saveTabSession({
+        accessToken: data.accessToken,
+        refreshToken: data.refreshToken,
+      });
+    }
+
     const profile = await fetchProfile(data.user.id);
-    return { user: profile ?? fromSupabaseUser(data.user) };
+    return {
+      user: profile ?? fromSupabaseUser(data.user),
+      accessToken: data.accessToken,
+      refreshToken: data.refreshToken,
+    };
   },
 
-  async register(dto: RegisterDto): Promise<{ user: AuthUser }> {
+  async register(
+    dto: RegisterDto,
+  ): Promise<{ user: AuthUser; accessToken?: string; refreshToken?: string }> {
     const data = await api.post<RegisterApiResponse>('/auth/register', dto);
-    // el back no setea cookie en register, así que hacemos login para obtenerla
-    await api.post<unknown>('/auth/login', { email: dto.email, password: dto.password });
-    return { user: fromUserProfile(data.userProfile) };
+    const loginData = await api.post<LoginApiResponse>('/auth/login', {
+      email: dto.email,
+      password: dto.password,
+    });
+
+    if (loginData.accessToken) {
+      saveTabSession({
+        accessToken: loginData.accessToken,
+        refreshToken: loginData.refreshToken,
+      });
+    }
+
+    return {
+      user: fromUserProfile(data.userProfile),
+      accessToken: loginData.accessToken,
+      refreshToken: loginData.refreshToken,
+    };
   },
 
   async forgotPassword(email: string): Promise<void> {

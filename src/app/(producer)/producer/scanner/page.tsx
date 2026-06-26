@@ -1,7 +1,10 @@
 "use client";
-import React, { useState, useEffect, useRef } from "react";
+
+import { authenticatedFetch } from '@/lib/authenticatedFetch';
+
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Html5QrcodeScanner } from "html5-qrcode";
+import { Html5Qrcode, Html5QrcodeScannerState } from "html5-qrcode";
 
 interface AccesoLog {
   id: string;
@@ -10,6 +13,57 @@ interface AccesoLog {
   hora: string;
   estado: "VALIDO" | "INVALIDO" | "USADO";
   mensaje?: string;
+}
+
+interface CameraDevice {
+  id: string;
+  label: string;
+}
+
+const SCANNER_ELEMENT_ID = "qr-reader";
+const QR_STORAGE_KEY = "HTML5_QRCODE_DATA";
+
+const SCANNER_CONFIG = {
+  fps: 10,
+  qrbox: { width: 250, height: 250 },
+  aspectRatio: 1,
+};
+
+function pickPreferredCamera(cameras: CameraDevice[]): string | null {
+  if (cameras.length === 0) return null;
+
+  const backCamera = cameras.find((camera) =>
+    /back|rear|environment|trasera|trase/i.test(camera.label),
+  );
+  if (backCamera) return backCamera.id;
+
+  const builtInCamera = cameras.find((camera) =>
+    /front|user|integrated|built|webcam|facetime|hd camera/i.test(camera.label),
+  );
+  if (builtInCamera) return builtInCamera.id;
+
+  return cameras[0].id;
+}
+
+function getCameraErrorMessage(error: unknown): string {
+  const name =
+    error instanceof DOMException
+      ? error.name
+      : error instanceof Error
+        ? error.name
+        : "";
+
+  if (name === "NotFoundError") {
+    return "No se encontró ninguna cámara disponible. Conectá una webcam o usá el ingreso manual.";
+  }
+  if (name === "NotAllowedError") {
+    return "Permiso de cámara denegado. Habilitalo en el navegador y recargá la página.";
+  }
+  if (name === "NotReadableError") {
+    return "La cámara está en uso por otra aplicación. Cerrala e intentá de nuevo.";
+  }
+
+  return "No se pudo iniciar la cámara. Probá otro dispositivo o usá el ingreso manual.";
 }
 
 export default function ScannerPage() {
@@ -21,107 +75,234 @@ export default function ScannerPage() {
   >("idle");
   const [feedbackMsg, setFeedbackMsg] = useState("");
   const [ultimosAccesos, setUltimosAccesos] = useState<AccesoLog[]>([]);
+  const [cameras, setCameras] = useState<CameraDevice[]>([]);
+  const [selectedCameraId, setSelectedCameraId] = useState("");
+  const [cameraError, setCameraError] = useState<string | null>(null);
+  const [cameraReady, setCameraReady] = useState(false);
 
-  const scannerRef = useRef<Html5QrcodeScanner | null>(null);
+  const scannerRef = useRef<Html5Qrcode | null>(null);
+  const processingRef = useRef(false);
 
-  useEffect(() => {
-    scannerRef.current = new Html5QrcodeScanner(
-      "reader",
-      {
-        fps: 10,
-        qrbox: { width: 250, height: 250 },
-        rememberLastUsedCamera: true,
-      },
-      false,
-    );
-
-    const onScanSuccess = (decodedText: string) => {
-      procesarCodigoTicket(decodedText);
-    };
-
-    const onScanFailure = (error: any) => {};
-
-    scannerRef.current.render(onScanSuccess, onScanFailure);
-
-    return () => {
-      if (scannerRef.current) {
-        scannerRef.current
-          .clear()
-          .catch((err) => console.error("Error limpiando scanner QR:", err));
-      }
-    };
-  }, []);
-
-  const procesarCodigoTicket = async (codigo: string) => {
+  const procesarCodigoTicket = useCallback(async (codigo: string) => {
     if (!codigo.trim()) return;
     setLoading(true);
     setStatusScanner("idle");
     setFeedbackMsg("");
 
     try {
-      const response = await fetch("/api/backend/tickets/validate", {
+      const response = await authenticatedFetch("/api/backend/tickets/scan", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ticketId: codigo.trim() }),
+        credentials: "include",
+        body: JSON.stringify({ qrCode: codigo.trim() }),
       });
 
-      const data = await response.json();
+      const data = await response.json().catch(() => ({}));
       const horaActual = new Date().toLocaleTimeString("es-AR", {
         hour: "2-digit",
         minute: "2-digit",
         second: "2-digit",
       });
 
-      if (response.ok && data.valid) {
+      const sector =
+        data.ticket?.ticketType?.zone ??
+        data.ticket?.ticketType?.name ??
+        "General";
+
+      if (response.ok) {
         setStatusScanner("success");
-        setFeedbackMsg(
-          `¡Acceso Permitido! Sector: ${data.sector || "General"}`,
-        );
+        setFeedbackMsg(`¡Acceso Permitido! Sector: ${sector}`);
 
         setUltimosAccesos((prev) => [
           {
             id: Math.random().toString(),
             ticketId: codigo.trim().substring(0, 8) + "...",
-            sector: data.sector || "General",
+            sector,
             hora: horaActual,
             estado: "VALIDO",
           },
           ...prev,
         ]);
       } else {
+        const message =
+          typeof data.message === "string"
+            ? data.message
+            : "El ticket provisto no es válido para este evento.";
         const esUsado =
-          data.status === "USED" ||
-          data.mensaje?.toLowerCase().includes("usado");
+          response.status === 400 &&
+          message.toLowerCase().includes("ya utilizado");
+
         setStatusScanner(esUsado ? "used" : "error");
-        setFeedbackMsg(
-          data.mensaje || "El ticket provisto no es válido para este evento.",
-        );
+        setFeedbackMsg(message);
 
         setUltimosAccesos((prev) => [
           {
             id: Math.random().toString(),
             ticketId: codigo.trim().substring(0, 8) + "...",
-            sector: data.sector || "N/A",
+            sector: "N/A",
             hora: horaActual,
             estado: esUsado ? "USADO" : "INVALIDO",
-            mensaje: data.mensaje || "Inválido",
+            mensaje: message,
           },
           ...prev,
         ]);
       }
-    } catch (err: any) {
-      console.error("🚨 Error al validar ticket:", err);
+    } catch {
       setStatusScanner("error");
       setFeedbackMsg("Error de red o servidor al procesar la validación.");
     } finally {
       setLoading(false);
       setTicketCodigo("");
     }
-  };
+  }, []);
+
+  const onScanSuccess = useCallback(
+    (decodedText: string) => {
+      if (processingRef.current || loading) return;
+      processingRef.current = true;
+      void procesarCodigoTicket(decodedText).finally(() => {
+        processingRef.current = false;
+      });
+    },
+    [loading, procesarCodigoTicket],
+  );
+
+  const stopScanner = useCallback(async () => {
+    const scanner = scannerRef.current;
+    if (!scanner) return;
+
+    try {
+      const state = scanner.getState();
+      if (state === Html5QrcodeScannerState.SCANNING) {
+        await scanner.stop();
+      }
+      scanner.clear();
+    } catch {
+      // Ignorar errores al detener cámara ya liberada
+    }
+  }, []);
+
+  const startScanner = useCallback(
+    async (cameraId?: string) => {
+      setCameraError(null);
+      setCameraReady(false);
+
+      await stopScanner();
+
+      if (!scannerRef.current) {
+        scannerRef.current = new Html5Qrcode(SCANNER_ELEMENT_ID);
+      }
+
+      const scanner = scannerRef.current;
+      const targetCameraId = cameraId || selectedCameraId;
+
+      const attempts: Array<string | { facingMode: string }> = [];
+      if (targetCameraId) attempts.push(targetCameraId);
+      attempts.push({ facingMode: "user" });
+      attempts.push({ facingMode: "environment" });
+
+      for (const cameraConfig of attempts) {
+        try {
+          await scanner.start(
+            cameraConfig,
+            SCANNER_CONFIG,
+            onScanSuccess,
+            () => {},
+          );
+          setCameraReady(true);
+          return;
+        } catch {
+          await stopScanner();
+        }
+      }
+
+      setCameraError(getCameraErrorMessage(new DOMException("", "NotFoundError")));
+    },
+    [onScanSuccess, selectedCameraId, stopScanner],
+  );
+
+  useEffect(() => {
+    localStorage.removeItem(QR_STORAGE_KEY);
+
+    let mounted = true;
+    scannerRef.current = new Html5Qrcode(SCANNER_ELEMENT_ID);
+
+    const startWithConfig = async (cameraConfig: string | { facingMode: string }) => {
+      const scanner = scannerRef.current;
+      if (!scanner) return false;
+
+      try {
+        await scanner.start(cameraConfig, SCANNER_CONFIG, onScanSuccess, () => {});
+        return true;
+      } catch {
+        try {
+          const state = scanner.getState();
+          if (state === Html5QrcodeScannerState.SCANNING) {
+            await scanner.stop();
+          }
+          scanner.clear();
+        } catch {
+          // ignore cleanup errors
+        }
+        return false;
+      }
+    };
+
+    const initCameras = async () => {
+      try {
+        const devices = await Html5Qrcode.getCameras();
+        if (!mounted) return;
+
+        const mapped = devices.map((device) => ({
+          id: device.id,
+          label: device.label || `Cámara ${device.id.slice(0, 6)}`,
+        }));
+
+        setCameras(mapped);
+
+        const preferredId = pickPreferredCamera(mapped);
+        if (preferredId) {
+          setSelectedCameraId(preferredId);
+        }
+
+        const attempts: Array<string | { facingMode: string }> = [];
+        if (preferredId) attempts.push(preferredId);
+        attempts.push({ facingMode: "user" });
+        attempts.push({ facingMode: "environment" });
+
+        for (const cameraConfig of attempts) {
+          const started = await startWithConfig(cameraConfig);
+          if (!mounted) return;
+          if (started) {
+            setCameraReady(true);
+            setCameraError(null);
+            return;
+          }
+        }
+
+        setCameraError(getCameraErrorMessage(new DOMException("", "NotFoundError")));
+      } catch (error) {
+        if (!mounted) return;
+        setCameraError(getCameraErrorMessage(error));
+      }
+    };
+
+    void initCameras();
+
+    return () => {
+      mounted = false;
+      void stopScanner();
+      scannerRef.current = null;
+    };
+  }, [onScanSuccess, stopScanner]);
 
   const handleManualSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    procesarCodigoTicket(ticketCodigo);
+    void procesarCodigoTicket(ticketCodigo);
+  };
+
+  const handleRestartCamera = () => {
+    void startScanner(selectedCameraId || undefined);
   };
 
   return (
@@ -136,7 +317,7 @@ export default function ScannerPage() {
           </h1>
         </div>
         <button
-          onClick={() => router.push("/producer")}
+          onClick={() => router.push("/producer/dashboard")}
           className="px-3 py-1.5 bg-surface text-text border-2 border-text font-mono text-xs font-black uppercase tracking-wider hover:translate-x-0.5 hover:translate-y-0.5 transition-all shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] hover:shadow-none"
         >
           ⬅️ Volver al Panel
@@ -149,10 +330,55 @@ export default function ScannerPage() {
             <h2 className="text-sm font-mono font-black uppercase mb-3 text-primary">
               📷 Cámara de Control en Vivo
             </h2>
+
+            {cameras.length > 1 && (
+              <div className="mb-3 flex flex-col sm:flex-row gap-2">
+                <select
+                  value={selectedCameraId}
+                  onChange={(e) => setSelectedCameraId(e.target.value)}
+                  className="flex-1 border-2 border-text p-2 bg-background font-mono text-xs"
+                >
+                  {cameras.map((camera) => (
+                    <option key={camera.id} value={camera.id}>
+                      {camera.label}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  type="button"
+                  onClick={handleRestartCamera}
+                  className="px-3 py-2 bg-text text-surface border-2 border-text font-mono text-xs font-black uppercase"
+                >
+                  Usar cámara
+                </button>
+              </div>
+            )}
+
             <div
-              id="reader"
-              className="w-full bg-background border-2 border-text overflow-hidden rounded-none [&_button]:bg-background! [&_button]:text-text! [&_button]:border-2! [&_button]:border-text! [&_button]:font-mono! [&_button]:text-xs! [&_button]:px-3! [&_button]:py-1.5! [&_button]:my-2! [&_button]:uppercase! [&_button]:font-bold! [&_button]:shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]!"
+              id={SCANNER_ELEMENT_ID}
+              className="w-full min-h-[280px] bg-background border-2 border-text overflow-hidden"
             />
+
+            {cameraReady && (
+              <p className="mt-2 text-xs font-mono text-success uppercase font-bold">
+                Cámara activa — apuntá al código QR
+              </p>
+            )}
+
+            {cameraError && (
+              <div className="mt-3 border-2 border-red-500 bg-red-500/10 p-3">
+                <p className="text-xs font-mono text-red-600 font-bold uppercase">
+                  {cameraError}
+                </p>
+                <button
+                  type="button"
+                  onClick={handleRestartCamera}
+                  className="mt-2 px-3 py-1.5 bg-background border-2 border-text font-mono text-xs font-black uppercase"
+                >
+                  Reintentar cámara
+                </button>
+              </div>
+            )}
           </div>
 
           <div className="bg-surface border-4 border-text p-5 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
@@ -162,7 +388,7 @@ export default function ScannerPage() {
             <form onSubmit={handleManualSubmit} className="flex gap-2">
               <input
                 type="text"
-                placeholder="Pegá o escribí el ID del ticket..."
+                placeholder="Pegá o escribí el código QR del ticket..."
                 value={ticketCodigo}
                 onChange={(e) => setTicketCodigo(e.target.value)}
                 disabled={loading}
@@ -206,9 +432,7 @@ export default function ScannerPage() {
                 <h3 className="text-red-600 font-mono font-black text-sm uppercase">
                   ACCESO DENEGADO
                 </h3>
-                <p className="text-xs font-medium text-text-soft">
-                  {feedbackMsg}
-                </p>
+                <p className="text-xs font-medium text-text-soft">{feedbackMsg}</p>
               </div>
             )}
 
@@ -218,9 +442,7 @@ export default function ScannerPage() {
                 <h3 className="text-amber-600 font-mono font-black text-sm uppercase">
                   TICKET YA PROCESADO
                 </h3>
-                <p className="text-xs font-medium text-text-soft">
-                  {feedbackMsg}
-                </p>
+                <p className="text-xs font-medium text-text-soft">{feedbackMsg}</p>
               </div>
             )}
           </div>

@@ -1,3 +1,4 @@
+import { authenticatedFetch } from '@/lib/authenticatedFetch';
 export interface FavoriteEvent {
   id: string;
   userId: string;
@@ -15,7 +16,7 @@ export interface FavoriteEvent {
 
 export const favoritesService = {
   async toggle(eventId: string): Promise<{ added: boolean; message: string }> {
-    const res = await fetch(`/api/backend/favorites/${eventId}/toggle`, {
+    const res = await authenticatedFetch(`/api/backend/favorites/${eventId}/toggle`, {
       method: 'POST',
       credentials: 'include',
     });
@@ -24,7 +25,7 @@ export const favoritesService = {
   },
 
   async getAll(): Promise<FavoriteEvent[]> {
-    const res = await fetch('/api/backend/favorites', {
+    const res = await authenticatedFetch('/api/backend/favorites', {
       credentials: 'include',
     });
     if (!res.ok) throw new Error('Error al obtener favoritos');

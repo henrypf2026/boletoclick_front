@@ -2,13 +2,12 @@
 
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import { clearToken, getUserFromToken, saveToken, type User } from "@/lib/auth";
+import { saveTabSession, getTabAccessToken } from "@/lib/tabSession";
 import { authService, type RegisterDto } from "@/services/authService";
 import { supabase } from "@/lib/supabaseClient";
 
-// Función auxiliar exportable para obtener el token JWT de la sesión activa de Supabase
 export const getAuthToken = async (): Promise<string | null> => {
-  const { data } = await supabase.auth.getSession();
-  return data.session?.access_token || null;
+  return getTabAccessToken() ?? null;
 };
 
 interface AuthContextValue {
@@ -22,6 +21,27 @@ interface AuthContextValue {
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
+
+async function persistSessionTokens(
+  accessToken?: string,
+  refreshToken?: string,
+  role?: User["role"],
+) {
+  if (!accessToken) return;
+
+  saveTabSession({
+    accessToken,
+    refreshToken,
+    role,
+  });
+
+  if (refreshToken) {
+    await supabase.auth.setSession({
+      access_token: accessToken,
+      refresh_token: refreshToken,
+    });
+  }
+}
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
@@ -40,24 +60,31 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     email: string;
     password: string;
   }) => {
-    const { user: account } = await authService.login({ email, password });
+    const { user: account, accessToken, refreshToken } =
+      await authService.login({ email, password });
 
-    const actualRole = (account as any).user_role || account.role;
+    const actualRole = account.user_role || account.role;
     account.role = actualRole;
 
+    await persistSessionTokens(accessToken, refreshToken, actualRole);
     saveToken(actualRole);
     setUser(account);
     return account;
   };
+
   const register = async (data: RegisterDto) => {
-    const { user: account } = await authService.register(data);
+    const { user: account, accessToken, refreshToken } =
+      await authService.register(data);
 
-    const roleToSave = (account as any).user_role || account.role;
+    const roleToSave = account.user_role || account.role;
+    account.role = roleToSave;
+
+    await persistSessionTokens(accessToken, refreshToken, roleToSave);
     saveToken(roleToSave);
-
     setUser(account);
     return account;
   };
+
   const logout = async () => {
     try {
       await authService.logout();

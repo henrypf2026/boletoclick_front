@@ -6,6 +6,9 @@ export const supabase = createBrowserClient(
   {
     auth: {
       detectSessionInUrl: false,
+      persistSession: true,
+      storage:
+        typeof window !== 'undefined' ? window.sessionStorage : undefined,
     },
   }
 );

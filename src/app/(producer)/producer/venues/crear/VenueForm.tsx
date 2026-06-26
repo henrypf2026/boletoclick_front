@@ -1,4 +1,6 @@
 "use client";
+
+import { authenticatedFetch } from '@/lib/authenticatedFetch';
  
 import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -49,7 +51,7 @@ export default function VenueForm() {
  
   //cargar provincias en orden 
   useEffect(() => {
-    fetch("/api/backend/province")
+    authenticatedFetch("/api/backend/province")
       .then((r) => r.json())
       .then((data) => {
         const list: Province[] = Array.isArray(data)
@@ -70,7 +72,7 @@ export default function VenueForm() {
  
     setLoadingMunicipalities(true);
     try {
-      const res = await fetch(`/api/backend/province/${provinceId}`);
+      const res = await authenticatedFetch(`/api/backend/province/${provinceId}`);
       const data = await res.json();
       const found = data.province ?? data.provinceSearched ?? data;
       const list: Municipality[] = Array.isArray(found.municipality)
@@ -171,7 +173,7 @@ export default function VenueForm() {
           newProvinceId = matchedProvince.id;
           setLoadingMunicipalities(true);
           try {
-            const mRes = await fetch(`/api/backend/province/${matchedProvince.id}`);
+            const mRes = await authenticatedFetch(`/api/backend/province/${matchedProvince.id}`);
             const mData = await mRes.json();
             const found = mData.province ?? mData.provinceSearched ?? mData;
             const list: Municipality[] = Array.isArray(found.municipality)
@@ -259,7 +261,7 @@ export default function VenueForm() {
         setUploadingImage(true);
         const formData = new FormData();
         formData.append("file", imageFile);
-        const uploadRes = await fetch(
+        const uploadRes = await authenticatedFetch(
           `/api/backend/files/uploadImage/${user.id}`,
           { method: "PUT", credentials: "include", body: formData }
         );
@@ -283,7 +285,7 @@ export default function VenueForm() {
       };
       if (imgUrl) body.imgUrl = imgUrl;
  
-      const res = await fetch("/api/backend/venues", {
+      const res = await authenticatedFetch("/api/backend/venues", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",

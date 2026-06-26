@@ -1,8 +1,11 @@
 "use client";
 
+import { authenticatedFetch } from '@/lib/authenticatedFetch';
+
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Swal from "sweetalert2";
+import { toApiEventStatus } from "@/lib/eventStatus";
 
 interface TicketType {
   name: string;
@@ -76,8 +79,8 @@ export default function EventForm() {
     const cargarDatosDesplegables = async () => {
       try {
         const [resCat, resVen] = await Promise.all([
-          fetch(`/api/backend/categories`).catch(() => null),
-          fetch(`/api/backend/venues`).catch(() => null),
+          authenticatedFetch(`/api/backend/categories`).catch(() => null),
+          authenticatedFetch(`/api/backend/venues`).catch(() => null),
         ]);
 
         if (resCat && resCat.ok) {
@@ -263,7 +266,7 @@ export default function EventForm() {
         `${evento.fecha}T${evento.hora}:00`
       ).toISOString();
       formData.append("eventDate", combinedDate);
-      formData.append("status", eventStatus);
+      formData.append("status", toApiEventStatus(eventStatus));
 
       const ticketsLimpios = ticketTypes.map((ticket) => ({
         name: ticket.name.trim(),
@@ -277,7 +280,7 @@ export default function EventForm() {
 
       console.log(`🚀 Enviando evento con estado: ${eventStatus}`);
 
-      const res = await fetch(`/api/backend/events`, {
+      const res = await authenticatedFetch(`/api/backend/events`, {
         method: "POST",
         credentials: "include",
         body: formData,
