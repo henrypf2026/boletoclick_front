@@ -202,9 +202,9 @@ async function generarComprobantePDF(orden: OrderItem) {
     doc.setFont("helvetica", "normal");
     doc.setTextColor(GRAY);
     if (evento.eventDate)
-      doc.text(`📅  ${formatFecha(evento.eventDate)}`, margen + 7, y + 20);
+      doc.text(`Fecha: ${formatFecha(evento.eventDate)}`, margen + 7, y + 20);
     if (evento.venue?.name)
-      doc.text(`📍  ${evento.venue.name}`, margen + 7, y + 25);
+      doc.text(`Lugar: ${evento.venue.name}`, margen + 7, y + 25);
     y += 36;
   }
 
