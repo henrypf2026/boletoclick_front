@@ -1,5 +1,7 @@
 "use client";
 
+import { authenticatedFetch } from '@/lib/authenticatedFetch';
+
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
@@ -61,7 +63,7 @@ export default function MisTicketsPage() {
     Promise.all(
       uniqueIds.map(async (id) => {
         try {
-          const res = await fetch(`/api/backend/events/${id}`, { credentials: "include" });
+          const res = await authenticatedFetch(`/api/backend/events/${id}`, { credentials: "include" });
           if (!res.ok) return null;
           const data = await res.json();
           return { id, title: data.title as string };

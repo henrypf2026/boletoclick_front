@@ -1,5 +1,7 @@
 "use client";
 
+import { authenticatedFetch } from '@/lib/authenticatedFetch';
+
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
@@ -7,6 +9,7 @@ import { ticketService, type ApiTicket } from "@/services/ticketService";
 import { orderService } from "@/services/orderService";
 import TicketQrCode from "@/components/ui/TicketQrCode";
 import AddToWalletButton from "@/components/ui/AddToWalletButton";
+import UserHistoryFilterForm from "@/components/dashboard/UserHistoryFilterForm";
 import jsPDF from "jspdf";
 import Swal from "sweetalert2";
 
@@ -88,9 +91,7 @@ function orderStatusColor(status: string) {
 
 async function fetchEvent(eventId: string): Promise<EventData | null> {
   try {
-    const token = localStorage.getItem("auth_token");
-    const res = await fetch(`/api/backend/events/${eventId}`, {
-      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    const res = await authenticatedFetch(`/api/backend/events/${eventId}`, {
       credentials: "include",
     });
     if (!res.ok) return null;
@@ -502,7 +503,7 @@ export default function UserDashboard() {
 
     setCancellingId(orderId);
     try {
-      const res = await fetch(`/api/backend/orders/${orderId}/cancel`, {
+      const res = await authenticatedFetch(`/api/backend/orders/${orderId}/cancel`, {
         method: "PATCH",
         credentials: "include",
       });
@@ -697,15 +698,10 @@ export default function UserDashboard() {
       {/* HISTORIAL DE COMPRAS */}
       {seccionActiva === "historial" && (
         <div className="space-y-4">
-          <div className="bg-surface border-2 border-text p-3 shadow-[2px_2px_0px_0px_var(--color-text)]">
-            <input
-              type="text"
-              placeholder="🔎 BUSCAR POR N° DE ORDEN O ESTADO..."
-              value={filtroHistorial}
-              onChange={(e) => setFiltroHistorial(e.target.value)}
-              className="w-full bg-background border-2 border-text p-2 font-mono text-xs font-bold uppercase focus:outline-none"
-            />
-          </div>
+          <UserHistoryFilterForm
+            value={filtroHistorial}
+            onChange={setFiltroHistorial}
+          />
 
           {loadingOrders ? (
             <div className="space-y-4 animate-pulse">

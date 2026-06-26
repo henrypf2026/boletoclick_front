@@ -112,10 +112,18 @@ function mapApiEvent(apiEvent: ApiEvent): Event {
     available: ticket.stock,
   }));
 
-  const validStatuses: EventStatus[] = ['ACTIVE', 'SOLDOUT', 'CANCELLED', 'INACTIVE', 'DRAFT'];
-  const status: EventStatus = validStatuses.includes(apiEvent.status as EventStatus)
-    ? (apiEvent.status as EventStatus)
-    : 'ACTIVE';
+  const apiStatus =
+    apiEvent.status === "APPROVED" ? "ACTIVE" : (apiEvent.status ?? "ACTIVE");
+  const validStatuses: EventStatus[] = [
+    "ACTIVE",
+    "SOLDOUT",
+    "CANCELLED",
+    "INACTIVE",
+    "DRAFT",
+  ];
+  const status: EventStatus = validStatuses.includes(apiStatus as EventStatus)
+    ? (apiStatus as EventStatus)
+    : "ACTIVE";
 
   return {
     id: apiEvent.id,

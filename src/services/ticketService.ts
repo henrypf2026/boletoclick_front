@@ -1,3 +1,4 @@
+import { authenticatedFetch } from '@/lib/authenticatedFetch';
 import { normalizeCoordinates } from '@/lib/geo/mapbox';
 import { createTicketQrUrl, normalizeQrUrl, type TicketQrData } from '@/lib/ticketQr';
 import type { Event, Zone } from '@/mocks/events';
@@ -231,7 +232,7 @@ export const ticketService = {
     let apiTickets: ApiTicket[] = [];
 
     try {
-      const res = await fetch('/api/backend/tickets/me', {
+      const res = await authenticatedFetch('/api/backend/tickets/me', {
         credentials: 'include',
       });
       if (res.ok) {
@@ -261,7 +262,7 @@ export const ticketService = {
     const { userId, event, zone, quantity, total } = input;
 
     try {
-      const res = await fetch('/api/backend/orders', {
+      const res = await authenticatedFetch('/api/backend/orders', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
@@ -326,7 +327,7 @@ export const ticketService = {
     let apiTickets: ApiTicket[] = [];
 
     try {
-      const res = await fetch('/api/backend/tickets/me', {
+      const res = await authenticatedFetch('/api/backend/tickets/me', {
         credentials: 'include',
       });
       if (res.ok) {

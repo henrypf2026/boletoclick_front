@@ -1,5 +1,7 @@
 "use client";
 
+import { authenticatedFetch } from '@/lib/authenticatedFetch';
+
 import { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
@@ -87,7 +89,7 @@ const SWAL_CUSTOM = {
 
 async function fetchEvent(eventId: string): Promise<EventData | null> {
   try {
-    const res = await fetch(`/api/backend/events/${eventId}`, {
+    const res = await authenticatedFetch(`/api/backend/events/${eventId}`, {
       credentials: "include",
     });
     if (!res.ok) return null;
@@ -359,7 +361,7 @@ export default function MisComprasPage() {
     if (!user) return;
 
     const load = () => {
-      fetch("/api/backend/orders/me", { credentials: "include" })
+      authenticatedFetch("/api/backend/orders/me", { credentials: "include" })
         .then((res) => {
           if (!res.ok) throw new Error("Error al traer órdenes");
           return res.json();
@@ -398,7 +400,7 @@ export default function MisComprasPage() {
     if (!uniqueIds.length) return;
     Promise.all(
       uniqueIds.map((id) =>
-        fetch(`/api/backend/events/${id}`, { credentials: "include" })
+        authenticatedFetch(`/api/backend/events/${id}`, { credentials: "include" })
           .then((r) => (r.ok ? r.json() : null))
           .catch(() => null)
       )
@@ -428,7 +430,7 @@ export default function MisComprasPage() {
 
     setCancellingId(orderId);
     try {
-      const res = await fetch(`/api/backend/orders/${orderId}/cancel`, {
+      const res = await authenticatedFetch(`/api/backend/orders/${orderId}/cancel`, {
         method: "PATCH",
         credentials: "include",
       });

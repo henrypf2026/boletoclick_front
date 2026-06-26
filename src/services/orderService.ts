@@ -1,6 +1,7 @@
+import { authenticatedFetch } from '@/lib/authenticatedFetch';
 export const orderService = {
   async getMyOrders() {
-    const res = await fetch("/api/backend/orders/me", {
+    const res = await authenticatedFetch("/api/backend/orders/me", {
       credentials: 'include',
     });
     if (!res.ok) throw new Error("Error al traer órdenes");
@@ -8,7 +9,7 @@ export const orderService = {
   },
 
   async createOrder(data: { ticketTypeId: string; quantity: number; couponId?: string }) {
-    const res = await fetch("/api/backend/orders", {
+    const res = await authenticatedFetch("/api/backend/orders", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       credentials: 'include',

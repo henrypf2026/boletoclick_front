@@ -1,13 +1,17 @@
 "use client";
 
-import React, { useState } from "react";
+import { authenticatedFetch } from '@/lib/authenticatedFetch';
+
+import React, { useEffect, useState } from "react";
 import {
+  mapApiToForm,
   mapFormToApi,
   type BankFormData,
+  type ApiBankAccount,
 } from "./bankAccountMapper";
 
 interface BankFormProps {
-  initialData: BankFormData | null;
+  initialData?: BankFormData | null;
 }
 
 const EMPTY_FORM: BankFormData = {
@@ -32,16 +36,39 @@ function parseErrorMessage(payload: unknown): string {
   return "Error al guardar los datos.";
 }
 
-export default function BankForm({ initialData }: BankFormProps) {
+export default function BankForm({ initialData = null }: BankFormProps) {
   const [formData, setFormData] = useState<BankFormData>(
     initialData ?? EMPTY_FORM,
   );
+  const [loadingData, setLoadingData] = useState(!initialData);
 
   const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState<{
     type: "success" | "error";
     msg: string;
   } | null>(null);
+
+  useEffect(() => {
+    if (initialData) return;
+
+    let mounted = true;
+    authenticatedFetch("/api/backend/bank-accounts/me", {
+      credentials: "include",
+    })
+      .then(async (res) => {
+        if (!mounted || !res.ok) return;
+        const account = (await res.json()) as ApiBankAccount;
+        setFormData(mapApiToForm(account));
+      })
+      .catch(() => {})
+      .finally(() => {
+        if (mounted) setLoadingData(false);
+      });
+
+    return () => {
+      mounted = false;
+    };
+  }, [initialData]);
 
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>,
@@ -58,7 +85,7 @@ export default function BankForm({ initialData }: BankFormProps) {
     setStatus(null);
 
     try {
-      const res = await fetch("/api/backend/bank-accounts", {
+      const res = await authenticatedFetch("/api/backend/bank-accounts", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         credentials: 'include',

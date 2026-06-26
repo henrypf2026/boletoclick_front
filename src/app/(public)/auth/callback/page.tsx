@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { supabase } from '@/lib/supabaseClient';
 import { authService } from '@/services/authService';
 import { saveToken } from '@/lib/auth';
+import { saveTabSession } from '@/lib/tabSession';
 import { FormAlert } from '@/components/ui/FormField';
 
 export default function AuthCallbackPage() {
@@ -27,6 +28,10 @@ export default function AuthCallbackPage() {
           body: JSON.stringify({ access_token: session.access_token }),
         });
         if (!setRes.ok) throw new Error('set-session failed');
+        saveTabSession({
+          accessToken: session.access_token,
+          refreshToken: session.refresh_token,
+        });
         const user = await authService.getMe();
         if (!mounted) return;
         if (!user || !user.role) {
