@@ -7,8 +7,15 @@ import {
   vibrateMobile,
 } from '@/lib/scannerFeedback';
 import { useCallback, useEffect, useId, useRef, useState } from 'react';
+import { flushSync } from 'react-dom';
 import { Html5Qrcode, Html5QrcodeScannerState } from 'html5-qrcode';
 import ProducerScannerAuth from '@/components/dashboard/ProducerScannerAuth';
+import {
+  buildCameraAttempts,
+  buildScannerConfig,
+  buildScannerFullConfig,
+  waitForScannerLayout,
+} from '@/lib/scannerConfig';
 
 interface AccesoLog {
   id: string;
@@ -42,11 +49,8 @@ interface ProducerEventScannerProps {
 
 const QR_STORAGE_KEY = 'HTML5_QRCODE_DATA';
 
-const SCANNER_CONFIG = {
-  fps: 10,
-  qrbox: { width: 250, height: 250 },
-  aspectRatio: 1,
-};
+const SCANNER_CONFIG = buildScannerConfig();
+const SCANNER_FULL_CONFIG = buildScannerFullConfig();
 
 function pickPreferredCamera(cameras: CameraDevice[]): string | null {
   if (cameras.length === 0) return null;
@@ -118,7 +122,15 @@ export default function ProducerEventScanner({
 
   const scannerRef = useRef<Html5Qrcode | null>(null);
   const processingRef = useRef(false);
+  const loadingRef = useRef(false);
   const scannedCodesRef = useRef<Set<string>>(new Set());
+  const procesarCodigoRef = useRef<(codigo: string) => Promise<void>>(
+    async () => {},
+  );
+
+  useEffect(() => {
+    loadingRef.current = loading;
+  }, [loading]);
 
   const procesarCodigoTicket = useCallback(
     async (codigo: string) => {
@@ -233,16 +245,17 @@ export default function ProducerEventScanner({
     [eventId, onScanComplete],
   );
 
-  const onScanSuccess = useCallback(
-    (decodedText: string) => {
-      if (processingRef.current || loading) return;
-      processingRef.current = true;
-      void procesarCodigoTicket(decodedText).finally(() => {
-        processingRef.current = false;
-      });
-    },
-    [loading, procesarCodigoTicket],
-  );
+  useEffect(() => {
+    procesarCodigoRef.current = procesarCodigoTicket;
+  }, [procesarCodigoTicket]);
+
+  const onScanSuccess = useCallback((decodedText: string) => {
+    if (processingRef.current || loadingRef.current) return;
+    processingRef.current = true;
+    void procesarCodigoRef.current(decodedText).finally(() => {
+      processingRef.current = false;
+    });
+  }, []);
 
   const stopScanner = useCallback(async () => {
     const scanner = scannerRef.current;
@@ -259,113 +272,94 @@ export default function ProducerEventScanner({
     }
   }, []);
 
-  const startScanner = useCallback(
-    async (cameraId?: string) => {
+  const activateCamera = useCallback(
+    async (preferredCameraId?: string): Promise<boolean> => {
+      localStorage.removeItem(QR_STORAGE_KEY);
       setCameraError(null);
       setCameraReady(false);
       await stopScanner();
 
+      try {
+        await waitForScannerLayout(scannerElementId);
+      } catch {
+        setCameraError('No se pudo preparar la vista de cámara. Reintentá.');
+        return false;
+      }
+
       if (!scannerRef.current) {
-        scannerRef.current = new Html5Qrcode(scannerElementId);
+        scannerRef.current = new Html5Qrcode(scannerElementId, SCANNER_FULL_CONFIG);
       }
 
       const scanner = scannerRef.current;
-      const targetCameraId = cameraId || selectedCameraId;
-
-      const attempts: Array<string | { facingMode: string }> = [];
-      if (targetCameraId) attempts.push(targetCameraId);
-      attempts.push({ facingMode: 'environment' });
-      attempts.push({ facingMode: 'user' });
+      const attempts = buildCameraAttempts(
+        preferredCameraId || selectedCameraId || undefined,
+      );
 
       for (const cameraConfig of attempts) {
         try {
-          await scanner.start(cameraConfig, SCANNER_CONFIG, onScanSuccess, () => {});
+          await scanner.start(
+            cameraConfig,
+            SCANNER_CONFIG,
+            onScanSuccess,
+            () => {},
+          );
           setCameraReady(true);
-          return;
+          setCameraError(null);
+
+          try {
+            const devices = await Html5Qrcode.getCameras();
+            const mapped = devices.map((device) => ({
+              id: device.id,
+              label: device.label || `Cámara ${device.id.slice(0, 6)}`,
+            }));
+            setCameras(mapped);
+            const preferred = pickPreferredCamera(mapped);
+            if (preferred) setSelectedCameraId(preferred);
+          } catch {
+            // La cámara ya funciona aunque no se listen dispositivos
+          }
+
+          return true;
         } catch {
           await stopScanner();
         }
       }
 
       setCameraError(getCameraErrorMessage(new DOMException('', 'NotFoundError')));
+      return false;
     },
     [onScanSuccess, scannerElementId, selectedCameraId, stopScanner],
   );
 
-  useEffect(() => {
-    if (!scannerAuthorized) return;
+  const startScanner = useCallback(
+    async (cameraId?: string) => {
+      await activateCamera(cameraId);
+    },
+    [activateCamera],
+  );
 
-    localStorage.removeItem(QR_STORAGE_KEY);
+  const handleScannerAuthorized = useCallback(async () => {
+    flushSync(() => {
+      setScannerAuthorized(true);
+    });
+    await activateCamera();
+  }, [activateCamera]);
+
+  useEffect(() => {
+    if (!scannerAuthorized || requireAuth) return;
 
     let mounted = true;
-    scannerRef.current = new Html5Qrcode(scannerElementId);
 
-    const startWithConfig = async (cameraConfig: string | { facingMode: string }) => {
-      const scanner = scannerRef.current;
-      if (!scanner) return false;
-
-      try {
-        await scanner.start(cameraConfig, SCANNER_CONFIG, onScanSuccess, () => {});
-        return true;
-      } catch {
-        try {
-          const state = scanner.getState();
-          if (state === Html5QrcodeScannerState.SCANNING) {
-            await scanner.stop();
-          }
-          scanner.clear();
-        } catch {
-          // ignore
-        }
-        return false;
-      }
-    };
-
-    const initCameras = async () => {
-      try {
-        const devices = await Html5Qrcode.getCameras();
-        if (!mounted) return;
-
-        const mapped = devices.map((device) => ({
-          id: device.id,
-          label: device.label || `Cámara ${device.id.slice(0, 6)}`,
-        }));
-
-        setCameras(mapped);
-
-        const preferredId = pickPreferredCamera(mapped);
-        if (preferredId) setSelectedCameraId(preferredId);
-
-        const attempts: Array<string | { facingMode: string }> = [];
-        if (preferredId) attempts.push(preferredId);
-        attempts.push({ facingMode: 'environment' });
-        attempts.push({ facingMode: 'user' });
-
-        for (const cameraConfig of attempts) {
-          const started = await startWithConfig(cameraConfig);
-          if (!mounted) return;
-          if (started) {
-            setCameraReady(true);
-            setCameraError(null);
-            return;
-          }
-        }
-
-        setCameraError(getCameraErrorMessage(new DOMException('', 'NotFoundError')));
-      } catch (error) {
-        if (!mounted) return;
-        setCameraError(getCameraErrorMessage(error));
-      }
-    };
-
-    void initCameras();
+    void activateCamera().finally(() => {
+      if (!mounted) void stopScanner();
+    });
 
     return () => {
       mounted = false;
       void stopScanner();
       scannerRef.current = null;
     };
-  }, [onScanSuccess, scannerAuthorized, scannerElementId, stopScanner]);
+  }, [activateCamera, requireAuth, scannerAuthorized, stopScanner]);
 
   const handleLockScanner = useCallback(async () => {
     await stopScanner();
@@ -375,22 +369,24 @@ export default function ProducerEventScanner({
     setFeedbackMsg('');
   }, [stopScanner]);
 
-  if (requireAuth && !scannerAuthorized) {
-    return (
-      <ProducerScannerAuth
-        eventTitle={eventTitle}
-        onAuthorized={() => setScannerAuthorized(true)}
-      />
-    );
-  }
-
   const handleManualSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     void procesarCodigoTicket(ticketCodigo);
   };
 
+  const showScannerUi = !requireAuth || scannerAuthorized;
+
   return (
     <div className={`space-y-4 ${compact ? '' : 'md:space-y-6'}`}>
+      {requireAuth && !scannerAuthorized && (
+        <ProducerScannerAuth
+          eventTitle={eventTitle}
+          onAuthorized={handleScannerAuthorized}
+        />
+      )}
+
+      {showScannerUi && (
+        <>
       {requireAuth && (
         <div className="flex justify-end">
           <button
@@ -477,14 +473,29 @@ export default function ProducerEventScanner({
               </div>
             )}
 
-            <div
-              id={scannerElementId}
-              className="w-full min-h-[240px] sm:min-h-[280px] bg-background border-2 border-text overflow-hidden"
-            />
+            <div className="relative w-full">
+              <div
+                id={scannerElementId}
+                className="w-full h-[min(70vw,320px)] min-h-[260px] bg-background border-2 border-text [&_#qr-shaded-region]:z-10 [&_#qr-shaded-region_div]:!bg-yellow-400"
+              />
+              {cameraReady && (
+                <div
+                  className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center"
+                  aria-hidden
+                >
+                  <div className="relative aspect-square w-[72%] max-w-[260px]">
+                    <span className="absolute left-0 top-0 h-10 w-10 border-l-[5px] border-t-[5px] border-yellow-400" />
+                    <span className="absolute right-0 top-0 h-10 w-10 border-r-[5px] border-t-[5px] border-yellow-400" />
+                    <span className="absolute bottom-0 left-0 h-10 w-10 border-b-[5px] border-l-[5px] border-yellow-400" />
+                    <span className="absolute bottom-0 right-0 h-10 w-10 border-b-[5px] border-r-[5px] border-yellow-400" />
+                  </div>
+                </div>
+              )}
+            </div>
 
             {cameraReady && (
               <p className="mt-2 text-xs font-mono text-success uppercase font-bold">
-                Cámara activa — apuntá al QR
+                Cámara activa — centra el QR dentro del marco amarillo
               </p>
             )}
 
@@ -595,6 +606,8 @@ export default function ProducerEventScanner({
             ))}
           </ul>
         </div>
+      )}
+        </>
       )}
     </div>
   );
