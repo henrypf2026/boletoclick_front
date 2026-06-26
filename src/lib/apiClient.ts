@@ -1,4 +1,4 @@
-import { getTabAccessToken } from "@/lib/tabSession";
+import { getValidAccessToken, refreshAccessToken, clearSessionAndRedirectToLogin } from "@/lib/sessionToken";
 
 const BASE_URL = "/api/backend";
 
@@ -27,7 +27,7 @@ async function getAuthHeaders(): Promise<Record<string, string>> {
     "Content-Type": "application/json",
   };
 
-  const token = getTabAccessToken();
+  const token = await getValidAccessToken();
   if (token) {
     headers.Authorization = `Bearer ${token}`;
   }
@@ -38,6 +38,7 @@ async function getAuthHeaders(): Promise<Record<string, string>> {
 async function request<T>(
   path: string,
   { method = "GET", body }: RequestOptions = {},
+  isRetry = false,
 ): Promise<T> {
   const headers = await getAuthHeaders();
 
@@ -47,6 +48,15 @@ async function request<T>(
     body,
     credentials: "include",
   });
+
+  if (res.status === 401 && !isRetry) {
+    const newToken = await refreshAccessToken();
+    if (newToken) {
+      return request<T>(path, { method, body }, true);
+    }
+    clearSessionAndRedirectToLogin();
+    throw new Error("Tu sesión expiró. Volvé a iniciar sesión.");
+  }
 
   const data = await parseJsonResponse<{ message?: string | string[] }>(res);
 

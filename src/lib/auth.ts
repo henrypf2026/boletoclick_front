@@ -3,10 +3,10 @@
 import { authService } from "@/services/authService";
 import {
   clearTabSession,
-  getTabAccessToken,
   getTabRole,
   saveTabSession,
 } from "@/lib/tabSession";
+import { getValidAccessToken, refreshAccessToken } from "@/lib/sessionToken";
 import type { UserRole } from "@/types";
 
 const TICKETS_KEY = "boletoclick_tickets";
@@ -46,7 +46,8 @@ export function clearToken(): void {
 }
 
 export async function getUserFromToken(): Promise<User | null> {
-  if (!getTabAccessToken()) {
+  const token = await getValidAccessToken();
+  if (!token) {
     return null;
   }
 
@@ -60,7 +61,7 @@ export async function getUserFromToken(): Promise<User | null> {
     const role = user.role ?? getTabRole() ?? undefined;
     if (role) {
       saveTabSession({
-        accessToken: getTabAccessToken() ?? "",
+        accessToken: token,
         role,
       });
     }
@@ -71,8 +72,23 @@ export async function getUserFromToken(): Promise<User | null> {
 
     return user;
   } catch {
-    clearToken();
-    return null;
+    const refreshed = await refreshAccessToken();
+    if (!refreshed) {
+      clearToken();
+      return null;
+    }
+
+    try {
+      const user = await authService.getMe();
+      if (!user) {
+        clearToken();
+        return null;
+      }
+      return user;
+    } catch {
+      clearToken();
+      return null;
+    }
   }
 }
 

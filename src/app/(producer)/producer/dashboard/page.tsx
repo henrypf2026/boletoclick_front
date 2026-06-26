@@ -1,7 +1,7 @@
 "use client";
 
 import { authenticatedFetch } from '@/lib/authenticatedFetch';
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Swal from "sweetalert2";
 import {
@@ -9,6 +9,7 @@ import {
   toApiEventStatus,
 } from "@/lib/eventStatus";
 import ProducerEventEditForm from "@/components/dashboard/ProducerEventEditForm";
+import ProducerEventScanner from "@/components/dashboard/ProducerEventScanner";
 import type { ProducerEventFormValues } from "@/validators/dashboardSchemas";
 
 interface TicketType {
@@ -34,13 +35,6 @@ interface Evento {
   venue?: string | { name?: string; address?: string };
 }
 
-interface Acceso {
-  id: string;
-  sector: string;
-  hora: string;
-  estado: "VALIDO" | "INVALIDO";
-}
-
 interface EventStats {
   total: number;
   arrived: number;
@@ -64,8 +58,6 @@ export default function DashboardProducer() {
   const [seccionActiva, setSeccionActiva] = useState<"ajustes" | "stats" | "scanner">("ajustes");
   const [eventStats, setEventStats] = useState<EventStats | null>(null);
   const [loadingStats, setLoadingStats] = useState(false);
-  const [statusScanner, setStatusScanner] = useState<"idle" | "success" | "error">("idle");
-  const [ultimosAccesos, setUltimosAccesos] = useState<Acceso[]>([]);
 
   const [loadingAccion, setLoadingAccion] = useState<boolean>(false);
   const [mostrarPanel, setMostrarPanel] = useState(false);
@@ -114,7 +106,55 @@ export default function DashboardProducer() {
     cargarDesplegables();
   }, []);
 
-  const seleccionarEvento = async (ev: Evento) => {
+  const refrescarStats = useCallback(async (silent = false) => {
+    if (!eventoSeleccionado) return;
+    if (!silent) setLoadingStats(true);
+    try {
+      const response = await authenticatedFetch(
+        `/api/backend/tickets/event/${eventoSeleccionado.id}/stats`,
+        { credentials: "include" },
+      );
+      if (response.ok) {
+        setEventStats(await response.json());
+      }
+    } catch {
+      // ignore
+    } finally {
+      if (!silent) setLoadingStats(false);
+    }
+  }, [eventoSeleccionado]);
+
+  useEffect(() => {
+    if (
+      (seccionActiva === "stats" || seccionActiva === "scanner") &&
+      eventoSeleccionado
+    ) {
+      void refrescarStats();
+    }
+  }, [seccionActiva, eventoSeleccionado?.id, refrescarStats]);
+
+  const handleScanComplete = useCallback(() => {
+    setEventStats((prev) => {
+      if (!prev) return prev;
+      const arrived = prev.arrived + 1;
+      const pending = Math.max(0, prev.pending - 1);
+      return {
+        ...prev,
+        arrived,
+        pending,
+        percentage:
+          prev.total > 0
+            ? Math.round((arrived / prev.total) * 1000) / 10
+            : 0,
+      };
+    });
+    void refrescarStats(true);
+  }, [refrescarStats]);
+
+  const seleccionarEvento = async (
+    ev: Evento,
+    tab?: "ajustes" | "stats" | "scanner",
+  ) => {
     setEventoSeleccionado(ev);
     setEventStats(null);
     setLoadingStats(true);
@@ -124,8 +164,11 @@ export default function DashboardProducer() {
       .catch(() => {})
       .finally(() => setLoadingStats(false));
 
-    setStatusScanner("idle");
-    if (ev.status === "CONCLUIDO") setSeccionActiva("ajustes");
+    if (tab) {
+      setSeccionActiva(tab);
+    } else if (ev.status === "CONCLUIDO") {
+      setSeccionActiva("ajustes");
+    }
     setMostrarPanel(true);
   };
 
@@ -487,6 +530,22 @@ export default function DashboardProducer() {
                           : "S/F"}
                       </span>
                     </div>
+                    {!esCancelado && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          void seleccionarEvento(ev, "scanner");
+                        }}
+                        className={`w-full border-2 py-2 font-mono text-[10px] font-black uppercase transition-all ${
+                          esEste
+                            ? "border-surface bg-primary text-background"
+                            : "border-text bg-background hover:bg-surface-2"
+                        }`}
+                      >
+                        📷 Iniciar escaneo
+                      </button>
+                    )}
                   </div>
                 );
               })
@@ -512,11 +571,11 @@ export default function DashboardProducer() {
               </button>
             </div>
           )}
-          <div className="flex gap-2 px-4 pt-2 lg:px-0 lg:pt-0">
+          <div className="flex gap-2 overflow-x-auto pb-1 pt-2 px-4 lg:px-0 lg:pt-0">
             <button
               disabled={!eventoSeleccionado}
               onClick={() => setSeccionActiva("ajustes")}
-              className={`px-4 py-2 font-mono text-xs font-black uppercase border-2 border-text ${
+              className={`shrink-0 px-3 py-2 font-mono text-xs font-black uppercase border-2 border-text ${
                 !eventoSeleccionado
                   ? "opacity-30"
                   : seccionActiva === "ajustes"
@@ -524,12 +583,12 @@ export default function DashboardProducer() {
                   : "bg-surface"
               }`}
             >
-              🛠️ Ajustes Avanzados
+              🛠️ Ajustes
             </button>
             <button
               disabled={!eventoSeleccionado}
               onClick={() => setSeccionActiva("stats")}
-              className={`px-4 py-2 font-mono text-xs font-black uppercase border-2 border-text ${
+              className={`shrink-0 px-3 py-2 font-mono text-xs font-black uppercase border-2 border-text ${
                 !eventoSeleccionado
                   ? "opacity-30"
                   : seccionActiva === "stats"
@@ -540,10 +599,20 @@ export default function DashboardProducer() {
               📊 Estadísticas
             </button>
             <button
-              onClick={() => router.push("/producer/scanner")}
-              className="px-4 py-2 bg-surface text-text font-mono text-xs font-black uppercase border-2 border-text hover:shadow-[2px_2px_0px_0px_var(--color-text)] hover:translate-x-0.5 hover:translate-y-0.5 transition-all"
+              disabled={!eventoSeleccionado}
+              onClick={() => {
+                setSeccionActiva("scanner");
+                setMostrarPanel(true);
+              }}
+              className={`shrink-0 px-3 py-2 font-mono text-xs font-black uppercase border-2 border-text ${
+                !eventoSeleccionado
+                  ? "opacity-30"
+                  : seccionActiva === "scanner"
+                  ? "bg-primary text-background"
+                  : "bg-surface"
+              }`}
             >
-              📷 Scanner General
+              📷 Escanear
             </button>
           </div>
 
@@ -589,7 +658,7 @@ export default function DashboardProducer() {
                           {[
                             { label: "Vendidas", value: eventStats.total },
                             { label: "Disponibles", value: totalStock },
-                            { label: "Asistieron", value: eventStats.arrived },
+                            { label: "Escaneados", value: eventStats.arrived },
                             { label: "Sin escanear", value: eventStats.pending },
                           ].map(({ label, value }) => (
                             <div key={label} className="border-2 border-text p-3 text-center bg-background">
@@ -658,11 +727,17 @@ export default function DashboardProducer() {
 
               {/* SECCIÓN SCANNER */}
               {seccionActiva === "scanner" && (
-                <div className="bg-surface border-2 border-text p-6 space-y-4 shadow-[4px_4px_0px_0px_var(--color-text)]">
-                  <h3 className="text-lg font-black uppercase">Módulo de Control de Accesos</h3>
-                  <div className="border-2 border-dashed border-text p-8 text-center font-mono text-xs font-bold text-text-soft">
-                    [ Aquí se inicializa la cámara para el escaneo de QRs ]
-                  </div>
+                <div className="bg-surface border-2 border-text p-4 md:p-6 shadow-[4px_4px_0px_0px_var(--color-text)]">
+                  <h3 className="text-lg font-black uppercase border-b-2 border-text pb-2 mb-4">
+                    Control de accesos
+                  </h3>
+                  <ProducerEventScanner
+                    compact
+                    eventId={eventoSeleccionado.id}
+                    eventTitle={eventoSeleccionado.title}
+                    stats={eventStats}
+                    onScanComplete={handleScanComplete}
+                  />
                 </div>
               )}
             </div>
