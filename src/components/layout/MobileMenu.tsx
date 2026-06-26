@@ -51,7 +51,7 @@ export default function MobileMenu({ navLinks }: { navLinks: NavLinkItem[] }) {
   const dashboardLabel = user?.role === 'producer' ? 'Mi Dashboard' : 'Mi Cuenta'
 
   const contextLink: NavLinkItem = user?.role === 'producer'
-    ? { href: '/producer/eventos', label: 'Mis Eventos' }
+    ? { href: '/producer/mis-eventos', label: 'Mis Eventos' }
     : { href: '/mis-tickets', label: 'Mis Tickets' };
 
   const userLinks: NavLinkItem[] = authenticated && user
