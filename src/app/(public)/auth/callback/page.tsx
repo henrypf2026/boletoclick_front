@@ -17,7 +17,7 @@ export default function AuthCallbackPage() {
     let mounted = true;
     let handled = false;
 
-    const processSession = async (session: { access_token: string }) => {
+    const processSession = async (session: { access_token: string; refresh_token?: string }) => {
       if (!mounted || handled) return;
       handled = true;
       try {
