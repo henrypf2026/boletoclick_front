@@ -202,9 +202,9 @@ async function generarComprobantePDF(orden: OrderItem) {
     doc.setFont("helvetica", "normal");
     doc.setTextColor(GRAY);
     if (evento.eventDate)
-      doc.text(`📅  ${formatFecha(evento.eventDate)}`, margen + 7, y + 20);
+      doc.text(`Fecha: ${formatFecha(evento.eventDate)}`, margen + 7, y + 20);
     if (evento.venue?.name)
-      doc.text(`📍  ${evento.venue.name}`, margen + 7, y + 25);
+      doc.text(`Lugar: ${evento.venue.name}`, margen + 7, y + 25);
     y += 36;
   }
 
@@ -394,7 +394,7 @@ export default function UserDashboard() {
 
   useEffect(() => {
     if (!user) return;
-    const fetchTickets = async () => {
+    const load = async () => {
       try {
         const data = await ticketService.getMyTickets(user.id);
         setTickets(data);
@@ -404,7 +404,10 @@ export default function UserDashboard() {
         setLoadingTickets(false);
       }
     };
-    fetchTickets();
+    load();
+    const onVisible = () => { if (!document.hidden) load(); };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => document.removeEventListener("visibilitychange", onVisible);
   }, [user]);
 
   useEffect(() => {
@@ -636,23 +639,29 @@ export default function UserDashboard() {
             </div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-              {tickets.map((ticket) => (
+              {tickets.map((ticket) => {
+                const isCancelled = ticket.order.status === "CANCELLED" || (ticket.order.status === "PAID" && !ticket.allowEntrance);
+                return (
                 <div
                   key={ticket.id}
                   onClick={() => setTicketExpandido(ticket)}
-                  className="bg-surface border-2 border-text rounded-none shadow-[4px_4px_0px_0px_var(--color-text)] p-5 flex flex-col justify-between transition-all hover:shadow-[7px_7px_0px_0px_var(--color-text)] hover:-translate-x-0.5 hover:-translate-y-0.5 cursor-pointer group"
+                  className={`bg-surface border-2 rounded-none shadow-[4px_4px_0px_0px_var(--color-text)] p-5 flex flex-col justify-between transition-all cursor-pointer group ${
+                    isCancelled
+                      ? "border-text/30 opacity-60 hover:opacity-80"
+                      : "border-text hover:shadow-[7px_7px_0px_0px_var(--color-text)] hover:-translate-x-0.5 hover:-translate-y-0.5"
+                  }`}
                 >
                   <div className="border-b-2 border-dashed border-text/40 pb-4 mb-4">
                     <div className="flex justify-between items-start gap-2">
-                      <h3 className="text-text font-black text-lg uppercase tracking-tight group-hover:text-primary transition-colors">
+                      <h3 className={`font-black text-lg uppercase tracking-tight transition-colors ${isCancelled ? "text-text/50 line-through" : "text-text group-hover:text-primary"}`}>
                         {ticketEventTitles[ticket.ticketType.eventId ?? ""] ??
                           ticket.eventTitle ??
                           ticket.ticketType.name}
                       </h3>
                       <span
-                        className={`text-[9px] font-mono px-1.5 py-0.5 font-bold whitespace-nowrap border ${orderStatusColor(ticket.order.status)}`}
+                        className={`text-[9px] font-mono px-1.5 py-0.5 font-bold whitespace-nowrap border ${orderStatusColor(isCancelled ? "CANCELLED" : ticket.order.status)}`}
                       >
-                        {orderStatusLabel(ticket.order.status)}
+                        {orderStatusLabel(isCancelled ? "CANCELLED" : ticket.order.status)}
                       </span>
                     </div>
                     {ticket.ticketType.zone && (
@@ -663,19 +672,23 @@ export default function UserDashboard() {
                         </span>
                       </p>
                     )}
-                    <p className="text-primary-deep dark:text-primary font-black mt-2 font-mono text-sm">
+                    <p className={`font-black mt-2 font-mono text-sm ${isCancelled ? "text-text/40" : "text-primary-deep dark:text-primary"}`}>
                       ${ticket.ticketType.price.toLocaleString("es-MX")}
                     </p>
                   </div>
-                  <div className="bg-surface-2 p-3 border-2 border-text flex flex-col items-center justify-center max-w-40 mx-auto w-full transition-transform group-hover:scale-105">
-                    <TicketQrCode
-                      value={ticket.qrCode}
-                      size={112}
-                      className="w-full h-auto"
-                    />
-                  </div>
+                  {isCancelled ? (
+                    <div className="flex flex-col items-center justify-center max-w-40 mx-auto w-full border-4 border-dashed border-red-400/50 bg-red-50/30 dark:bg-red-950/20 aspect-square gap-1">
+                      <span className="text-2xl font-black text-red-400/60">✕</span>
+                      <span className="text-[9px] font-black uppercase tracking-wide text-red-400/70 font-mono text-center leading-tight px-1">QR<br/>inválido</span>
+                    </div>
+                  ) : (
+                    <div className="bg-surface-2 p-3 border-2 border-text flex flex-col items-center justify-center max-w-40 mx-auto w-full transition-transform group-hover:scale-105">
+                      <TicketQrCode value={ticket.qrCode} size={112} className="w-full h-auto" />
+                    </div>
+                  )}
                 </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </>
@@ -859,19 +872,27 @@ export default function UserDashboard() {
               </p>
             </div>
 
-            <div className="my-6 bg-white p-4 border-4 border-black flex flex-col items-center justify-center aspect-square w-full max-w-60 mx-auto shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
-              <TicketQrCode
-                value={ticketExpandido.qrCode}
-                size={200}
-                className="w-full h-full"
-              />
-            </div>
+            {(ticketExpandido.order.status === "CANCELLED" || (ticketExpandido.order.status === "PAID" && !ticketExpandido.allowEntrance)) ? (
+              <div className="my-6 flex flex-col items-center justify-center gap-3 border-4 border-dashed border-red-400 bg-red-50 aspect-square w-full max-w-60 mx-auto">
+                <span className="text-4xl font-black text-red-400">✕</span>
+                <p className="text-center font-mono text-[11px] font-black uppercase tracking-wide text-red-500 leading-tight px-4">
+                  QR inválido<br/>Entrada cancelada
+                </p>
+              </div>
+            ) : (
+              <div className="my-6 bg-white p-4 border-4 border-black flex flex-col items-center justify-center aspect-square w-full max-w-60 mx-auto shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
+                <TicketQrCode value={ticketExpandido.qrCode} size={200} className="w-full h-full" />
+              </div>
+            )}
 
             <div className="space-y-3">
               <p className="text-center text-[10px] font-mono font-black text-neutral-600 uppercase tracking-tight">
-                📱 Presentá esta pantalla en los lectores de puerta
+                {(ticketExpandido.order.status === "CANCELLED" || (ticketExpandido.order.status === "PAID" && !ticketExpandido.allowEntrance))
+                  ? "⚠ Este evento fue cancelado por el organizador"
+                  : "📱 Presentá esta pantalla en los lectores de puerta"}
               </p>
               <div className="grid grid-cols-1 gap-2">
+                {!(ticketExpandido.order.status === "CANCELLED" || (ticketExpandido.order.status === "PAID" && !ticketExpandido.allowEntrance)) && (
                 <AddToWalletButton
                   ticket={{
                     id: ticketExpandido.id,
@@ -881,6 +902,7 @@ export default function UserDashboard() {
                     zone: ticketExpandido.ticketType.zone,
                   }}
                 />
+                )}
                 <button
                   onClick={() => setTicketExpandido(null)}
                   className="w-full bg-black hover:bg-neutral-900 text-white font-mono font-black py-2.5 text-[11px] uppercase tracking-wider border-2 border-black transition-colors cursor-pointer"
