@@ -556,7 +556,7 @@ export default function DashboardProducer() {
         {/* Panel derecho — overlay en mobile, columna en desktop */}
         <div className={`space-y-6 lg:col-span-8 ${
           eventoSeleccionado && mostrarPanel
-            ? "fixed bottom-0 left-0 right-0 z-50 max-h-[85vh] overflow-y-auto bg-background border-t-4 border-text pb-8 lg:static lg:max-h-none lg:overflow-visible lg:bg-transparent lg:border-none lg:pb-0"
+            ? "fixed bottom-0 left-0 right-0 z-[45] max-h-[85vh] overflow-y-auto bg-background border-t-4 border-text pb-8 lg:static lg:max-h-none lg:overflow-visible lg:bg-transparent lg:border-none lg:pb-0"
             : "hidden lg:block"
         }`}>
           {/* Barra de título móvil con cierre */}
