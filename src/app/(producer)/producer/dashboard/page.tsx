@@ -68,6 +68,7 @@ export default function DashboardProducer() {
   const [formTicketTypes, setFormTicketTypes] = useState<TicketType[]>([]);
 
   const [loadingAccion, setLoadingAccion] = useState<boolean>(false);
+  const [mostrarPanel, setMostrarPanel] = useState(false);
   const [categorias, setCategorias] = useState<ApiItem[]>([]);
   const [locaciones, setLocaciones] = useState<ApiItem[]>([]);
 
@@ -132,6 +133,7 @@ export default function DashboardProducer() {
     setFormTicketTypes(ev.ticketTypes ? ev.ticketTypes.map((t) => ({ ...t })) : []);
     setStatusScanner("idle");
     if (ev.status === "CONCLUIDO") setSeccionActiva("ajustes");
+    setMostrarPanel(true);
   };
 
   const handleTicketTypeChange = (index: number, field: keyof TicketType, value: any) => {
@@ -467,6 +469,14 @@ export default function DashboardProducer() {
         </div>
       </div>
 
+      {/* Backdrop móvil — cierra el panel al tocar fuera */}
+      {eventoSeleccionado && mostrarPanel && (
+        <div
+          className="fixed inset-0 bg-black/60 z-40 lg:hidden"
+          onClick={() => setMostrarPanel(false)}
+        />
+      )}
+
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
         {/* Lista de eventos */}
         <div className="lg:col-span-4 space-y-4">
@@ -492,30 +502,41 @@ export default function DashboardProducer() {
             ) : (
               eventos.map((ev) => {
                 const esEste = eventoSeleccionado?.id === ev.id;
+                const esCancelado = ev.status === "CANCELLED" || ev.status === "INACTIVE";
                 return (
                   <div
                     key={ev.id}
-                    onClick={() => seleccionarEvento(ev)}
-                    className={`border-2 border-text p-5 transition-all cursor-pointer flex flex-col gap-3 ${
-                      esEste
-                        ? "bg-text text-surface"
-                        : "bg-surface text-text hover:shadow-[4px_4px_0px_0px_var(--color-text)]"
+                    onClick={() => !esCancelado && seleccionarEvento(ev)}
+                    className={`border-2 p-5 transition-all flex flex-col gap-3 ${
+                      esCancelado
+                        ? "border-text/30 opacity-50 cursor-not-allowed"
+                        : esEste
+                        ? "bg-text text-surface border-text cursor-pointer"
+                        : "bg-surface text-text border-text cursor-pointer hover:shadow-[4px_4px_0px_0px_var(--color-text)]"
                     }`}
                   >
                     <div className="flex justify-between items-start">
                       <div>
                         <span
                           className={`font-mono text-[10px] font-black px-1.5 py-0.5 border uppercase ${
-                            ev.status === "ACTIVE"
+                            ev.status === "ACTIVE" || ev.status === "APPROVED"
                               ? "bg-green-400/20 text-green-700 border-green-500"
                               : ev.status === "DRAFT"
                               ? "bg-yellow-400/20 text-yellow-700 border-yellow-500"
+                              : ev.status === "CANCELLED" || ev.status === "INACTIVE"
+                              ? "bg-red-400/20 text-red-600 border-red-400"
                               : "bg-success/10 text-success border-success/30"
                           }`}
                         >
-                          {ev.status === "ACTIVE" ? "📡 AL AIRE" : ev.status === "DRAFT" ? "📝 BORRADOR" : ev.status}
+                          {ev.status === "ACTIVE" || ev.status === "APPROVED"
+                            ? "📡 AL AIRE"
+                            : ev.status === "DRAFT"
+                            ? "📝 BORRADOR"
+                            : ev.status === "CANCELLED" || ev.status === "INACTIVE"
+                            ? "✕ CANCELADO"
+                            : ev.status}
                         </span>
-                        <h3 className="uppercase font-black text-sm mt-1.5 line-clamp-2">
+                        <h3 className={`uppercase font-black text-sm mt-1.5 line-clamp-2 ${ev.status === "CANCELLED" || ev.status === "INACTIVE" ? "line-through opacity-60" : ""}`}>
                           {ev.title}
                         </h3>
                       </div>
@@ -532,9 +553,25 @@ export default function DashboardProducer() {
           </div>
         </div>
 
-        {/* Panel derecho */}
-        <div className="lg:col-span-8 space-y-6">
-          <div className="flex gap-2">
+        {/* Panel derecho — overlay en mobile, columna en desktop */}
+        <div className={`space-y-6 lg:col-span-8 ${
+          eventoSeleccionado && mostrarPanel
+            ? "fixed bottom-0 left-0 right-0 z-50 max-h-[85vh] overflow-y-auto bg-background border-t-4 border-text pb-8 lg:static lg:max-h-none lg:overflow-visible lg:bg-transparent lg:border-none lg:pb-0"
+            : "hidden lg:block"
+        }`}>
+          {/* Barra de título móvil con cierre */}
+          {eventoSeleccionado && mostrarPanel && (
+            <div className="lg:hidden sticky top-0 z-10 flex items-center justify-between bg-surface border-b-2 border-text px-4 py-3">
+              <span className="font-mono text-xs font-black uppercase truncate pr-4">{eventoSeleccionado.title}</span>
+              <button
+                onClick={() => setMostrarPanel(false)}
+                className="shrink-0 border-2 border-text bg-background px-3 py-1 font-mono text-xs font-black uppercase"
+              >
+                ✕ Cerrar
+              </button>
+            </div>
+          )}
+          <div className="flex gap-2 px-4 pt-2 lg:px-0 lg:pt-0">
             <button
               disabled={!eventoSeleccionado}
               onClick={() => setSeccionActiva("ajustes")}
@@ -670,10 +707,20 @@ export default function DashboardProducer() {
                             key={idx}
                             className={`p-4 border-2 border-text shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] ${tieneVentas ? "bg-secondary/5" : "bg-background"}`}
                           >
-                            <div className="flex justify-between items-center mb-2">
-                              <span className="text-xs font-mono font-black uppercase text-text">{ticket.name}</span>
+                            <div className="flex justify-between items-center mb-2 gap-2">
+                              {tieneVentas ? (
+                                <span className="text-xs font-mono font-black uppercase text-text">{ticket.name}</span>
+                              ) : (
+                                <input
+                                  type="text"
+                                  value={ticket.name}
+                                  placeholder="NOMBRE DEL TICKET"
+                                  onChange={(e) => handleTicketTypeChange(idx, "name", e.target.value)}
+                                  className="flex-1 border border-text p-1.5 bg-background font-mono text-xs font-black uppercase focus:outline-none placeholder:text-text-soft/40"
+                                />
+                              )}
                               {tieneVentas && (
-                                <span className="text-[10px] font-mono bg-accent text-white font-black px-2 py-0.5 uppercase tracking-tighter">
+                                <span className="text-[10px] font-mono bg-accent text-white font-black px-2 py-0.5 uppercase tracking-tighter shrink-0">
                                   ⚠️ BLOQUEO ACTIVO: {entradasVendidas} VENDIDAS
                                 </span>
                               )}
@@ -714,6 +761,38 @@ export default function DashboardProducer() {
                         );
                       })}
                     </div>
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        const { isConfirmed } = await Swal.fire({
+                          title: "¿AGREGAR TICKET TYPE?",
+                          text: "Esta acción es irreversible. Una vez guardado, el tipo de ticket no se puede eliminar. Si necesitás desactivarlo, poné el stock en 0.",
+                          icon: "warning",
+                          showCancelButton: true,
+                          confirmButtonText: "SÍ, AGREGAR",
+                          cancelButtonText: "CANCELAR",
+                          confirmButtonColor: "#6750e0",
+                          cancelButtonColor: "#4a4a4a",
+                          background: "#f5f4f0",
+                          color: "#171717",
+                          customClass: {
+                            popup: "border-4 border-[#171717] rounded-none shadow-[6px_6px_0px_0px_#171717] font-mono",
+                            title: "uppercase font-black tracking-tighter",
+                            confirmButton: "font-mono font-black uppercase tracking-wider border-2 border-[#171717] rounded-none",
+                            cancelButton: "font-mono font-black uppercase tracking-wider border-2 border-[#171717] rounded-none",
+                          },
+                        });
+                        if (isConfirmed) {
+                          setFormTicketTypes((prev) => [
+                            ...prev,
+                            { name: "", zone: "", price: 0, stock: 0, sold: 0 },
+                          ]);
+                        }
+                      }}
+                      className="w-full border-2 border-dashed border-text py-2 font-mono text-xs font-black uppercase text-text-soft hover:text-text hover:border-solid hover:bg-surface transition-all"
+                    >
+                      + Agregar tipo de ticket
+                    </button>
                   </div>
 
                   {/* Botones de acción */}

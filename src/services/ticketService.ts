@@ -21,7 +21,7 @@ export interface ApiTicket {
   order: {
     id: string;
     total: number;
-    status: 'PENDING' | 'PAID' | 'FAILED' | 'REFUNDED';
+    status: 'PENDING' | 'PAID' | 'FAILED' | 'REFUNDED' | 'CANCELLED';
     createdAt: string;
   };
 }
