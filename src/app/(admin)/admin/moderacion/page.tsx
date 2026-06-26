@@ -344,6 +344,7 @@ export default function AdminModeracion() {
                 <option value="ALL">Cualquier Estado</option>
                 <option value="APROBADO">Activos</option>
                 <option value="RECHAZADO">Rechazados</option>
+                <option value="CANCELADO">Cancelados</option>
               </select>
             </div>
           </div>

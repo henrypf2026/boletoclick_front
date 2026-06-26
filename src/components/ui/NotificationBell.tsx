@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { Bell } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 
-type NotifType = 'cancelled' | 'recommendation';
+type NotifType = 'cancelled' | 'recommendation' | 'suspended' | 'reactivated';
 
 interface Notification {
   id: string;
@@ -111,21 +111,41 @@ async function fetchUserNotifications(): Promise<Notification[]> {
 
 // ─── Notificaciones para el productor ────────────────────────────────────────
 
-async function fetchProducerNotifications(): Promise<Notification[]> {
+async function fetchProducerNotifications(seenIds: Set<string>): Promise<Notification[]> {
   const events: any[] = await fetch('/api/backend/events/producer', { credentials: 'include' })
     .then((r) => (r.ok ? r.json() : []))
     .catch(() => []);
 
-  return events
-    .filter((ev) => ev.status === 'CANCELLED' || ev.status === 'INACTIVE')
-    .map((ev) => ({
-      id: `cancelled_${ev.id}`,
-      date: ev.updatedAt ?? ev.createdAt,
-      title: ev.title,
-      message: 'El administrador dio de baja este evento.',
-      type: 'cancelled' as NotifType,
-      href: '/producer/dashboard',
-    }));
+  const notifications: Notification[] = [];
+
+  for (const ev of events) {
+    if (ev.status === 'REJECTED') {
+      notifications.push({
+        id: `suspended_${ev.id}`,
+        date: ev.updatedAt ?? ev.createdAt,
+        title: ev.title,
+        message:
+          'Tu evento fue suspendido temporalmente. Comunicate con el administrador para resolverlo.',
+        type: 'suspended',
+        href: 'mailto:adminhenry31@gmail.com',
+      });
+    } else if (
+      ev.status === 'APPROVED' &&
+      seenIds.has(`suspended_${ev.id}`) &&
+      !seenIds.has(`reactivated_${ev.id}`)
+    ) {
+      notifications.push({
+        id: `reactivated_${ev.id}`,
+        date: ev.updatedAt ?? ev.createdAt,
+        title: ev.title,
+        message: 'Tu evento fue reactivado y ya está visible en la cartelera.',
+        type: 'reactivated',
+        href: '/producer/dashboard',
+      });
+    }
+  }
+
+  return notifications;
 }
 
 // ─── Componente ───────────────────────────────────────────────────────────────
@@ -157,9 +177,12 @@ export default function NotificationBell() {
     if (!isUser && !isProducer) return;
 
     const stored: string[] = JSON.parse(localStorage.getItem(SEEN_KEY) || '[]');
-    setSeenIds(new Set(stored));
+    const storedSet = new Set(stored);
+    setSeenIds(storedSet);
 
-    const fetcher = isUser ? fetchUserNotifications : fetchProducerNotifications;
+    const fetcher = isUser
+      ? fetchUserNotifications
+      : () => fetchProducerNotifications(storedSet);
     fetcher().then(setNotifications).catch(() => {});
   }, [isUser, isProducer]);
 
@@ -219,18 +242,22 @@ export default function NotificationBell() {
             <ul className="max-h-72 divide-y-2 divide-border overflow-y-auto">
               {notifications.map((n) => (
                 <li key={n.id}>
-                  <Link
+                  <a
                     href={n.href ?? '/'}
                     onClick={() => setOpen(false)}
                     className="flex items-start gap-2.5 px-4 py-3 transition-colors hover:bg-surface-2"
                   >
                     <span
                       className={`mt-1 size-2 shrink-0 rounded-full ${
-                        n.type === 'cancelled' ? 'bg-red-500' : 'bg-primary'
+                        n.type === 'cancelled' || n.type === 'suspended'
+                          ? 'bg-red-500'
+                          : n.type === 'reactivated'
+                            ? 'bg-green-500'
+                            : 'bg-primary'
                       }`}
                     />
                     <div className="min-w-0 flex-1">
-                      <p className="truncate text-xs font-black uppercase leading-tight text-text">
+                      <p className="break-words text-xs font-black uppercase leading-tight text-text">
                         {n.title}
                       </p>
                       <p className="mt-0.5 font-mono text-[11px] leading-snug text-text-soft">
@@ -244,7 +271,7 @@ export default function NotificationBell() {
                         })}
                       </p>
                     </div>
-                  </Link>
+                  </a>
                 </li>
               ))}
             </ul>
