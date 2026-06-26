@@ -1,8 +1,16 @@
 "use client";
 
 import { authenticatedFetch } from '@/lib/authenticatedFetch';
+import {
+  CHECKOUT_TIMER_SECONDS,
+  clearCheckoutTimer,
+  getCheckoutStorageKeys,
+  initCheckoutTimer,
+  readRemainingSeconds,
+  renewCheckoutTimer,
+} from '@/lib/checkoutTimer';
 
-import { useState, useEffect, useCallback, Suspense } from "react";
+import { useState, useEffect, useCallback, useRef, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import { savePendingPurchase } from "@/lib/pendingPurchase";
@@ -11,7 +19,34 @@ import type { Event, Zone } from "@/mocks/events";
 import Swal from "sweetalert2";
 import Link from "next/link";
 
-const TIMER_SECONDS = 10 * 60; // 10 minutos
+const SWAL_BASE = {
+  confirmButtonColor: "#6750e0",
+  background: "#f5f4f0",
+  color: "#171717",
+  customClass: {
+    popup:
+      "border-4 border-[#171717] rounded-none shadow-[6px_6px_0px_0px_#171717] font-mono",
+    title: "uppercase font-black tracking-tighter",
+    confirmButton:
+      "font-mono font-black uppercase tracking-wider border-2 border-[#171717] rounded-none",
+    cancelButton:
+      "font-mono font-black uppercase tracking-wider border-2 border-[#171717] rounded-none",
+  },
+} as const;
+
+async function promptExtendCheckoutTime(): Promise<boolean> {
+  const result = await Swal.fire({
+    ...SWAL_BASE,
+    title: "¿NECESITÁS MÁS TIEMPO?",
+    text: "Tu tiempo para completar la compra se agotó. ¿Querés renovarlo por 10 minutos más?",
+    icon: "question",
+    showCancelButton: true,
+    confirmButtonText: "SÍ, RENOVAR",
+    cancelButtonText: "VOLVER A EVENTOS",
+    allowOutsideClick: false,
+  });
+  return result.isConfirmed;
+}
 
 function formatTime(seconds: number) {
   const m = Math.floor(seconds / 60)
@@ -43,8 +78,9 @@ function CheckoutContent() {
   const lng = Number(searchParams.get("lng") ?? 0);
 
   const [quantity] = useState(initialQuantity);
-  const [timerSeconds, setTimerSeconds] = useState(TIMER_SECONDS);
+  const [timerSeconds, setTimerSeconds] = useState(CHECKOUT_TIMER_SECONDS);
   const [timerExpired, setTimerExpired] = useState(false);
+  const expiryPromptOpenRef = useRef(false);
   const [couponCode, setCouponCode] = useState("");
   const [couponApplied, setCouponApplied] = useState(false);
   const [couponId, setCouponId] = useState<string | undefined>(undefined);
@@ -65,123 +101,66 @@ function CheckoutContent() {
     }
   }, [ticketTypeId, eventId, router]);
 
-  // Usamos localStorage para persistir `sessionId` y `expiresAt` por ticketType
+  useEffect(() => {
+    if (ticketTypeId) initCheckoutTimer(ticketTypeId);
+  }, [ticketTypeId]);
+
+  const applyTimerRenewal = useCallback(() => {
+    if (!ticketTypeId) return;
+    renewCheckoutTimer(ticketTypeId);
+    setTimerSeconds(CHECKOUT_TIMER_SECONDS);
+    setTimerExpired(false);
+    expiryPromptOpenRef.current = false;
+  }, [ticketTypeId]);
+
+  const handleTimerExpired = useCallback(async () => {
+    if (expiryPromptOpenRef.current) return;
+    expiryPromptOpenRef.current = true;
+    setTimerExpired(true);
+
+    const wantsMoreTime = await promptExtendCheckoutTime();
+    if (wantsMoreTime) {
+      applyTimerRenewal();
+      return;
+    }
+
+    if (ticketTypeId) clearCheckoutTimer(ticketTypeId);
+    router.push("/eventos");
+  }, [applyTimerRenewal, router, ticketTypeId]);
+
+  const requestMoreTime = useCallback(async (): Promise<boolean> => {
+    const wantsMoreTime = await promptExtendCheckoutTime();
+    if (!wantsMoreTime) {
+      if (ticketTypeId) clearCheckoutTimer(ticketTypeId);
+      router.push("/eventos");
+      return false;
+    }
+    applyTimerRenewal();
+    return true;
+  }, [applyTimerRenewal, router, ticketTypeId]);
+
   useEffect(() => {
     if (!ticketTypeId || timerExpired) return;
 
-    const storageKey = `checkoutSession_${ticketTypeId}`;
-    const startKey   = `checkoutStart_${ticketTypeId}`;
-    // Si hay una sesión guardada, usamos su expiresAt como referencia
-    const stored =
-      typeof window !== "undefined"
-        ? window.localStorage.getItem(storageKey)
-        : null;
-    if (stored) {
-      try {
-        const parsed = JSON.parse(stored) as {
-          sessionId?: string;
-          expiresAt?: string;
-        };
-        if (parsed?.expiresAt) {
-          const remaining = Math.floor(
-            (new Date(parsed.expiresAt).getTime() - Date.now()) / 1000,
-          );
-          if (remaining <= 0) {
-            if (typeof window !== "undefined")
-              window.localStorage.removeItem(storageKey);
-            setTimerExpired(true);
-            Swal.fire({
-              title: "TIEMPO AGOTADO",
-              text: "Tu reserva expiró. Volvé a seleccionar las entradas.",
-              icon: "warning",
-              confirmButtonText: "VOLVER A EVENTOS",
-              confirmButtonColor: "#6750e0",
-              background: "#f5f4f0",
-              color: "#171717",
-              allowOutsideClick: false,
-            }).then(() => router.push("/eventos"));
-            return;
-          }
-          setTimerSeconds(remaining);
-        }
-      } catch {
-        if (typeof window !== "undefined")
-          window.localStorage.removeItem(storageKey);
-      }
+    const remaining = readRemainingSeconds(ticketTypeId);
+    if (remaining <= 0) {
+      void handleTimerExpired();
+      return;
     }
+    setTimerSeconds(remaining);
 
-  const interval = setInterval(() => {
-      const s =
-        typeof window !== "undefined"
-          ? window.localStorage.getItem(storageKey)
-          : null;
+    const interval = setInterval(() => {
+      const nextRemaining = readRemainingSeconds(ticketTypeId);
+      setTimerSeconds(Math.max(0, nextRemaining));
 
-      if (!s) {
-        const storedStart =
-          typeof window !== "undefined"
-            ? window.localStorage.getItem(startKey)
-            : null;
-
-        if (!storedStart) {
-          setTimerSeconds((prev) => Math.max(0, prev - 1));
-          return;
-        }
-
-        const elapsed   = Math.floor((Date.now() - Number(storedStart)) / 1000);
-        const remaining = Math.max(0, TIMER_SECONDS - elapsed);
-        setTimerSeconds(remaining);
-
-        if (remaining <= 0) {
-          clearInterval(interval);
-          if (typeof window !== "undefined")
-            window.localStorage.removeItem(startKey);
-          setTimerExpired(true);
-          Swal.fire({
-            title: "TIEMPO AGOTADO",
-            text: "Tu reserva expiró. Volvé a seleccionar las entradas.",
-            icon: "warning",
-            confirmButtonText: "VOLVER A EVENTOS",
-            confirmButtonColor: "#6750e0",
-            background: "#f5f4f0",
-            color: "#171717",
-            allowOutsideClick: false,
-          }).then(() => router.push("/eventos"));
-        }
-        return;
-      }
-
-      try {
-        const p = JSON.parse(s) as { expiresAt?: string };
-        if (!p?.expiresAt) return;
-        const remaining = Math.floor(
-          (new Date(p.expiresAt).getTime() - Date.now()) / 1000,
-        );
-        setTimerSeconds(Math.max(0, remaining));
-        if (remaining <= 0) {
-          clearInterval(interval);
-          if (typeof window !== "undefined") {
-            window.localStorage.removeItem(storageKey);
-            window.localStorage.removeItem(startKey);
-          }
-          setTimerExpired(true);
-          Swal.fire({
-            title: "TIEMPO AGOTADO",
-            text: "Tu reserva expiró. Volvé a seleccionar las entradas.",
-            icon: "warning",
-            confirmButtonText: "VOLVER A EVENTOS",
-            confirmButtonColor: "#6750e0",
-            background: "#f5f4f0",
-            color: "#171717",
-            allowOutsideClick: false,
-          }).then(() => router.push("/eventos"));
-        }
-      } catch {
-        // ignore parse errors
+      if (nextRemaining <= 0) {
+        clearInterval(interval);
+        void handleTimerExpired();
       }
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [ticketTypeId, timerExpired, router]); 
+  }, [ticketTypeId, timerExpired, handleTimerExpired]);
   const subtotal = ticketPrice * quantity;
   const totalFinal = Math.max(0, subtotal - discount);
 
@@ -243,7 +222,12 @@ function CheckoutContent() {
   };
 
   const handlePurchase = useCallback(async () => {
-    if (!user || timerExpired) return;
+    if (!user) return;
+
+    if (timerExpired || timerSeconds <= 0) {
+      const renewed = await requestMoreTime();
+      if (!renewed) return;
+    }
 
     setLoadingPurchase(true);
 
@@ -317,14 +301,15 @@ function CheckoutContent() {
       // Guardar sessionId y expiresAt para sobrevivir refresh y usar el countdown del server
       try {
         if (typeof window !== "undefined") {
-          const storageKey = `checkoutSession_${ticketTypeId}`;
+          const { sessionKey, startKey } = getCheckoutStorageKeys(ticketTypeId);
           window.localStorage.setItem(
-            storageKey,
+            sessionKey,
             JSON.stringify({
               sessionId: session.sessionId,
               expiresAt: session.expiresAt,
             }),
           );
+          window.localStorage.removeItem(startKey);
         }
       } catch {
         // no bloquear por errores de storage
@@ -344,6 +329,8 @@ function CheckoutContent() {
   }, [
     user,
     timerExpired,
+    timerSeconds,
+    requestMoreTime,
     eventId,
     ticketTypeName,
     venue,
@@ -392,7 +379,9 @@ function CheckoutContent() {
       {/* Temporizador */}
       <div
         className={`border-4 p-4 mb-6 flex items-center justify-between shadow-[4px_4px_0px_0px_var(--color-text)] ${
-          timerSeconds <= 60
+          timerExpired
+            ? "border-red-500 bg-red-500/10"
+            : timerSeconds <= 60
             ? "border-red-500 bg-red-500/10"
             : timerSeconds <= 180
               ? "border-yellow-500 bg-yellow-400/10"
@@ -401,18 +390,35 @@ function CheckoutContent() {
       >
         <div>
           <p className="font-mono text-[10px] font-black uppercase tracking-widest text-text-soft">
-            Tiempo restante para completar tu compra
+            {timerExpired
+              ? "Tiempo agotado — renovalo para continuar"
+              : "Tiempo restante para completar tu compra"}
           </p>
           <p
             className={`font-mono font-black text-3xl tracking-tighter ${
-              timerSeconds <= 60 ? "text-red-500 animate-pulse" : "text-text"
+              timerExpired || timerSeconds <= 60
+                ? "text-red-500 animate-pulse"
+                : "text-text"
             }`}
           >
-            {formatTime(timerSeconds)}
+            {timerExpired ? "00:00" : formatTime(timerSeconds)}
           </p>
+          {timerExpired && (
+            <button
+              type="button"
+              onClick={() => void requestMoreTime()}
+              className="mt-2 font-mono text-[10px] font-black uppercase text-primary underline hover:no-underline"
+            >
+              Pedir 10 minutos más
+            </button>
+          )}
         </div>
         <div className="text-4xl">
-          {timerSeconds <= 60 ? "🚨" : timerSeconds <= 180 ? "⚠️" : "⏱️"}
+          {timerExpired || timerSeconds <= 60
+            ? "🚨"
+            : timerSeconds <= 180
+              ? "⚠️"
+              : "⏱️"}
         </div>
       </div>
 
@@ -498,14 +504,14 @@ function CheckoutContent() {
       </div>
 
       <button
-        onClick={handlePurchase}
-        disabled={loadingPurchase || timerExpired}
+        onClick={() => void handlePurchase()}
+        disabled={loadingPurchase}
         className="w-full bg-primary text-background border-4 border-text font-mono font-black py-4 text-sm uppercase tracking-wider shadow-[4px_4px_0px_0px_var(--color-text)] hover:shadow-none hover:translate-x-0.5 hover:translate-y-0.5 transition-all disabled:opacity-50 cursor-pointer"
       >
         {loadingPurchase
           ? "[ PROCESANDO... ]"
           : timerExpired
-            ? "[ TIEMPO AGOTADO ]"
+            ? "Renovar tiempo y confirmar compra"
             : `Confirmar compra · $${totalFinal.toLocaleString("es-MX")}`}
       </button>
 

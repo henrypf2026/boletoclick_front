@@ -17,10 +17,19 @@ export default function AuthCallbackPage() {
     let mounted = true;
     let handled = false;
 
-    const processSession = async (session: { access_token: string; refresh_token?: string }) => {
+    const processSession = async (session: {
+      access_token: string;
+      refresh_token?: string;
+    }) => {
       if (!mounted || handled) return;
       handled = true;
       try {
+        if (session.refresh_token) {
+          await supabase.auth.setSession({
+            access_token: session.access_token,
+            refresh_token: session.refresh_token,
+          });
+        }
         const setRes = await fetch('/api/backend/auth/set-session', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
