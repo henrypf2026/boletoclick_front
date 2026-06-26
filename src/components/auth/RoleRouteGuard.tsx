@@ -33,8 +33,16 @@ export default function RoleRouteGuard({
 
   if (loading) {
     return (
-      <div className="flex min-h-[40vh] items-center justify-center font-mono text-xs uppercase text-text-soft">
-        Cargando sesión...
+      <div className="p-4 md:p-8 max-w-7xl mx-auto space-y-6 animate-pulse">
+        <div className="h-10 w-48 bg-surface-2 border-2 border-border" />
+        <div className="h-4 w-full bg-surface-2 border-2 border-border" />
+        <div className="h-4 w-3/4 bg-surface-2 border-2 border-border" />
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-8">
+          <div className="h-40 bg-surface-2 border-2 border-border" />
+          <div className="h-40 bg-surface-2 border-2 border-border" />
+          <div className="h-40 bg-surface-2 border-2 border-border" />
+        </div>
+        <div className="h-64 w-full bg-surface-2 border-2 border-border" />
       </div>
     );
   }
