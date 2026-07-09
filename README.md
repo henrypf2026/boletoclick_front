@@ -1,36 +1,93 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# BoletoClick Frontend 🎫✨
 
-## Getting Started
+BoletoClick es el cliente web interactivo y responsivo para la plataforma de gestión, reserva y compra de boletos para eventos. Diseñado para ofrecer una experiencia fluida e intuitiva tanto para compradores como para organizadores de eventos.
 
-First, run the development server:
+---
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+## 🔗 Demostraciones y Producción
+
+La aplicación frontend se encuentra desplegada y lista para su uso en producción:
+
+* **Sitio Web Activo (Deploy):** [https://boletoclick-front.vercel.app/](https://boletoclick-front.vercel.app/)
+
+---
+
+## 🎨 Características Principales (UX/UI)
+
+* **Exploración de Eventos Interactiva:** Buscador avanzado y filtros geográficos dinámicos por provincias y municipios dominicanos con soporte visual de mapas (**Mapbox**).
+* **Flujo de Checkout Seguro (Stripe):** Compra de boletos fluida e integrada con Stripe, con visualización de resúmenes de órdenes, cupones de descuento y control de temporizadores de reserva.
+* **Panel del Organizador (Dashboard):** Vista administrativa con estadísticas de ventas utilizando gráficos interactivos (**Recharts**), creación de eventos y gestión de tipos de boletos.
+* **Asistente Virtual con IA:** Ventana de chatbot flotante asistido por IA para resolver dudas recurrentes de los usuarios.
+* **Lector de Códigos QR integrado:** Capacidad para escanear y validar códigos QR directamente desde la cámara del dispositivo para el acceso a eventos.
+* **Generación de Entradas en PDF:** Descarga de boletos electrónicos en formato PDF listos para imprimir o guardar.
+
+---
+
+## 🛠️ Stack Tecnológico
+
+* **Framework Principal:** [Next.js](https://nextjs.org/) (v16 / React 19) con soporte para App Router, optimización de imágenes y renderizado híbrido.
+* **Estilos y Componentes:** [Tailwind CSS v4](https://tailwindcss.com/) para estilos utilitarios modernos y [Flowbite React](https://flowbite-react.com/) como biblioteca de componentes interactivos y accesibles.
+* **Animaciones:** [Framer Motion](https://www.framer.com/motion/) para transiciones suaves y micro-interacciones.
+* **Autenticación e Integración SSR:** [@supabase/ssr](https://supabase.com/docs/guides/auth/server-side-rendering) y `@supabase/supabase-js` para control de sesiones tanto del lado del cliente como del servidor.
+* **Formularios y Validaciones:** **Formik** en combinación con **Yup** para validaciones robustas de entrada de datos en formularios complejos.
+* **Mapas:** [Mapbox GL](https://docs.mapbox.com/mapbox-gl-js/api/) para la renderización de recintos y venues.
+* **Gráficos:** **Recharts** para reportes visuales en los paneles de control.
+* **Notificaciones:** **Sonner** (toasts rápidos) y **SweetAlert2** para alertas de confirmación interactivas.
+
+---
+
+## 📁 Estructura del Proyecto
+
+El proyecto sigue la convención estándar del App Router de Next.js dentro de la carpeta `/src`:
+
+```text
+src/
+├── app/                  # Rutas de la aplicación (páginas, layouts, middleware)
+├── components/           # Componentes visuales reutilizables (Botones, Modales, Cards)
+│   ├── common/           # Componentes globales de interfaz
+│   ├── dashboard/        # Componentes del panel del organizador/administrador
+│   └── events/           # Componentes del flujo de eventos y compra
+├── context/              # Contextos globales de React (Estado del carrito, etc.)
+├── hooks/                # Custom hooks útiles (geolocalización, fetching)
+├── services/             # Clientes de API y peticiones al backend
+└── utils/                # Funciones auxiliares y formateadores de datos
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+---
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## 🚀 Instalación y Ejecución Local
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+### Requisitos Previos
+* Node.js (v18 o superior)
+* Servidor backend de **BoletoClick API** en ejecución (o la URL de producción configurada)
 
-## Learn More
+### Pasos para Configurar
 
-To learn more about Next.js, take a look at the following resources:
+1. **Navegar a la carpeta del frontend:**
+   ```bash
+   cd client
+   ```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+2. **Instalar dependencias:**
+   ```bash
+   npm install
+   ```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+3. **Configurar variables de entorno:**
+   Crea un archivo local `.env.local` basado en la plantilla de ejemplo:
+   ```bash
+   cp .env.example .env.local
+   ```
+   *Rellena el archivo `.env.local` con las URLs correctas del backend, tus claves públicas de Supabase, tokens de Mapbox y la clave pública de Stripe.*
 
-## Deploy on Vercel
+4. **Iniciar el servidor de desarrollo:**
+   ```bash
+   npm run dev
+   ```
+   *La aplicación estará disponible en [http://localhost:3002](http://localhost:3002).*
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+5. **Construir para producción:**
+   ```bash
+   npm run build
+   npm run start
+   ```
